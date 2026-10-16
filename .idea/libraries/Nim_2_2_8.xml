@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Nim 2.2.8">
+    <CLASSES>
+      <root url="file://$USER_HOME$/.choosenim/toolchains/nim-2.2.8/lib" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$USER_HOME$/.choosenim/toolchains/nim-2.2.8/lib" />
+    </SOURCES>
+  </library>
+</component>
