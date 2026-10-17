@@ -29,6 +29,11 @@ for the sprite there:
 How sure:
 
 - Every example is 3 + 64 × n bytes long, from 32 to 159 sprites.
+- SpritePad 1.8 opened a file written this way without problems (checked by
+  the user, 2026-10-17): 16 sprites from De grotten van Oberon, written by
+  `~/IdeaProjects/grotten_van_oberon/tools/sprites.py`. Some were multicolour,
+  some hires, all with their colours set. Exporting and importing again gives
+  back the same bytes.
 - Bit 7 means multicolour, according to the ReadMe ("Sprite Pad uses [the spare byte] to store colour and
   mode information"). Hires sets such as Thrust have it clear in every sprite;
   multicolour sets such as Armalyte and Uridium have it set in every sprite.
