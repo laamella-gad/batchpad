@@ -34,3 +34,4 @@ nim c -r tests/tfoo.nim      # run a single test file once tests exist
 
 - `srcDir = "src"`, `binDir = "bin"`; the binary entry point is `src/charpad_spritepad_assistant.nim` (code under `when isMainModule:`).
 - Library modules for the package should go in `src/charpad_spritepad_assistant/`; tests in `tests/` with `t` prefix (Nimble convention picked up by `nimble test`).
+- `docs/charpad.md`: CTM format notes and lessons from earlier projects; `docs/reference/` holds the Python scripts they came from.
