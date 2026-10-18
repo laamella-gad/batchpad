@@ -125,6 +125,26 @@ CharPad Free 2.86 has a smaller set, all 8 bit (the low byte of each cell):
   the others load over the existing data. A 16-bit map is only possible as
   assembler text (below).
 
+CharPad 1.7 (Ghidra decompile of its exe; not on itch.io) has one export
+dialog with four checkboxes and a Raw/PRG choice:
+
+- Chars, default name `CHARS`: 8 bytes per char, without the 9th (material)
+  byte.
+- Tiles, `TILES`: n x n cells per tile (tiles are square), row by row, the low
+  byte of each cell. The bundled `Docs/CharPad - Export Formats.txt` says it
+  warns above 256 chars; the exe has no such message, it just truncates.
+- Tile colours, `TILECOLOURS`: one byte per tile. The bundled doc doesn't
+  mention this one.
+- Map, `MAP`: one byte per cell, row by row. 1.7 keeps the map as bytes.
+- PRG puts a little-endian load address in front of each file. Each file has
+  its own address field, in hex with digits `0-9` and `A-F` only (no lower
+  case, no `$`); an empty or invalid field gives "Not all PRG addresses are
+  valid" and nothing is written.
+- Import takes chars only: a size of 2 mod 8 skips a load address, and 1 to
+  256 chars are accepted. It starts a new project with that many 1 x 1 tiles
+  (tile n = char n), the map keeps its size but is cleared to 0, tile colours
+  become `$0d`, and multicolour and per-tile colouring are switched on.
+
 ### SpritePad
 
 | File | Contents |
@@ -447,8 +467,9 @@ on disk their names are 16 characters ending in `.A` to `.G`.
   as 819 columns, right to left, each column bottom to top, then one `$00`.
   On save 1.7 needs 5 x 5 tiles, multicolour, per-tile colouring, a map of
   8 x 512 or 819 x 5 and at most 254 chars; fewer than 128 tiles or 254 chars
-  are padded with zeros. It loads the tile colour bytes unmasked. Pro has no
-  sideways option.
+  are padded with zeros. It loads the tile colour bytes unmasked and sets
+  $d021 to `$0b`, $d022 to `$00`, $d023 to `$01` and the char colour to `$0d`.
+  Pro has no sideways option.
 
 ## C64 bitmap pictures
 
