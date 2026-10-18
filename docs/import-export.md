@@ -436,9 +436,19 @@ on disk their names are 16 characters ending in `.A` to `.G`.
   64th byte `xxxM CCCC`. SpritePad pads to 127 sprites on export.
 - `.B` background, 9596 bytes: the signature; the map, 8 x 512 bytes, left to
   right then bottom to top; tile colours, 128 bytes (low nibble); 128 unused
-  bytes; 128 tiles of 5 x 5 bytes; 254 chars of 8 bytes; then 9 x `$ff` and
-  `$cf`. CharPad only exports a project with exactly those sizes and per-tile
-  colouring.
+  bytes; 128 tiles of 5 x 5 bytes; 254 chars of 8 bytes; then `$3f` and
+  9 x `$ff`. CharPad only exports a project with exactly those sizes and
+  per-tile colouring. Loading masks the tile colours with `$0f` and skips the
+  last 10 bytes.
+- CharPad 1.7 (`Docs/CharPad - Export Formats.txt` and its decompiled exe)
+  also saved and loaded `.B` files, with the same 9596-byte layout. It asks
+  "Is this background for the sideways SEUCK mod?", since nothing in the file
+  tells. The sideways map is 819 wide x 5 high, and takes the 4096 map bytes
+  as 819 columns, right to left, each column bottom to top, then one `$00`.
+  On save 1.7 needs 5 x 5 tiles, multicolour, per-tile colouring, a map of
+  8 x 512 or 819 x 5 and at most 254 chars; fewer than 128 tiles or 254 chars
+  are padded with zeros. It loads the tile colour bytes unmasked. Pro has no
+  sideways option.
 
 ## C64 bitmap pictures
 

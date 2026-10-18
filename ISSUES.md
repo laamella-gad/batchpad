@@ -125,6 +125,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #57 [feature, low] Read and write SEUCK `.B` background files
   - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; 9 x `$ff`, `$cf`. Layout in `docs/import-export.md`.
   - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
+  - CharPad 1.7 also wrote backgrounds for the "sideways SEUCK mod" (819 x 5 map), same file layout with the map bytes reordered; see docs/import-export.md. The file doesn't say which kind it is, so this needs an option.
 
 ## In progress
 
