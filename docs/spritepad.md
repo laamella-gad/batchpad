@@ -12,8 +12,14 @@
   last byte (2026-10-18). None of the V2 samples use tiles, so the user saved
   `software/spritepad23_tiles.spd` from 2.3.0 Preview: 32 sprites, 12 tiles of
   2 x 2, 15 animations. It parses the same way.
+- **Decompiled code.** SpritePad C64 Pro 3.80's `_NET.exe` is a plain .NET
+  assembly; ilspycmd turns it back into C# (2026-10-18). It has a loader for
+  the headerless 1.8 format and SPD V1 to V5, and a saver for each, though the
+  menus only ever save V5. The V3 and V4 code matches the layouts below, so
+  those two are confirmed without samples. See "What SpritePad Pro 3.80 does".
 - **Missing.** No samples or releases for SPD V3 (never released), SPD V4 or
-  the `.inf`-colour `.spr` of 1.2 and before. V4 came with the paid SpritePad
+  the `.inf`-colour `.spr` of 1.2 and before. SpritePad Pro 3.80 has V3 and V4
+  savers but no menu item that calls them. V4 came with the paid SpritePad
   Pro 2.76 to 2.90 builds (and possibly 3.01 to 3.20), which are no longer
   sold; their download links were never archived. The 2.3.0 Preview and the
   older free releases came from the Wayback Machine's copy of
@@ -114,6 +120,33 @@ way, with the tile overlay distance.
 
 Animation attribute byte: bit 4 ping-pong. Up to V3 also bit 7 enabled (not
 blanked in the editor) and, from V2, bit 5 overlay.
+
+## What SpritePad Pro 3.80 does
+
+From the decompiled loaders and savers.
+
+- **Which format:** it tries V5, V4, V3, V2, V1 and then the headerless 1.8
+  format, and takes the first loader that accepts the file. There is no `.spr`
+  loader.
+- **Length checks:** V1 to V4 must be exactly the size the header implies (V1:
+  9 + 64 × sprites + 4 × animations; V3, V4: header + 64 × sprites + 2 × tile
+  cells + tiles + 6 × sprite animations + 6 × tile animations). V5 is not
+  checked. Headerless: 3 + 64 × n with n from 1 to 256; the three colours are
+  masked to the low nibble.
+- **Counts:** the tile count and the animation counts are only read when their
+  flag is set; otherwise they count as 0, whatever the header says. V2 also
+  refuses more than 4096 sprites or 256 animations.
+- **64th byte:** decoded the same way in every version, expand X and Y
+  included. So bits 5 and 6 of an old file show up as expansion in Pro.
+- **Overlay distance:** 1 when the format has none (V1 to V3).
+- **Tile attributes:** only bit 4 (has overlay) is kept.
+- **Animation attributes:** only bit 4 (ping-pong) is read and written. The
+  enabled and overlay bits of V1 to V3 are dropped, and the savers write 0 or
+  `$10`.
+- **V5 tile names:** read up to 33 bytes or the 0, then trimmed.
+- **Saving:** "Save" and "Save As" write V5, up to 65536 sprites. The unused
+  V3 and V4 savers drop tile tags and names. With tiles or animations off,
+  their header fields are written as 0.
 
 ## SpritePad 1.8 format (no header)
 

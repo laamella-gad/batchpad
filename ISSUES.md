@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#52**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#55**.
 
 ## Open
 
@@ -25,6 +25,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #7 [feature, low] CharPad CTM V1 writer
 - #8 [feature, low] CharPad CTM V2 reader
   - CharPad 1.7. 9-byte chars (material), byte map.
+  - Colouring method 2: the spec has a per-tile-cell colour block, CharPad Pro 3.88's loader doesn't read one. See #52.
 - #9 [feature, low] CharPad CTM V2 writer
 - #10 [feature, low] CharPad CTM V3 reader
   - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Glaze has no V3 loader either.
@@ -42,7 +43,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad 2.8 / Free 2.86 (still on itch.io). 277 samples; writer already proven in Python references.
 - #19 [feature, high] CharPad CTM V7 writer
 - #20 [feature, normal] CharPad CTM V8 reader
-  - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some.
+  - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some. Layout confirmed by Pro 3.88's decompiled V8 loader and saver.
 - #21 [feature, low] CharPad CTM V8 writer
 - #22 [feature, high] CharPad CTM V9 reader
   - CharPad Pro 3.5+ (current on itch.io). 652 samples; flexi-grid, key map, bitmap modes.
@@ -63,30 +64,34 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - SpritePad 2.3. 15 samples (1 with tiles, saved by hand); plain-word counts.
 - #33 [feature, low] SPD V2 writer
 - #34 [feature, low] SPD V3 reader
-  - SpritePad 2.8 private build, never released. No samples.
+  - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
 - #35 [feature, low] SPD V3 writer
 - #36 [feature, normal] SPD V4 reader
-  - SpritePad 2.8. No samples; overlay distances.
+  - SpritePad 2.8. No samples; overlay distances. Layout confirmed by SpritePad Pro 3.80's decompiled V4 loader and saver (no menu item saves V4).
 - #37 [feature, low] SPD V4 writer
 - #38 [feature, high] SPD V5 reader
   - SpritePad 2.9 / Pro (current on itch.io). 112 samples.
 - #39 [feature, high] SPD V5 writer
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
+  - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
   - CharPad Glaze C64 already checked: it reads CTM V1-V9 (no V3) and its examples are V9; see `docs/charpad.md`.
 - #41 [feature, high] Write raw binary files
   - Same layouts as CharPad/SpritePad "Export": chars, char attributes L1/L2/M, tiles, tile attributes, map, map area; sprites, sprite attributes, sprite tiles, tile attributes. See `docs/import-export.md`.
-  - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address.
+  - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address (#54).
 - #42 [feature, normal] Read raw binary files
-  - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites). Tile/map sizes come from options.
+  - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
 - #43 [feature, high] Write assembler source for several assemblers
   - 64tass first, matching CharPad/SpritePad's template (labels, `colr_*`, `*_count`, `addr_`/`size_` constants, animation lists). Then ACME, KickAssembler, ca65, ... Ties into #3.
+  - Template details in `docs/import-export.md`. CharPad's 12/16-bit output uses `addr_*_lo`/`_hi`/`_hi_packed` labels its header never defines; ours should define them.
 - #44 [feature, normal] Export flexi-grid sub-maps
   - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
 - #45 [feature, normal] Export colour map
   - 1 byte per map char cell, the colour matrix low nibble (for $d800). Binary and asm (`colourmap_data`).
 - #46 [feature, normal] Export tile event jump table
   - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
+  - CharPad puts names into labels as they are; ours should reject or clean names that aren't valid labels.
+  - C output: see #53.
 - #47 [feature, low] Export usage statistics
   - How often each char is used in tiles and map, and each tile in the map. Plain text.
 - #48 [feature, normal] Export PNG previews
@@ -97,6 +102,19 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Text, 16 `#RRGGBB` per line, optional quoted name per line. Built-in default (e.g. Pepto) when none given. Used by #48 and #49.
 - #51 [feature, low] Read CharPad C16 `.ctt` projects
   - Decide after #40.
+- #52 [task, low] Get a CTM V2 sample with colouring per tile cell
+  - Save one from CharPad 1.7 (`software/CharPad 1.7.zip`, runs under wine?) to see whether a per-tile-cell colour block follows the tiles, as the spec says, or not, as CharPad Pro 3.88's loader assumes.
+
+- #53 [feature, normal] Write C source for oscar64
+  - Same content as the assembler output (#43): every labelled block becomes a `const` array (`charset_data`, `map_data`, `spriteset_data`, ...), the `colr_*`, `*_count`, `size_*` values become constants, names become a string table.
+  - Tile events (#46): the jump table becomes an array of function pointers, `void (* const chartileset_events[])(void)`, one per tile, pointing at a function named after the tile (`chtl_<name>_event`, or `chtl_null_event`). Our output declares them; the user's code defines them. Optionally also write empty default functions.
+  - Names must be valid C identifiers (as for #46).
+  - Optionally a header (`.h`) with `extern` declarations and the `.c` with the data, so several files can include it.
+  - Check what oscar64 offers for placing data at an address (needed for char sets and sprites in a VIC bank) and whether `#embed` of our raw binaries (#41) is the simpler route.
+- #54 [feature, normal] Load address option for exports and imports
+  - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
+  - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found.
+  - Could also feed the asm (#43) and C (#53) output, instead of CharPad's dummy `addr_* = $1000`.
 
 ## In progress
 

@@ -22,6 +22,14 @@
   8)" can still make V8 files (see `import-export.md`). `CharPad2_010915.zip` (a later 2.0 beta) and
   `CharPadExamples276.zip` came from the Wayback Machine's copy of
   `subchristsoftware.com/downloads/`.
+- **Decompiled code.** CharPad C64 Pro 3.88's `CharPadC64Pro_NET.exe` is a
+  plain .NET assembly (Dotfuscator renamed only some helpers), so ilspycmd turns
+  it back into readable C# (2026-10-18). It has a loader for every version
+  (`CPV_FileIO_CTM1` to `CTM9`, no `CTM3`) and savers for V5 to V9. The V8 and
+  V9 savers match the layouts below byte for byte, which confirms V8 even
+  without samples. What the loaders do differently from the specs is under
+  "What CharPad Pro 3.88 does with each version". The decompiled source is not
+  kept in the repo.
 - **CharPad Glaze C64** (free on itch.io, 1.60 from June 2026) builds parallax
   scrolling data from a foreground and a background CharPad project. Its 55
   examples are all V9 (11 not in the other releases); they parse like the rest.
@@ -188,6 +196,63 @@ The format allows 65536 chars, 65536 tiles (256 in V1 to V4), tiles up to
 255 x 255 and maps up to 65535 x 65535. CharPad itself allows less: tiles up to
 8 x 8 (2.0), 10 x 10 (2.6 to 3.0) or 16 x 16 (3.8), maps up to 8192 x 8192.
 CharPad 2.0 and later have no 1 x 1 tiles: turn the tile system off instead.
+
+## What CharPad Pro 3.88 does with each version
+
+From the decompiled loaders and savers. Where Pro differs from the spec, a
+reader of ours should follow the spec, but these are the cases to test.
+
+- **All versions:** colours read from the file are masked to the low nibble.
+  An unknown colouring method becomes per project.
+- **V1:** per-tile colours are read when the method is 1. With method 2 the
+  per-tile-cell colours are read and thrown away.
+- **V2:** the 9th char byte goes through the same attribute decoder as V4 and
+  later (material in the high nibble, colour in the low nibble, colour kept
+  only when colouring is per char). Pro reads the per-tile colour block for
+  method 1, but **no per-tile-cell block for method 2**, which the spec says is
+  there; method 2 then turns into per project. None of the 24 V2 samples uses
+  method 2, so this is untested; a file saved that way from CharPad 1.7 would
+  settle it. Tile size 1 turns the tile system off (per tile then becomes per
+  char).
+- **V4:** the per-char attribute block straight after the chars is read and
+  thrown away. The tile-cell attribute block is applied to the chars the cells
+  point at. With 1 x 1 tiles the tile words are char numbers, used to rebuild
+  the char set.
+- **V5 saver:** flags bit 0 tile system on, bit 1 char set expanded, bit 2
+  multicolour. With the tile system off the tile fields are written as 0 (count)
+  and 1, 1 (size). The colour in each attribute byte is cleared unless
+  colouring is per char.
+- **V6 and V5 savers** refuse display modes above multicolour text; the V7
+  saver allows ECM; V8 and V9 allow everything up to multicolour bitmap.
+- **V8:** the saver always writes version 8; the loader accepts 8 and 82.
+- **V9:** tile names are read up to 33 bytes or the 0. Before saving, Pro
+  clamps out-of-range values (`CorrectDataLimits`).
+
+## CharPad C16 (`.ctt`)
+
+CharPad C64 Pro 3.88 opens CharPad C16 projects and converts them
+(`CPV_FileIO_CTT8_Converter`, `CTT9_Converter`); the layout below comes from
+that code, not from CharPad C16 itself. Magic `CTT`, version 8 or 9. The blocks
+are those of CTM V8 and V9; the header and colours differ:
+
+| Offset | CTT V8 | CTT V9 |
+| --- | --- | --- |
+| 4 | display mode | display mode |
+| 5 | colouring method | colouring method |
+| 6 | flags, bit 0 tile system | flags, key map in the high nibble |
+| 7 | 4 chip colours | flexi-grid width, height, settings (as CTM V9) |
+| 11 | 2 project colours (text modes use the first) | |
+| 12 | | 4 chip colours |
+| 16 | | 2 project colours |
+| size | 13 | 18 |
+
+- Colours are TED values, 7 bits (`& $7f`): luminance and hue, not the C64's 16.
+- Per-char and per-tile colour blocks: 1 byte in text modes, 2 in bitmap modes
+  (the two screen-RAM colours, high one first). There is no colour-RAM byte;
+  multicolour bitmap takes its third colour from chip colour 1, the same for
+  every cell.
+- The converter maps each TED colour to the nearest C64 colour and changes the
+  file name to `.ctm`, so the result is an ordinary C64 project.
 
 ## What has been checked in CharPad itself
 
