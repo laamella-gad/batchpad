@@ -1,5 +1,8 @@
 ## CharPad project files (.ctm). Layouts are described in docs/charpad.md.
 
+import std/bitops
+import binio
+
 type
   CtmError* = object of ValueError
 
@@ -50,21 +53,7 @@ func colourCount*(mode: DisplayMode): int =
   of dmHiresBitmap: 2
   of dmMulticolourBitmap: 3
 
-type Reader = object
-  data: seq[byte]
-  pos: int
-
-proc fail(r: Reader, msg: string) {.noreturn.} =
-  raise newException(CtmError, msg & " at offset " & $r.pos)
-
-proc u8(r: var Reader): uint8 =
-  if r.pos >= r.data.len: r.fail("unexpected end of file")
-  result = r.data[r.pos]
-  inc r.pos
-
-proc u16(r: var Reader): uint16 =
-  let lo = r.u8
-  result = lo.uint16 or (r.u8.uint16 shl 8)
+type Reader = binio.Reader[CtmError]
 
 proc blockMarker(r: var Reader, what: string) =
   ## Every block starts with `$da, $b0 | n`, n counting the blocks in order.
@@ -113,11 +102,7 @@ proc readTagsAndNames(r: var Reader, p: var Project) =
   r.blockMarker("tile tags")
   for t in p.tiles.mitems: t.tag = r.u8
   r.blockMarker("tile names")
-  for t in p.tiles.mitems:
-    while true:
-      let c = r.u8
-      if c == 0: break
-      t.name.add char(c)
+  for t in p.tiles.mitems: t.name = r.zstring
 
 proc readMap(r: var Reader, p: var Project) =
   r.blockMarker("map")
@@ -136,7 +121,7 @@ proc parseV7(r: var Reader): Project =
   result.colouring = r.readColouring
   result.displayMode = r.readDisplayMode(dmEcmText)
   let flags = r.u8
-  result.tileSystem = (flags and 1) != 0
+  result.tileSystem = flags.testBit(0)
 
   r.readChars(result)
   r.blockMarker("char attributes")
@@ -159,7 +144,7 @@ proc parseV9(r: var Reader): Project =
   result.displayMode = r.readDisplayMode(DisplayMode.high)
   result.colouring = r.readColouring
   let flags = r.u8
-  result.tileSystem = (flags and 1) != 0
+  result.tileSystem = flags.testBit(0)
   result.keyMap = flags shr 4
   result.flexiGrid.width = r.u16
   result.flexiGrid.height = r.u16
@@ -200,16 +185,6 @@ proc parseCtm*(data: openArray[byte]): Project =
 proc readCtm*(path: string): Project =
   let s = readFile(path)
   parseCtm(s.toOpenArrayByte(0, s.high))
-
-type Writer = object
-  data: seq[byte]
-  blocks: int
-
-proc u8(w: var Writer, v: SomeInteger) = w.data.add byte(v)
-
-proc u16(w: var Writer, v: SomeInteger) =
-  w.u8(v and 0xff)
-  w.u8((v shr 8) and 0xff)
 
 proc blockMarker(w: var Writer) =
   w.u8 0xda
@@ -265,9 +240,7 @@ proc writeTagsAndNames(w: var Writer, p: Project) =
   w.blockMarker
   for t in p.tiles: w.u8 t.tag
   w.blockMarker
-  for t in p.tiles:
-    for c in t.name: w.u8 ord(c)
-    w.u8 0
+  for t in p.tiles: w.zstring t.name
 
 proc writeMap(w: var Writer, p: Project) =
   w.blockMarker

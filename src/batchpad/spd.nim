@@ -1,5 +1,8 @@
 ## SpritePad project files (.spd). Layouts are described in docs/spritepad.md.
 
+import std/bitops
+import binio
+
 type
   SpdError* = object of ValueError
 
@@ -32,28 +35,14 @@ type
     tileAnims*: seq[Animation]      ## empty when off
 
 func colour*(s: Sprite): uint8 = s.attributes and 0x0f
-func overlay*(s: Sprite): bool = (s.attributes and 0x10) != 0
-func expandX*(s: Sprite): bool = (s.attributes and 0x20) != 0
-func expandY*(s: Sprite): bool = (s.attributes and 0x40) != 0
-func multicolour*(s: Sprite): bool = (s.attributes and 0x80) != 0
-func overlay*(t: SpriteTile): bool = (t.attributes and 0x10) != 0
-func pingPong*(a: Animation): bool = (a.attributes and 0x10) != 0
+func overlay*(s: Sprite): bool = s.attributes.testBit(4)
+func expandX*(s: Sprite): bool = s.attributes.testBit(5)
+func expandY*(s: Sprite): bool = s.attributes.testBit(6)
+func multicolour*(s: Sprite): bool = s.attributes.testBit(7)
+func overlay*(t: SpriteTile): bool = t.attributes.testBit(4)
+func pingPong*(a: Animation): bool = a.attributes.testBit(4)
 
-type Reader = object
-  data: seq[byte]
-  pos: int
-
-proc fail(r: Reader, msg: string) {.noreturn.} =
-  raise newException(SpdError, msg & " at offset " & $r.pos)
-
-proc u8(r: var Reader): uint8 =
-  if r.pos >= r.data.len: r.fail("unexpected end of file")
-  result = r.data[r.pos]
-  inc r.pos
-
-proc u16(r: var Reader): uint16 =
-  let lo = r.u8
-  result = lo.uint16 or (r.u8.uint16 shl 8)
+type Reader = binio.Reader[SpdError]
 
 proc readAnims(r: var Reader, anims: var seq[Animation]) =
   ## Four lists in turn: first frames, last frames, timers, attributes.
@@ -66,7 +55,7 @@ proc parseV5(r: var Reader): SpriteProject =
   ## Counts whose flag is off are ignored, as SpritePad does.
   result.version = 5
   let flags = r.u8
-  result.tileSystem = (flags and 1) != 0
+  result.tileSystem = flags.testBit(0)
   let sprites = r.u16.int
   if sprites == 0: r.fail("no sprites")
   let tiles = r.u16.int
@@ -92,16 +81,12 @@ proc parseV5(r: var Reader): SpriteProject =
       for c in t.cells.mitems: c = r.u16
     for t in result.tiles.mitems: t.attributes = r.u8
     for t in result.tiles.mitems: t.tag = r.u8
-    for t in result.tiles.mitems:
-      while true:
-        let c = r.u8
-        if c == 0: break
-        t.name.add char(c)
+    for t in result.tiles.mitems: t.name = r.zstring
 
-  if (flags and 2) != 0:
+  if flags.testBit(1):
     result.spriteAnims.setLen spriteAnims
     r.readAnims(result.spriteAnims)
-  if (flags and 4) != 0:
+  if flags.testBit(2):
     result.tileAnims.setLen tileAnims
     r.readAnims(result.tileAnims)
 
@@ -121,15 +106,6 @@ proc parseSpd*(data: openArray[byte]): SpriteProject =
 proc readSpd*(path: string): SpriteProject =
   let s = readFile(path)
   parseSpd(s.toOpenArrayByte(0, s.high))
-
-type Writer = object
-  data: seq[byte]
-
-proc u8(w: var Writer, v: SomeInteger) = w.data.add byte(v)
-
-proc u16(w: var Writer, v: SomeInteger) =
-  w.u8(v and 0xff)
-  w.u8((v shr 8) and 0xff)
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(SpdError, msg)
@@ -183,9 +159,7 @@ proc formatV5(p: SpriteProject): seq[byte] =
       for c in t.cells: w.u16 c
     for t in p.tiles: w.u8 t.attributes
     for t in p.tiles: w.u8 t.tag
-    for t in p.tiles:
-      for c in t.name: w.u8 ord(c)
-      w.u8 0
+    for t in p.tiles: w.zstring t.name
 
   w.writeAnims(p.spriteAnims)
   w.writeAnims(p.tileAnims)
