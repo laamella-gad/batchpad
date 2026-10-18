@@ -161,6 +161,13 @@ way, with the tile overlay distance.
 Animation attribute byte: bit 4 ping-pong. Up to V3 also bit 7 enabled (not
 blanked in the editor) and, from V2, bit 5 overlay.
 
+In SpritePad 2.0 Beta 1 (decompiled), an animation that isn't enabled shows
+as blank, and the animator and "Selecting an animation selects it's images"
+skip it. There is no switch for the bit: only "Send range to Animator" sets
+it, and that also sets from and to to the selected sprites, the timer to 3
+and the attributes to `$80` (ping-pong off). So our V1 writer sets bit 7 on
+every animation of a project read from V4 or later, which has no such bit.
+
 ## What SpritePad Pro 3.80 does
 
 From the decompiled loaders and savers.

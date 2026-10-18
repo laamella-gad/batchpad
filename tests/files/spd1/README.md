@@ -17,4 +17,9 @@ animation. Animation attributes: bit 7 enabled, bit 4 ping-pong.
 
 ## Checked in SpritePad
 
-Not yet.
+Opened in SpritePad and found to look as described above:
+
+- `sprites.spd` (2026-10-19), in SpritePad 2.0 Beta 1 (under Wine with Wine
+  Mono 8.1.0)
+- `anims.spd` (2026-10-19), in SpritePad 2.0 Beta 1; animation 2, not enabled,
+  shows as blank

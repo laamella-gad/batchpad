@@ -153,7 +153,9 @@ proc fitV1(p: SpriteProject): SpriteProject =
   ## Drops what V1 can't hold: tiles, tile animations, sprites and animations
   ## past 256, animations with frames above 255, and overlays when the overlay
   ## distance isn't 1. V1 always holds an animation, so a project without one
-  ## gets a blank one (not enabled).
+  ## gets a blank one (not enabled). Projects from formats without the enabled
+  ## bit (bit 7, V1 to V3 only) get it set on every animation, as SpritePad 2.0
+  ## hides animations without it.
   result = p
   if result.sprites.len > 256: result.sprites.setLen 256
   result.tileSystem = false
@@ -163,6 +165,7 @@ proc fitV1(p: SpriteProject): SpriteProject =
   for a in p.spriteAnims:
     if a.first <= 255 and a.last <= 255 and result.spriteAnims.len < 256:
       result.spriteAnims.add a
+      if p.version notin 1..3: result.spriteAnims[^1].attributes.setBit(7)
   if result.spriteAnims.len == 0: result.spriteAnims.add Animation()
   if result.spriteOverlay != 1:
     for s in result.sprites.mitems: s.attributes.clearBit(4)

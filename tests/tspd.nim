@@ -67,7 +67,8 @@ suite "SPD V1":
     let p = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "sprite_anims.spd")
     let q = parseSpd(p.toSpd(version = 1))
     check q.sprites == p.sprites
-    check q.spriteAnims == p.spriteAnims
+    check q.spriteAnims == @[Animation(first: 0, last: 5, timer: 4, attributes: 0x80),  # enabled
+                             Animation(first: 2, last: 4, timer: 10, attributes: 0x90)]
 
   test "writer leaves out what doesn't fit":
     let p = readSpd(dir / "anims.spd")
@@ -87,7 +88,7 @@ suite "SPD V1":
     let t = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "tiles_anims.spd")
     let r = parseSpd(t.toSpd(version = 1))
     check not r.tileSystem and r.tiles.len == 0 and r.tileAnims.len == 0
-    check r.spriteAnims == t.spriteAnims
+    check r.spriteAnims == @[Animation(first: 0, last: 3, timer: 6, attributes: 0x80)]
     check r.sprites[0].attributes == 0x82                    # overlay distance was 4
     q = p
     q.sprites.setLen 0

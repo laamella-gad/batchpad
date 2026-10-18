@@ -128,7 +128,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - SpritePad 2.0. 13 samples.
   - Done: `parseSpd` in `src/batchpad/spd.nim`, tested on the two `tests/files/spd1/` files. Overlay distances read as 1; animation attribute bytes kept as stored (bit 7 enabled).
 - #31 [feature, high] SPD V1 writer
-  - Done: `toSpd(p, version = 1)`; the two `tests/files/spd1/` files come back byte for byte. Leaves out tiles, tile animations, sprites and animations past 256, animations with frames above 255, and overlays when the sprite overlay distance isn't 1; adds a blank animation (not enabled) when there is none. One-off check: all 13 distinct V1 samples from `software/` come back byte for byte.
+  - Done: `toSpd(p, version = 1)`; the two `tests/files/spd1/` files come back byte for byte. Leaves out tiles, tile animations, sprites and animations past 256, animations with frames above 255, and overlays when the sprite overlay distance isn't 1; adds a blank animation (not enabled) when there is none. Sets the enabled bit (7) on every animation of a project from V4 or later, which has none, since SpritePad 2.0 hides animations without it. One-off check: all 13 distinct V1 samples from `software/` come back byte for byte.
 - #38 [feature, high] SPD V5 reader
   - SpritePad 2.9 / Pro (current on itch.io). 112 samples.
   - Done: `parseSpd` / `readSpd` in `src/batchpad/spd.nim`, tested on the three `tests/files/spd5/` files.
