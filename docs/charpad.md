@@ -204,7 +204,15 @@ development aid, but every sample has them right.
 The format allows 65536 chars, 65536 tiles (256 in V1 to V4), tiles up to
 255 x 255 and maps up to 65535 x 65535. CharPad itself allows less: tiles up to
 8 x 8 (2.0), 10 x 10 (2.6 to 3.0) or 16 x 16 (3.8), maps up to 8192 x 8192.
-CharPad 2.0 and later have no 1 x 1 tiles: turn the tile system off instead.
+CharPad 2.x has no 1 x 1 tiles (turn the tile system off instead), but Pro 3.88
+offers every size from 1 x 1 to 16 x 16 again (its Tile Set size list).
+
+Pro 3.88 allows up to 500,000 chars (`CPV_Project.MaxCharCount`; its help says
+so too), more than a CTM file can hold. The V9 saver doesn't check: it writes
+the count minus 1 as a word and every char after it, so a project with more
+than 65536 chars gives a file that can't be read back. Map and tile cells are
+words as well, so char numbers above 65535 lose their high bits. Our writer
+refuses such projects.
 
 ## What CharPad Pro 3.88 does with each version
 
@@ -212,7 +220,9 @@ From the decompiled loaders and savers. Where Pro differs from the spec, a
 reader of ours should follow the spec, but these are the cases to test.
 
 - **All versions:** colours read from the file are masked to the low nibble.
-  An unknown colouring method becomes per project.
+  An unknown colouring method becomes per project in V2, V4, V5 and V6, but
+  per char in V7 to V9 (values above 2 are clamped to 2). V7 clamps the
+  display mode to 2, V8 and V9 to 4.
 - **V1:** per-tile colours are read when the method is 1. With method 2 the
   per-tile-cell colours are read and thrown away.
 - **V2:** the 9th char byte goes through the same attribute decoder as V4 and
@@ -234,7 +244,15 @@ reader of ours should follow the spec, but these are the cases to test.
   saver allows ECM; V8 and V9 allow everything up to multicolour bitmap.
 - **V8:** the saver always writes version 8; the loader accepts 8 and 82.
 - **V9:** tile names are read up to 33 bytes or the 0. Before saving, Pro
-  clamps out-of-range values (`CorrectDataLimits`).
+  clamps out-of-range values (`CorrectDataLimits`). Files under 19 bytes are
+  refused; bytes after the map are ignored.
+- **V8, V9 project colours:** the three at the end of the header are only read
+  when colouring is per project, screen low and high only in bitmap modes.
+  Otherwise Pro keeps its defaults, cyan, orange, yellow (3, 8, 7), and writes
+  those on the next save. The help says the same: matrix colours a project
+  doesn't use are reset to the defaults when it is saved. So a file saved by
+  Pro after loading ours can differ in those header bytes only (seen with
+  `tests/files/ctm9/mctext_pertile.ctm`: 14, 0, 0 came back as 3, 8, 7).
 
 ## CharPad C16 (`.ctt`)
 

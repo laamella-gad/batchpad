@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#59**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#60**.
 
 ## Open
 
@@ -123,6 +123,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; `$3f`, 9 x `$ff`. Layout in `docs/import-export.md`.
   - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
   - CharPad 1.7 also wrote backgrounds for the "sideways SEUCK mod" (819 x 5 map), same file layout with the map bytes reordered; see docs/import-export.md. The file doesn't say which kind it is, so this needs an option.
+- #59 [task, normal] Find out how CharPad stores ECM chars 64 and up
+  - ECM shows only 64 shapes; CharPad Pro treats chars 64-255 as copies of chars 0-63 in the other three background colour banks, each with its own colour and material (3.88 help, "ECM Mode Tips"). Pixel edits and transforms on char 64+ go to char & 63.
+  - Open: does a saved CTM hold the same 8 bytes for char n and n & 63, or the char's own (possibly stale) data? What happens with more than 256 chars? Matters for char set exports and for what our readers and writers should do with ECM projects.
+  - Check with a CharPad Pro 3.88 ECM project of more than 64 chars, saved after editing a char in the first bank, and in the decompiled code (`Form_CPV_CharEdit`, the set operations).
 
 ## In progress
 
