@@ -46,7 +46,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #20 [feature, normal] CharPad CTM V8 reader
   - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some. Layout confirmed by Pro 3.88's decompiled V8 loader and saver.
 - #21 [feature, low] CharPad CTM V8 writer
-- #23 [feature, high] CharPad CTM V9 writer
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #25 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
@@ -129,6 +128,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #23 [feature, high] CharPad CTM V9 writer
+  - Done: `toCtm` / `writeCtm` in `src/batchpad/ctm.nim`; the five `tests/files/ctm9/` files come back byte for byte. One-off check: all 3618 V9 files from `software/` (duplicates included) do too.
 - #58 [task, high] Our own test files for every CTM and SPD version
   - Dropped as a separate task: each version's reader or writer issue makes its own small test files when we work on it (see CLAUDE.md).
 - #22 [feature, high] CharPad CTM V9 reader

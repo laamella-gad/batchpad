@@ -1,4 +1,4 @@
-import std/[os, unittest]
+import std/[os, strutils, unittest]
 import batchpad/ctm
 
 proc words(values: varargs[int]): seq[byte] =
@@ -113,3 +113,42 @@ suite "CTM V9":
     discard parseCtm(trailing)
     trailing.add 0
     expect CtmError: discard parseCtm(trailing)
+
+  test "writing gives back the same bytes":
+    var files = 0
+    for kind, path in walkDir(dir):
+      if path.endsWith(".ctm"):
+        checkpoint path
+        let data = readFile(path)
+        check readCtm(path).toCtm == cast[seq[byte]](data)
+        inc files
+    check files == 5
+
+  test "writeCtm":
+    let path = getTempDir() / "batchpad_tctm.ctm"
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    writeCtm(path, p)
+    check readCtm(path) == p
+    removeFile path
+
+  test "writer errors":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    var q = p
+    q.chars.setLen 0
+    expect CtmError: discard q.toCtm
+    q = p
+    q.tiles.setLen 0
+    expect CtmError: discard q.toCtm
+    q = p
+    q.tiles[2].cells.add 0
+    expect CtmError: discard q.toCtm
+    q = p
+    q.tiles[0].name = repeat('x', 33)
+    expect CtmError: discard q.toCtm
+    q = p
+    q.map.add 0
+    expect CtmError: discard q.toCtm
+    q = p
+    q.keyMap = 16
+    expect CtmError: discard q.toCtm
+    expect CtmError: discard p.toCtm(version = 7)

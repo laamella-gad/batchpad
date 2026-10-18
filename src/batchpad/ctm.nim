@@ -152,3 +152,106 @@ proc parseCtm*(data: openArray[byte]): Project =
 proc readCtm*(path: string): Project =
   let s = readFile(path)
   parseCtm(s.toOpenArrayByte(0, s.high))
+
+type Writer = object
+  data: seq[byte]
+  blocks: int
+
+proc u8(w: var Writer, v: SomeInteger) = w.data.add byte(v)
+
+proc u16(w: var Writer, v: SomeInteger) =
+  w.u8(v and 0xff)
+  w.u8((v shr 8) and 0xff)
+
+proc blockMarker(w: var Writer) =
+  w.u8 0xda
+  w.u8(0xb0 + w.blocks)
+  inc w.blocks
+
+proc writeColours(w: var Writer, c: Colours, mode: DisplayMode) =
+  case mode.colourCount
+  of 1: w.u8 c[0]
+  of 2:
+    w.u8 c[1]
+    w.u8 c[2]
+  else:
+    for v in c: w.u8 v
+
+proc fail(msg: string) {.noreturn.} =
+  raise newException(CtmError, msg)
+
+proc checkV9(p: Project) =
+  if p.chars.len notin 1..65536: fail("V9 holds 1 to 65536 chars, not " & $p.chars.len)
+  if p.keyMap > 15: fail("key map " & $p.keyMap & " does not fit in 4 bits")
+  if p.tileSystem:
+    if p.tiles.len notin 1..65536: fail("V9 holds 1 to 65536 tiles, not " & $p.tiles.len)
+    if p.tileWidth notin 1..255 or p.tileHeight notin 1..255:
+      fail("tile size " & $p.tileWidth & " x " & $p.tileHeight & " is not 1 to 255 each way")
+    for i, t in p.tiles:
+      if t.cells.len != p.tileWidth * p.tileHeight:
+        fail("tile " & $i & " has " & $t.cells.len & " cells, not " & $(p.tileWidth * p.tileHeight))
+      if t.name.len > 32: fail("tile " & $i & " name is longer than 32 chars")
+      if '\0' in t.name: fail("tile " & $i & " name holds a 0 byte")
+  if p.mapWidth notin 0..65535 or p.mapHeight notin 0..65535:
+    fail("map size " & $p.mapWidth & " x " & $p.mapHeight & " is over 65535 one way")
+  if p.map.len != p.mapWidth * p.mapHeight:
+    fail("map has " & $p.map.len & " cells, not " & $(p.mapWidth * p.mapHeight))
+
+proc formatV9(p: Project): seq[byte] =
+  p.checkV9
+  var w: Writer
+  for c in "CTM": w.u8 ord(c)
+  w.u8 9
+  w.u8 ord(p.displayMode)
+  w.u8 ord(p.colouring)
+  w.u8((p.keyMap shl 4) or uint8(p.tileSystem))
+  w.u16 p.flexiGrid.width
+  w.u16 p.flexiGrid.height
+  w.u8 p.flexiGrid.settings
+  for c in p.chipColours: w.u8 c
+  for c in p.colours: w.u8 c
+
+  w.blockMarker
+  w.u16 p.chars.len - 1
+  for ch in p.chars:
+    for b in ch.data: w.u8 b
+  w.blockMarker
+  for ch in p.chars: w.u8 ch.material
+  if p.colouring == cmPerChar:
+    w.blockMarker
+    for ch in p.chars: w.writeColours(ch.colours, p.displayMode)
+
+  if p.tileSystem:
+    w.blockMarker
+    w.u16 p.tiles.len - 1
+    w.u8 p.tileWidth
+    w.u8 p.tileHeight
+    for t in p.tiles:
+      for c in t.cells: w.u16 c
+    if p.colouring == cmPerTile:
+      w.blockMarker
+      for t in p.tiles: w.writeColours(t.colours, p.displayMode)
+    w.blockMarker
+    for t in p.tiles: w.u8 t.tag
+    w.blockMarker
+    for t in p.tiles:
+      for c in t.name: w.u8 ord(c)
+      w.u8 0
+
+  w.blockMarker
+  w.u16 p.mapWidth
+  w.u16 p.mapHeight
+  for c in p.map: w.u16 c
+  w.data
+
+proc toCtm*(p: Project, version = 9): seq[byte] =
+  ## Formats `p` as a .ctm file of the given version. Raises CtmError when the
+  ## version can't hold it. The colour bytes a display mode doesn't store
+  ## (e.g. colour RAM in hires bitmap) are dropped.
+  case version
+  of 9: formatV9(p)
+  else: fail("writing CTM version " & $version & " is not supported yet")
+
+proc writeCtm*(path: string, p: Project, version = 9) =
+  let data = p.toCtm(version)
+  writeFile(path, data)
