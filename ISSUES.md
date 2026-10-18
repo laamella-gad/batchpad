@@ -71,7 +71,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #43 [feature, high] Write assembler source for several assemblers
   - 64tass first, matching CharPad/SpritePad's template (labels, `colr_*`, `*_count`, `addr_`/`size_` constants, animation lists). Then ACME, KickAssembler, ca65, ... Ties into #3.
   - Template details in `docs/import-export.md`. CharPad's 12/16-bit output uses `addr_*_lo`/`_hi`/`_hi_packed` labels its header never defines; ours should define them.
-  - CharPad Free 2.86 writes an older template (upper-case `COLR_*`/`SZ_*` constants, no `* =` lines, other label names); also in `docs/import-export.md`. Decide whether to offer it as a variant.
+  - CharPad Free 2.86 writes an older template (upper-case `COLR_*`/`SZ_*` constants, no `* =` lines, other label names); also in `docs/import-export.md`. Not offered: we write the newest template only (decided 2026-10-19).
 - #44 [feature, normal] Export flexi-grid sub-maps
   - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
 - #45 [feature, normal] Export colour map
@@ -100,10 +100,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
   - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found.
   - Could also feed the asm (#43) and C (#53) output, instead of CharPad's dummy `addr_* = $1000`.
-- #55 [task, high] Design the command line arguments
-  - List every import and export option (`docs/import-export.md`, #41-#54) and every setting in the CharPad and SpritePad files (display mode, colouring method, colours, tile system, flexi-grid, key map, overlay distances, animations, ...).
-  - From that, come up with a consistent set of commands and arguments: input/output files, what to export, cell width (8/12/16 bit), load address, assembler or C dialect, label names, sub-maps, overrides of project settings.
-  - Write it down in a doc and check it against the build pipelines it's meant for. Supersedes the CLI part of #3.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
   - `$42 $00`, then 127 sprites of 64 bytes (8130 bytes); the 64th byte is `000M CCCC`. Layout in `docs/import-export.md`, conversions in `docs/spritepad.md` (SpritePad 1.8 and Pro agree).
   - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
@@ -121,6 +117,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #55 [task, high] Design the command line arguments
+  - List every import and export option (`docs/import-export.md`, #41-#54) and every setting in the CharPad and SpritePad files (display mode, colouring method, colours, tile system, flexi-grid, key map, overlay distances, animations, ...).
+  - From that, come up with a consistent set of commands and arguments: input/output files, what to export, cell width (8/12/16 bit), load address, assembler or C dialect, label names, sub-maps, overrides of project settings.
+  - Write it down in a doc and check it against the build pipelines it's meant for. Supersedes the CLI part of #3.
+  - Done 2026-10-19: `docs/cli.md`, with make examples for 64tass, ca65 and oscar64. The examples haven't been run yet; do that as the commands are built.
 - #32 [feature, high] SPD V2 reader
   - SpritePad 2.3. 15 samples (1 with tiles, saved by hand); plain-word counts.
   - Done: `parseSpd` in `src/batchpad/spd.nim`, tested on the two `tests/files/spd2/` files. Overlay distances read as 1; counts whose flag is off are ignored.

@@ -39,6 +39,7 @@ nim c -r -p:src tests/tctm.nim   # run a single test file (also tests/tspd.nim)
 - `srcDir = "src"`, `binDir = "bin"`; the binary entry point is `src/batchpad.nim` (code under `when isMainModule:`).
 - Library modules for the package should go in `src/batchpad/`; tests in `tests/` with `t` prefix (Nimble convention picked up by `nimble test`). Tests build their input bytes themselves: they must never need `software/` or other commercial downloads. Work on a format version includes making a few small test files for it ourselves, in `tests/files/<format><version>/` with a README saying what they hold (e.g. `tests/files/ctm7/`, `tests/files/ctm9/`, `tests/files/spd1/`, `tests/files/spd2/`, `tests/files/spd5/`).
 - `docs/spritepad.md`: SpritePad formats: 1.x `.spr`+`.inf`, headerless 1.8 `.spd`, SPD V1-V5.
+- `docs/cli.md`: the command line design (#55).
 - `docs/import-export.md`: every import/export format of the current CharPad, SpritePad and Glaze releases, and which we support.
 - `docs/charpad.md`: CTM V1-V9 format (from CharPad's official specs, checked against all bundled samples) and lessons from earlier projects; `docs/reference/` holds the Python scripts they came from.
 - `software/` (untracked, ~83 MB): every CharPad and SpritePad release found, as zip/rar. They hold the official spec HTML (`Help/File Format - *.htm`) and ~1500 distinct sample `.ctm`/`.spd` files, a good test corpus. Extract to a scratch dir; don't commit.
