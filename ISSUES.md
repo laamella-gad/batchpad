@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#55**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#56**.
 
 ## Open
 
@@ -14,6 +14,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Umbrella: model #5, per-version readers/writers #24-#39. Specs for all formats: `docs/spritepad.md`.
 - #3 [task, normal] Decide output artifact formats and CLI options
   - Which outputs (raw binary, assembler includes, ...) and which assemblers to target.
+  - CLI arguments: see #55.
 - #4 [feature, high] Shared in-memory model for all CharPad formats
   - One model every CTM reader fills and every writer reads: chars, materials, colours (per project/tile/char, 1-3 per item for bitmap modes), tiles, tags, names, map, display mode, V9 extras.
   - Readers convert older layouts into it (V1-V4 tile-cell colours, V2 9-byte chars, expanded char sets); writers report what the target version can't hold.
@@ -115,6 +116,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
   - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found.
   - Could also feed the asm (#43) and C (#53) output, instead of CharPad's dummy `addr_* = $1000`.
+- #55 [task, high] Design the command line arguments
+  - List every import and export option (`docs/import-export.md`, #41-#54) and every setting in the CharPad and SpritePad files (display mode, colouring method, colours, tile system, flexi-grid, key map, overlay distances, animations, ...).
+  - From that, come up with a consistent set of commands and arguments: input/output files, what to export, cell width (8/12/16 bit), load address, assembler or C dialect, label names, sub-maps, overrides of project settings.
+  - Write it down in a doc and check it against the build pipelines it's meant for. Supersedes the CLI part of #3.
 
 ## In progress
 
