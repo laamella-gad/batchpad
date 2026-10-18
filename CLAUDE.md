@@ -8,7 +8,7 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 ## Project status
 
-Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model and the CTM V9 reader and writer (#22, #23), tested by `tests/tctm.nim`. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
+Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model, the CTM V7 reader (#18) and the V9 reader and writer (#22, #23), tested by `tests/tctm.nim`. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
 ## Priorities
 
@@ -37,7 +37,7 @@ nim c -r -p:src tests/tctm.nim   # run a single test file
 ## Layout
 
 - `srcDir = "src"`, `binDir = "bin"`; the binary entry point is `src/batchpad.nim` (code under `when isMainModule:`).
-- Library modules for the package should go in `src/batchpad/`; tests in `tests/` with `t` prefix (Nimble convention picked up by `nimble test`). Tests build their input bytes themselves: they must never need `software/` or other commercial downloads. Work on a format version includes making a few small test files for it ourselves, in `tests/files/<format><version>/` with a README saying what they hold (e.g. `tests/files/ctm9/`).
+- Library modules for the package should go in `src/batchpad/`; tests in `tests/` with `t` prefix (Nimble convention picked up by `nimble test`). Tests build their input bytes themselves: they must never need `software/` or other commercial downloads. Work on a format version includes making a few small test files for it ourselves, in `tests/files/<format><version>/` with a README saying what they hold (e.g. `tests/files/ctm7/`, `tests/files/ctm9/`).
 - `docs/spritepad.md`: SpritePad formats: 1.x `.spr`+`.inf`, headerless 1.8 `.spd`, SPD V1-V5.
 - `docs/import-export.md`: every import/export format of the current CharPad, SpritePad and Glaze releases, and which we support.
 - `docs/charpad.md`: CTM V1-V9 format (from CharPad's official specs, checked against all bundled samples) and lessons from earlier projects; `docs/reference/` holds the Python scripts they came from.

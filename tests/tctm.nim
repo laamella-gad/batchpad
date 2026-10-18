@@ -13,44 +13,44 @@ proc v9(mode, colouring, flags: int, body: seq[byte]): seq[byte] =
   result.add @[byte 6, 11, 12, 15, 1, 2, 3]
   result.add body
 
+const charData = [
+  [0x00'u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+  [0xff'u8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+  [0xaa'u8, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55],
+  [0xff'u8, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff],
+  [0x80'u8, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01],
+  [0x00'u8, 0x00, 0x55, 0x55, 0xaa, 0xaa, 0xff, 0xff]]
+const tileMap = @[1'u16, 2, 3, 1, 2, 3,
+                  2, 3, 1, 2, 3, 1,
+                  0, 1, 0, 1, 0, 1]
+const charMap = @[1'u16, 2, 3, 4, 5, 0,
+                  5, 4, 3, 2, 1, 0]
+
+proc checkChars(p: Project) =
+  check p.chars.len == 6
+  for i, ch in p.chars:
+    check ch.data == charData[i]
+    check ch.material == uint8(i)
+
+proc checkTiles(p: Project) =
+  check p.tileSystem
+  check p.tileWidth == 2 and p.tileHeight == 2
+  check p.tiles.len == 4
+  check p.tiles[3].cells == @[5'u16, 2, 2, 5]
+  for i, name in ["empty", "solid", "box", "bands"]:
+    check p.tiles[i].name == name
+    check p.tiles[i].tag == uint8(i)
+  check p.mapWidth == 6 and p.mapHeight == 3
+  check p.map == tileMap
+
+proc checkNoTiles(p: Project) =
+  check not p.tileSystem
+  check p.tiles.len == 0
+  check p.mapWidth == 6 and p.mapHeight == 2
+  check p.map == charMap
+
 suite "CTM V9":
   const dir = currentSourcePath().parentDir / "files" / "ctm9"
-  const charData = [
-    [0x00'u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-    [0xff'u8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
-    [0xaa'u8, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55],
-    [0xff'u8, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff],
-    [0x80'u8, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01],
-    [0x00'u8, 0x00, 0x55, 0x55, 0xaa, 0xaa, 0xff, 0xff]]
-  const tileMap = @[1'u16, 2, 3, 1, 2, 3,
-                    2, 3, 1, 2, 3, 1,
-                    0, 1, 0, 1, 0, 1]
-  const charMap = @[1'u16, 2, 3, 4, 5, 0,
-                    5, 4, 3, 2, 1, 0]
-
-  proc checkChars(p: Project) =
-    check p.chars.len == 6
-    for i, ch in p.chars:
-      check ch.data == charData[i]
-      check ch.material == uint8(i)
-
-  proc checkTiles(p: Project) =
-    check p.tileSystem
-    check p.tileWidth == 2 and p.tileHeight == 2
-    check p.tiles.len == 4
-    check p.tiles[3].cells == @[5'u16, 2, 2, 5]
-    for i, name in ["empty", "solid", "box", "bands"]:
-      check p.tiles[i].name == name
-      check p.tiles[i].tag == uint8(i)
-    check p.mapWidth == 6 and p.mapHeight == 3
-    check p.map == tileMap
-
-  proc checkNoTiles(p: Project) =
-    check not p.tileSystem
-    check p.tiles.len == 0
-    check p.mapWidth == 6 and p.mapHeight == 2
-    check p.map == charMap
-
   test "multicolour text, per tile":
     let p = readCtm(dir / "mctext_pertile.ctm")
     check p.displayMode == dmMulticolourText
@@ -152,3 +152,64 @@ suite "CTM V9":
     q.keyMap = 16
     expect CtmError: discard q.toCtm
     expect CtmError: discard p.toCtm(version = 7)
+
+suite "CTM V7":
+  const dir = currentSourcePath().parentDir / "files" / "ctm7"
+
+  proc v7(mode, colouring, flags: int, body: seq[byte]): seq[byte] =
+    result = @[byte('C'), byte('T'), byte('M'), 7, 6, 11, 12, 15, 1,
+               byte(colouring), byte(mode), byte(flags)]
+    result.add body
+
+  test "multicolour text, per tile":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    check p.version == 7
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerTile
+    check p.chipColours == [6'u8, 11, 12, 0]
+    check p.colours == [14'u8, 0, 0]
+    p.checkChars
+    p.checkTiles
+    for i, c in [9'u8, 10, 13, 15]:
+      check p.tiles[i].colours == [c, 0, 0]
+    for ch in p.chars:
+      check ch.colours == [0'u8, 0, 0]
+
+  test "hires text, per char, no tiles":
+    let p = readCtm(dir / "hirestext_perchar_notiles.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerChar
+    check p.colours == [1'u8, 0, 0]
+    p.checkChars
+    p.checkNoTiles
+    for i, c in [1'u8, 2, 5, 7, 13, 14]:
+      check p.chars[i].colours == [c, 0, 0]
+
+  test "hires text, per project":
+    let p = readCtm(dir / "hirestext_perproject.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerProject
+    check p.chipColours == [6'u8, 0, 0, 0]
+    check p.colours == [7'u8, 0, 0]
+    p.checkChars
+    p.checkTiles
+
+  test "ECM text, per project, no tiles":
+    let p = readCtm(dir / "ecm_perproject_notiles.ctm")
+    check p.displayMode == dmEcmText
+    check p.colouring == cmPerProject
+    check p.chipColours == [0'u8, 2, 5, 6]
+    check p.colours == [1'u8, 0, 0]
+    p.checkChars
+    p.checkNoTiles
+
+  test "errors":
+    expect CtmError: discard parseCtm(v7(3, 0, 0, @[]))     # no bitmap modes in V7
+    expect CtmError: discard parseCtm(v7(0, 3, 0, @[]))
+    expect CtmError: discard parseCtm(v7(0, 0, 0, @[byte 0xda]))
+    var trailing = v7(0, 0, 0, @[byte 0xda, 0xb0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                  0xda, 0xb1, 0x5a, 0xda, 0xb2, 1, 0, 1, 0, 0, 0])
+    let p = parseCtm(trailing)
+    check p.chars[0].material == 5 and p.chars[0].colours[0] == 10
+    trailing.add 0
+    expect CtmError: discard parseCtm(trailing)

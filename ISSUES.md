@@ -40,8 +40,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #16 [feature, normal] CharPad CTM V6 reader
   - CharPad 2.6. First block format; flags bit 0 = multicolour, bit 1 = tiles.
 - #17 [feature, low] CharPad CTM V6 writer
-- #18 [feature, high] CharPad CTM V7 reader
-  - CharPad 2.8 / Free 2.86 (still on itch.io). 277 samples; writer already proven in Python references.
 - #19 [feature, high] CharPad CTM V7 writer
 - #20 [feature, normal] CharPad CTM V8 reader
   - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some. Layout confirmed by Pro 3.88's decompiled V8 loader and saver.
@@ -132,6 +130,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #18 [feature, high] CharPad CTM V7 reader
+  - CharPad 2.8 / Free 2.86 (still on itch.io). 277 samples; writer already proven in Python references.
+  - Done: `parseV7` in `src/batchpad/ctm.nim`, tested on the four `tests/files/ctm7/` files. One-off check: all 741 V7 files from `software/` (duplicates included) parse.
 - #23 [feature, high] CharPad CTM V9 writer
   - Done: `toCtm` / `writeCtm` in `src/batchpad/ctm.nim`; the five `tests/files/ctm9/` files come back byte for byte. One-off check: all 3618 V9 files from `software/` (duplicates included) do too.
 - #58 [task, high] Our own test files for every CTM and SPD version

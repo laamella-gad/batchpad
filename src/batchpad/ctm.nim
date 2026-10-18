@@ -83,14 +83,81 @@ proc readColours(r: var Reader, mode: DisplayMode): Colours =
   else:
     for c in result.mitems: c = r.u8
 
-proc parseV9(r: var Reader): Project =
-  result.version = 9
+proc readDisplayMode(r: var Reader, max: DisplayMode): DisplayMode =
   let mode = r.u8
-  if mode > ord(DisplayMode.high): r.fail("unknown display mode " & $mode)
-  result.displayMode = DisplayMode(mode)
+  if mode.int > ord(max): r.fail("unknown display mode " & $mode)
+  DisplayMode(mode)
+
+proc readColouring(r: var Reader): ColouringMethod =
   let colouring = r.u8
   if colouring > ord(ColouringMethod.high): r.fail("unknown colouring method " & $colouring)
-  result.colouring = ColouringMethod(colouring)
+  ColouringMethod(colouring)
+
+proc readChars(r: var Reader, p: var Project) =
+  r.blockMarker("chars")
+  p.chars.setLen(r.u16.int + 1)
+  for ch in p.chars.mitems:
+    for b in ch.data.mitems: b = r.u8
+
+proc readTiles(r: var Reader, p: var Project) =
+  ## The tile block up to, not including, the tile colours.
+  r.blockMarker("tiles")
+  p.tiles.setLen(r.u16.int + 1)
+  p.tileWidth = r.u8.int
+  p.tileHeight = r.u8.int
+  for t in p.tiles.mitems:
+    t.cells.setLen(p.tileWidth * p.tileHeight)
+    for c in t.cells.mitems: c = r.u16
+
+proc readTagsAndNames(r: var Reader, p: var Project) =
+  r.blockMarker("tile tags")
+  for t in p.tiles.mitems: t.tag = r.u8
+  r.blockMarker("tile names")
+  for t in p.tiles.mitems:
+    while true:
+      let c = r.u8
+      if c == 0: break
+      t.name.add char(c)
+
+proc readMap(r: var Reader, p: var Project) =
+  r.blockMarker("map")
+  p.mapWidth = r.u16.int
+  p.mapHeight = r.u16.int
+  p.map.setLen(p.mapWidth * p.mapHeight)
+  for c in p.map.mitems: c = r.u16
+
+proc parseV7(r: var Reader): Project =
+  ## V7 has no bitmap modes: one colour per project, tile or char, kept in
+  ## `colours[0]`. The char attribute byte is split into material (high
+  ## nibble) and colour (low nibble).
+  result.version = 7
+  for c in result.chipColours.mitems: c = r.u8
+  result.colours[0] = r.u8
+  result.colouring = r.readColouring
+  result.displayMode = r.readDisplayMode(dmEcmText)
+  let flags = r.u8
+  result.tileSystem = (flags and 1) != 0
+
+  r.readChars(result)
+  r.blockMarker("char attributes")
+  for ch in result.chars.mitems:
+    let a = r.u8
+    ch.material = a shr 4
+    ch.colours[0] = a and 0x0f
+
+  if result.tileSystem:
+    r.readTiles(result)
+    if result.colouring == cmPerTile:
+      r.blockMarker("tile colours")
+      for t in result.tiles.mitems: t.colours[0] = r.u8
+    r.readTagsAndNames(result)
+
+  r.readMap(result)
+
+proc parseV9(r: var Reader): Project =
+  result.version = 9
+  result.displayMode = r.readDisplayMode(DisplayMode.high)
+  result.colouring = r.readColouring
   let flags = r.u8
   result.tileSystem = (flags and 1) != 0
   result.keyMap = flags shr 4
@@ -100,10 +167,7 @@ proc parseV9(r: var Reader): Project =
   for c in result.chipColours.mitems: c = r.u8
   for c in result.colours.mitems: c = r.u8
 
-  r.blockMarker("chars")
-  result.chars.setLen(r.u16.int + 1)
-  for ch in result.chars.mitems:
-    for b in ch.data.mitems: b = r.u8
+  r.readChars(result)
   r.blockMarker("char materials")
   for ch in result.chars.mitems: ch.material = r.u8
   if result.colouring == cmPerChar:
@@ -111,30 +175,13 @@ proc parseV9(r: var Reader): Project =
     for ch in result.chars.mitems: ch.colours = r.readColours(result.displayMode)
 
   if result.tileSystem:
-    r.blockMarker("tiles")
-    result.tiles.setLen(r.u16.int + 1)
-    result.tileWidth = r.u8.int
-    result.tileHeight = r.u8.int
-    for t in result.tiles.mitems:
-      t.cells.setLen(result.tileWidth * result.tileHeight)
-      for c in t.cells.mitems: c = r.u16
+    r.readTiles(result)
     if result.colouring == cmPerTile:
       r.blockMarker("tile colours")
       for t in result.tiles.mitems: t.colours = r.readColours(result.displayMode)
-    r.blockMarker("tile tags")
-    for t in result.tiles.mitems: t.tag = r.u8
-    r.blockMarker("tile names")
-    for t in result.tiles.mitems:
-      while true:
-        let c = r.u8
-        if c == 0: break
-        t.name.add char(c)
+    r.readTagsAndNames(result)
 
-  r.blockMarker("map")
-  result.mapWidth = r.u16.int
-  result.mapHeight = r.u16.int
-  result.map.setLen(result.mapWidth * result.mapHeight)
-  for c in result.map.mitems: c = r.u16
+  r.readMap(result)
 
 proc parseCtm*(data: openArray[byte]): Project =
   ## Parses a whole .ctm file. Raises CtmError on anything it can't read.
@@ -144,6 +191,7 @@ proc parseCtm*(data: openArray[byte]): Project =
   r.pos = 3
   let version = r.u8.int
   case version
+  of 7: result = parseV7(r)
   of 9: result = parseV9(r)
   else: r.fail("CTM version " & $version & " is not supported yet")
   if r.pos != r.data.len:
