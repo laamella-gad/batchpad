@@ -10,6 +10,10 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 Freshly generated Nimble binary package (`nimble init` skeleton). The only source file is `src/charpad_spritepad_assistant.nim`, which currently prints "Hello, World!". No tests or architecture exist yet; `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
+## Priorities
+
+Formats written by the releases currently on itch.io (subchristsoftware.itch.io) matter most: CTM V9 (CharPad C64 Pro 3.6+), CTM V7 (CharPad Free 2.86) and SPD V5 (SpritePad C64 Pro). Older versions come after these.
+
 ## Issue tracking
 
 Issues live in `ISSUES.md` (format described at its top). When finishing work on an issue, move it to "Closed"; when adding one, use the next free number and bump it.

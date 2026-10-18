@@ -7,8 +7,8 @@
   CharPad C64 Pro 3.88 (2025) documents all of V1 to V9. Older releases
   document fewer versions and word some fields less precisely, but no field
   moved between releases. The releases are in `software/` (not in git).
-- **Samples.** The releases come with 1369 distinct `.ctm` files: V1 (1),
-  V2 (24), V4 (110), V5 (292), V6 (13), V7 (277), V9 (652). None for V3 or V8.
+- **Samples.** The releases come with 1380 distinct `.ctm` files: V1 (1),
+  V2 (24), V4 (110), V5 (292), V6 (13), V7 (277), V9 (663). None for V3 or V8.
   A throwaway Python checker parsed every one of them by the specs below and
   consumed each file to its last byte, block markers included (2026-10-18).
   The one V1 sample colours per tile, so the user saved two more from CharPad
@@ -21,6 +21,13 @@
   links were never archived. `CharPad2_010915.zip` (a later 2.0 beta) and
   `CharPadExamples276.zip` came from the Wayback Machine's copy of
   `subchristsoftware.com/downloads/`.
+- **CharPad Glaze C64** (free on itch.io, 1.60 from June 2026) builds parallax
+  scrolling data from a foreground and a background CharPad project. Its 55
+  examples are all V9 (11 not in the other releases); they parse like the rest.
+  Its exe has a loader class per version, `CPV_FileIO_CTM1` to `CTM9` with no
+  `CTM3`, so Glaze can't open V3 files. It exports chars, maps and
+  tiles as binaries (8 bpc, 12 bpc as LSB + MSN files, 16 bpc as LSB + MSB
+  files), assembler source and text.
 - **Earlier projects.** Two C64 rebuilds converted game data to and from CharPad
   projects with small Python scripts:
   - `reference/grotten_playfield.py`, from De grotten van Oberon
@@ -48,7 +55,7 @@ From the specs. Each release reads all older versions.
 | 6 | CharPad 2.6 ("Thalamus" edition) | a few, in Free 2.72, Free 2.86, Pro 3.60, 3.69 |
 | 7 | CharPad 2.8 | Free 2.76, Free 2.86 |
 | 8 | CharPad C64 3.0; the version byte may be 82, from a dropped prototype | none |
-| 9 | CharPad C64 Pro 3.5 | Pro 3.60 to 3.88 |
+| 9 | CharPad C64 Pro 3.5 | Pro 3.60 to 3.88, Glaze 1.60 |
 
 ## File layout
 
