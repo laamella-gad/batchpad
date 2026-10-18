@@ -49,11 +49,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #22 [feature, high] CharPad CTM V9 reader
   - CharPad Pro 3.5+ (current on itch.io). 652 samples; flexi-grid, key map, bitmap modes.
 - #23 [feature, high] CharPad CTM V9 writer
-- #24 [feature, low] SpritePad 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
-  - No samples; layout from 1.5 ReadMe only.
-- #25 [feature, low] SpritePad 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
+- #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
+  - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
+- #25 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
 - #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader
-  - Samples in 1.5 and 1.7.
+  - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
 - #27 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
 - #28 [feature, normal] SpritePad 1.8 headerless .spd reader
   - 10 samples; writer already proven in Python reference.

@@ -17,8 +17,10 @@
   the headerless 1.8 format and SPD V1 to V5, and a saver for each, though the
   menus only ever save V5. The V3 and V4 code matches the layouts below, so
   those two are confirmed without samples. See "What SpritePad Pro 3.80 does".
+  SpritePad 1.5 is a native Borland C++ Builder exe; Ghidra 12.1.4 decompiled it
+  to C (2026-10-18). See "What SpritePad 1.5 does".
 - **Missing.** No samples or releases for SPD V3 (never released), SPD V4 or
-  the `.inf`-colour `.spr` of 1.2 and before. SpritePad Pro 3.80 has V3 and V4
+  Sprite Painter 1.0-1.2 (1.5 can't read 1.2's `.inf`). SpritePad Pro 3.80 has V3 and V4
   savers but no menu item that calls them. V4 came with the paid SpritePad
   Pro 2.76 to 2.90 builds (and possibly 3.01 to 3.20), which are no longer
   sold; their download links were never archived. The 2.3.0 Preview and the
@@ -29,7 +31,8 @@
 
 | Format | Written by |
 | --- | --- |
-| `.spr` + `.spr.inf`, colours in the `.inf` | SpritePad 1.2 and before |
+| `.spr` only, no colours | Sprite Painter 1.0, 1.1 |
+| `.spr` + `.spr.inf`, colours in the `.inf` | Sprite Painter 1.2 |
 | `.spr` + `.spr.inf`, colours in the 64th bytes | SpritePad 1.3 to 1.7 |
 | `.spd` without header | SpritePad 1.8 |
 | SPD V1 | SpritePad 2.0 (beta 1 is from 2014) |
@@ -45,8 +48,44 @@ From the SpritePad 1.5 ReadMe, checked against the 1.5 and 1.7 examples.
 below. `.spr.inf` holds 3 bytes: background, multicolour 1, multicolour 2.
 Together that is exactly a 1.8 file split in two: 1.8 puts the 3 bytes first.
 
-Up to 1.2, the 64th bytes held nothing and `.spr.inf` held a colour byte per
-sprite, then the 3 colours. 1.3 and later still read that.
+The ReadMe gives the 64th byte from 1.3 on as bit 7 mode (0 = hires) and bits
+0-3 colour; bits 4-6 aren't mentioned.
+
+Older versions, also from the 1.5 ReadMe (no releases or samples of them):
+
+- Up to 1.2 the program was called Sprite Painter; 1.3 renamed it to avoid a
+  clash with another program.
+- 1.0 and 1.1 saved the `.spr` alone. 1.2 added the `.inf` "to record colour
+  and mode information for sprites".
+- 1.2's `.spr` holds just the pixel data. Its `.spr.inf` holds a colour byte
+  per sprite, then background, multicolour 1, multicolour 2. How that byte holds
+  the mode is not said.
+- 1.1 added "Save up to current", so a `.spr` can hold any number of sprites.
+- The ReadMe says "the program still supports the original .inf files but they
+  will be updated when saved", but 1.5's code doesn't (see below).
+
+### What SpritePad 1.5 does
+
+From the decompiled exe. 1.5 has a single sprite loader and a single saver.
+
+- **Loading:** the `.spr` must be a multiple of 64 bytes and at most 16384
+  (256 sprites), otherwise "Invalid file size". An empty file passes. The whole
+  file goes into the sprite buffer. Then, if `<file>.inf` exists and is exactly
+  3 bytes long, it supplies background, multicolour 1 and multicolour 2. An
+  `.inf` of any other length is ignored, so a 1.2 `.inf` loses its colours and
+  the sprites keep whatever their 64th bytes hold.
+- **Command line:** a file named as the only argument is loaded at start-up.
+- **Saving:** writes the first n sprites to the `.spr` and the 3 colours to
+  `<file>.inf`. n is 256 ("Save All"), 16, 32, 64 or 128 ("First 16" to
+  "First 128"), or the current sprite + 1. It saves no other format.
+- **64th byte:** bits 0-3 sprite colour, bit 7 multicolour. Setting a sprite's
+  colour writes `(byte & $80) + colour`, so it clears bits 4-6. The exe has no
+  "overlay" string. New and cleared sprites get `$8c`: multicolour, colour 12.
+  "Copy current sprite attributes to all" copies the whole 64th byte.
+- **"View text data":** writes the current sprite's first 63 bytes as decimal,
+  comma-separated (`0,0,255,...`, no line breaks or `DATA` keyword) to
+  `%WINDIR%\temp\spritedata.txt`, opens it with the shell and deletes it on
+  exit.
 
 ## SPD versions 1 to 5
 
