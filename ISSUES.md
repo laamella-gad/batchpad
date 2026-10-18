@@ -47,15 +47,12 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #25 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
-- #26 [feature, high] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader
+- #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader
   - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
-- #27 [feature, high] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
-- #28 [feature, high] SpritePad 1.8 headerless .spd reader
+- #27 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
+- #28 [feature, low] SpritePad 1.8 headerless .spd reader
   - 10 samples; writer already proven in Python reference.
-- #29 [feature, high] SpritePad 1.8 headerless .spd writer
-- #32 [feature, high] SPD V2 reader
-  - SpritePad 2.3. 15 samples (1 with tiles, saved by hand); plain-word counts.
-- #33 [feature, high] SPD V2 writer
+- #29 [feature, low] SpritePad 1.8 headerless .spd writer
 - #34 [feature, low] SPD V3 reader
   - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
 - #35 [feature, low] SPD V3 writer
@@ -124,6 +121,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #32 [feature, high] SPD V2 reader
+  - SpritePad 2.3. 15 samples (1 with tiles, saved by hand); plain-word counts.
+  - Done: `parseSpd` in `src/batchpad/spd.nim`, tested on the two `tests/files/spd2/` files. Overlay distances read as 1; counts whose flag is off are ignored.
+- #33 [feature, high] SPD V2 writer
+  - Done: `toSpd(p, version = 2)`; the two `tests/files/spd2/` files come back byte for byte. Leaves out what SpritePad 2.3 can't load (sprites past 4096, tiles and animations past 256, tile cells past 4 either way), tile animations, tile attributes, tags and names, and overlays when the sprite overlay distance isn't 1. Sets the enabled bit like the V1 writer. One-off check: all 15 V2 samples from `software/` (14 distinct plus the hand-saved tiles file) come back byte for byte.
 - #30 [feature, high] SPD V1 reader
   - SpritePad 2.0. 13 samples.
   - Done: `parseSpd` in `src/batchpad/spd.nim`, tested on the two `tests/files/spd1/` files. Overlay distances read as 1; animation attribute bytes kept as stored (bit 7 enabled).

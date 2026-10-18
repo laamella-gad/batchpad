@@ -167,6 +167,15 @@ skip it. There is no switch for the bit: only "Send range to Animator" sets
 it, and that also sets from and to to the selected sprites, the timer to 3
 and the attributes to `$80` (ping-pong off). So our V1 writer sets bit 7 on
 every animation of a project read from V4 or later, which has no such bit.
+SpritePad 2.3.0 Preview handles the bit the same way, and its V2 writer does
+the same.
+
+SpritePad 2.3.0 Preview's V2 loader (decompiled) refuses files under 80 bytes,
+sprite counts outside 1 to 4096, tile or animation counts above 256, tiles
+wider or taller than 4, and any length other than 16 + 64 × sprites + 2 ×
+tile cells + 6 × animations. Unlike Pro, it reads the tile and animation
+counts whether their flag is set or not. Its saver writes 0 for the parts
+that are off.
 
 ## What SpritePad Pro 3.80 does
 

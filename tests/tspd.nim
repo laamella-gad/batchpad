@@ -94,6 +94,83 @@ suite "SPD V1":
     q.sprites.setLen 0
     expect SpdError: discard q.toSpd(version = 1)
 
+suite "SPD V2":
+  const dir = currentSourcePath().parentDir / "files" / "spd2"
+
+  test "sprites and animations":
+    let p = readSpd(dir / "sprites_anims.spd")
+    check p.version == 2
+    check p.colours == [0'u8, 2, 8]
+    check p.spriteOverlay == 1 and p.tileOverlay == 1
+    check p.sprites.len == 8
+    check p.sprites[7].data == diagonal
+    check p.sprites[6].overlay and p.sprites[6].colour == 11 and p.sprites[6].multicolour
+    check not p.tileSystem and p.tiles.len == 0 and p.tileAnims.len == 0
+    check p.spriteAnims == @[Animation(first: 0, last: 5, timer: 4, attributes: 0x80),
+                             Animation(first: 2, last: 4, timer: 10, attributes: 0x90),
+                             Animation(first: 6, last: 6, timer: 1, attributes: 0xa0),
+                             Animation(first: 7, last: 7, timer: 3, attributes: 0x80),
+                             Animation(first: 1, last: 3, timer: 2)]
+
+  test "tiles":
+    let p = readSpd(dir / "tiles.spd")
+    check p.colours == [6'u8, 1, 0]
+    check p.sprites.len == 4
+    check p.tileSystem and p.tileWidth == 2 and p.tileHeight == 2
+    check p.tiles == @[SpriteTile(cells: @[0'u16, 1, 2, 3]), SpriteTile(cells: @[3'u16, 2, 1, 0]),
+                       SpriteTile(cells: @[0'u16, 0, 1, 1])]
+    check p.spriteAnims.len == 0
+
+  test "errors and odd files":
+    let sprite = newSeq[byte](64)
+    let one = @[byte('S'), byte('P'), byte('D'), 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 6, 10, 3] & sprite
+    check parseSpd(one).sprites.len == 1
+    expect SpdError: discard parseSpd(one[0 .. ^2])
+    expect SpdError: discard parseSpd(one & @[byte 0])
+    var none = one
+    none[5] = 0
+    expect SpdError: discard parseSpd(none)                  # no sprites
+    var counts = one
+    counts[7] = 5                                            # tiles and animations are off
+    counts[9] = 5
+    check parseSpd(counts).tiles.len == 0 and parseSpd(counts).spriteAnims.len == 0
+
+  test "writing gives back the same bytes":
+    var files = 0
+    for kind, path in walkDir(dir):
+      if path.endsWith(".spd"):
+        checkpoint path
+        check readSpd(path).toSpd(version = 2) == cast[seq[byte]](readFile(path))
+        inc files
+    check files == 2
+
+  test "V5 to V2":
+    let p = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "tiles_anims.spd")
+    let q = parseSpd(p.toSpd(version = 2))
+    check q.tileSystem and q.tileWidth == 2 and q.tileHeight == 1
+    check q.tiles == @[SpriteTile(cells: @[0'u16, 1]), SpriteTile(cells: @[2'u16, 3]),
+                       SpriteTile(cells: @[0'u16, 3])]               # no attributes, tags, names
+    check q.tileAnims.len == 0
+    check q.spriteAnims == @[Animation(first: 0, last: 3, timer: 6, attributes: 0x80)]  # enabled
+    for s in q.sprites: check not s.overlay                    # overlay distance was 4
+
+  test "writer leaves out what doesn't fit":
+    let p = readSpd(dir / "tiles.spd")
+    var q = p
+    q.sprites.setLen 4097
+    q.tiles.setLen 257
+    for t in q.tiles.mitems: t.cells.setLen 4
+    q.spriteAnims.setLen 257
+    var r = parseSpd(q.toSpd(version = 2))
+    check r.sprites.len == 4096 and r.tiles.len == 256 and r.spriteAnims.len == 256
+    q = p
+    q.tileWidth = 5
+    for t in q.tiles.mitems:
+      t.cells = newSeq[uint16](10)
+      t.cells[5] = 3
+    r = parseSpd(q.toSpd(version = 2))
+    check r.tileWidth == 4 and r.tiles[0].cells == @[0'u16, 0, 0, 0, 3, 0, 0, 0]
+
 suite "SPD V5":
   const dir = currentSourcePath().parentDir / "files" / "spd5"
 

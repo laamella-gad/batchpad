@@ -69,6 +69,37 @@ proc parseV1(r: var Reader): SpriteProject =
   r.readSprites(result, sprites)
   r.readAnims(result.spriteAnims, wordFrames = false)
 
+proc parseV2(r: var Reader): SpriteProject =
+  ## V2 has tiles, but no tile attributes, tags, names or tile animations, and
+  ## its counts are plain words. Counts whose flag is off are ignored, as
+  ## SpritePad Pro does. Overlay distances are 1, as in V1.
+  result.version = 2
+  let flags = r.u8
+  result.tileSystem = flags.testBit(0)
+  let sprites = r.u16.int
+  if sprites == 0: r.fail("no sprites")
+  let tiles = r.u16.int
+  let anims = r.u16.int
+  let width = r.u8.int
+  let height = r.u8.int
+  for c in result.colours.mitems: c = r.u8
+  result.spriteOverlay = 1
+  result.tileOverlay = 1
+
+  r.readSprites(result, sprites)
+
+  if result.tileSystem:
+    result.tileWidth = width
+    result.tileHeight = height
+    result.tiles.setLen tiles
+    for t in result.tiles.mitems:
+      t.cells.setLen(width * height)
+      for c in t.cells.mitems: c = r.u16
+
+  if flags.testBit(1):
+    result.spriteAnims.setLen anims
+    r.readAnims(result.spriteAnims)
+
 proc parseV5(r: var Reader): SpriteProject =
   ## Counts whose flag is off are ignored, as SpritePad does.
   result.version = 5
@@ -114,6 +145,7 @@ proc parseSpd*(data: openArray[byte]): SpriteProject =
   let version = r.u8.int
   case version
   of 1: result = parseV1(r)
+  of 2: result = parseV2(r)
   of 5: result = parseV5(r)
   else: r.fail("SPD version " & $version & " is not supported yet")
   if r.pos != r.data.len:
@@ -149,13 +181,24 @@ proc cropTiles(p: var SpriteProject, width, height: int) =
   p.tileWidth = w
   p.tileHeight = h
 
+proc enableAnims(p: var SpriteProject, fromVersion: int) =
+  ## V1 to V3 have an enabled bit (bit 7) in the animation attributes, and
+  ## SpritePad 2.0 and 2.3 hide animations without it. Projects from other
+  ## formats have no such bit, so it is set on every animation.
+  if fromVersion notin 1..3:
+    for a in p.spriteAnims.mitems: a.attributes.setBit(7)
+
+proc dropOverlays(p: var SpriteProject) =
+  ## Up to V3 overlay means the next sprite, so overlays at another distance
+  ## are left out.
+  if p.spriteOverlay != 1:
+    for s in p.sprites.mitems: s.attributes.clearBit(4)
+
 proc fitV1(p: SpriteProject): SpriteProject =
   ## Drops what V1 can't hold: tiles, tile animations, sprites and animations
   ## past 256, animations with frames above 255, and overlays when the overlay
   ## distance isn't 1. V1 always holds an animation, so a project without one
-  ## gets a blank one (not enabled). Projects from formats without the enabled
-  ## bit (bit 7, V1 to V3 only) get it set on every animation, as SpritePad 2.0
-  ## hides animations without it.
+  ## gets a blank one (not enabled). See `enableAnims` for the enabled bit.
   result = p
   if result.sprites.len > 256: result.sprites.setLen 256
   result.tileSystem = false
@@ -165,10 +208,25 @@ proc fitV1(p: SpriteProject): SpriteProject =
   for a in p.spriteAnims:
     if a.first <= 255 and a.last <= 255 and result.spriteAnims.len < 256:
       result.spriteAnims.add a
-      if p.version notin 1..3: result.spriteAnims[^1].attributes.setBit(7)
+  result.enableAnims(p.version)
   if result.spriteAnims.len == 0: result.spriteAnims.add Animation()
-  if result.spriteOverlay != 1:
-    for s in result.sprites.mitems: s.attributes.clearBit(4)
+  result.dropOverlays
+
+proc fitV2(p: SpriteProject): SpriteProject =
+  ## Drops what V2 can't hold, or SpritePad 2.3 won't load: sprites past 4096,
+  ## tiles and animations past 256, tile cells past 4 either way, tile
+  ## animations, and overlays when the overlay distance isn't 1. Tile
+  ## attributes, tags and names are not written. See `enableAnims` for the
+  ## enabled bit.
+  result = p
+  if result.sprites.len > 4096: result.sprites.setLen 4096
+  if not result.tileSystem: result.tiles = @[]
+  if result.tiles.len > 256: result.tiles.setLen 256
+  result.cropTiles(4, 4)
+  result.tileAnims = @[]
+  if result.spriteAnims.len > 256: result.spriteAnims.setLen 256
+  result.enableAnims(p.version)
+  result.dropOverlays
 
 proc fitV5(p: SpriteProject): SpriteProject =
   ## Drops what V5 can't hold: sprites and tiles past 65535, tile cells past
@@ -209,6 +267,26 @@ proc formatV1(p: SpriteProject): seq[byte] =
   w.writeAnims(p.spriteAnims, wordFrames = false)
   w.data
 
+proc formatV2(p: SpriteProject): seq[byte] =
+  var w: Writer
+  for c in "SPD": w.u8 ord(c)
+  w.u8 2
+  w.u8(uint8(p.tileSystem) or uint8(p.spriteAnims.len > 0) shl 1)
+  w.u16 p.sprites.len
+  # Like SpritePad, 0 for the parts that are off.
+  w.u16 p.tiles.len
+  w.u16 p.spriteAnims.len
+  w.u8(if p.tileSystem: p.tileWidth else: 0)
+  w.u8(if p.tileSystem: p.tileHeight else: 0)
+  for c in p.colours: w.u8 c
+
+  w.writeSprites(p)
+  if p.tileSystem:
+    for t in p.tiles:
+      for c in t.cells: w.u16 c
+  w.writeAnims(p.spriteAnims)
+  w.data
+
 proc formatV5(p: SpriteProject): seq[byte] =
   var w: Writer
   for c in "SPD": w.u8 ord(c)
@@ -240,12 +318,13 @@ proc formatV5(p: SpriteProject): seq[byte] =
   w.data
 
 proc toSpd*(p: SpriteProject, version = 5): seq[byte] =
-  ## Formats `p` as a .spd file of version 1 or 5. What the version can't hold
-  ## is left out (see `fitV1` and `fitV5`). Raises SpdError on other versions
+  ## Formats `p` as a .spd file of version 1, 2 or 5. What the version can't
+  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`). Raises SpdError on other versions
   ## and on projects that don't hold together, such as one without sprites.
   p.check
   case version
   of 1: formatV1(p.fitV1)
+  of 2: formatV2(p.fitV2)
   of 5: formatV5(p.fitV5)
   else: fail("writing SPD version " & $version & " is not supported yet")
 
