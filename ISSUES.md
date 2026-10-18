@@ -17,10 +17,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CLI arguments: see #55.
 - #4 [feature, high] Shared in-memory model for all CharPad formats
   - One model every CTM reader fills and every writer reads: chars, materials, colours (per project/tile/char, 1-3 per item for bitmap modes), tiles, tags, names, map, display mode, V9 extras.
-  - Readers convert older layouts into it (V1-V4 tile-cell colours, V2 9-byte chars, expanded char sets); writers report what the target version can't hold.
+  - Readers convert older layouts into it (V1-V4 tile-cell colours, V2 9-byte chars, expanded char sets); writers leave out what the target version can't hold, with no error.
 - #5 [feature, high] Shared in-memory model for all SpritePad formats
   - One model every SpritePad reader fills and every writer reads: sprites with 64th-byte attributes, colours, tiles with attributes/tags/names, sprite and tile animations, overlay distances.
-  - Keep unused bits of the 64th byte for round trips; writers report what the target format can't hold.
+  - Keep unused bits of the 64th byte for round trips; writers leave out what the target format can't hold, with no error.
   - Started: `SpriteProject` in `src/batchpad/spd.nim` (#38), filled by the V5 reader. Keeps the 64th byte and the tile and animation attribute bytes as stored.
 - #6 [feature, low] CharPad CTM V1 reader
   - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
@@ -47,18 +47,15 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #25 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
-- #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader
+- #26 [feature, high] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader
   - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
-- #27 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
-- #28 [feature, normal] SpritePad 1.8 headerless .spd reader
+- #27 [feature, high] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
+- #28 [feature, high] SpritePad 1.8 headerless .spd reader
   - 10 samples; writer already proven in Python reference.
-- #29 [feature, normal] SpritePad 1.8 headerless .spd writer
-- #30 [feature, normal] SPD V1 reader
-  - SpritePad 2.0. 13 samples.
-- #31 [feature, low] SPD V1 writer
-- #32 [feature, low] SPD V2 reader
+- #29 [feature, high] SpritePad 1.8 headerless .spd writer
+- #32 [feature, high] SPD V2 reader
   - SpritePad 2.3. 15 samples (1 with tiles, saved by hand); plain-word counts.
-- #33 [feature, low] SPD V2 writer
+- #33 [feature, high] SPD V2 writer
 - #34 [feature, low] SPD V3 reader
   - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
 - #35 [feature, low] SPD V3 writer
@@ -127,13 +124,18 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #30 [feature, high] SPD V1 reader
+  - SpritePad 2.0. 13 samples.
+  - Done: `parseSpd` in `src/batchpad/spd.nim`, tested on the two `tests/files/spd1/` files. Overlay distances read as 1; animation attribute bytes kept as stored (bit 7 enabled).
+- #31 [feature, high] SPD V1 writer
+  - Done: `toSpd(p, version = 1)`; the two `tests/files/spd1/` files come back byte for byte. Leaves out tiles, tile animations, sprites and animations past 256, animations with frames above 255, and overlays when the sprite overlay distance isn't 1; adds a blank animation (not enabled) when there is none. One-off check: all 13 distinct V1 samples from `software/` come back byte for byte.
 - #38 [feature, high] SPD V5 reader
   - SpritePad 2.9 / Pro (current on itch.io). 112 samples.
   - Done: `parseSpd` / `readSpd` in `src/batchpad/spd.nim`, tested on the three `tests/files/spd5/` files.
 - #39 [feature, high] SPD V5 writer
   - Done: `toSpd` / `writeSpd` in `src/batchpad/spd.nim`; the three `tests/files/spd5/` files come back byte for byte. One-off check: all 237 V5 files from `software/` (112 distinct) do too.
 - #19 [feature, high] CharPad CTM V7 writer
-  - Done: `toCtm(p, version = 7)` in `src/batchpad/ctm.nim`; the four `tests/files/ctm7/` files come back byte for byte. Refuses bitmap modes and materials or char colours above 15; drops the key map, flexi-grid and screen colours. One-off check: all 741 V7 files from `software/` (duplicates included) come back byte for byte.
+  - Done: `toCtm(p, version = 7)` in `src/batchpad/ctm.nim`; the four `tests/files/ctm7/` files come back byte for byte. Refuses bitmap modes (the output would be garbage); keeps the low 4 bits of materials and colours; drops the key map, flexi-grid and screen colours. One-off check: all 741 V7 files from `software/` (duplicates included) come back byte for byte.
 - #18 [feature, high] CharPad CTM V7 reader
   - CharPad 2.8 / Free 2.86 (still on itch.io). 277 samples; writer already proven in Python references.
   - Done: `parseV7` in `src/batchpad/ctm.nim`, tested on the four `tests/files/ctm7/` files. One-off check: all 741 V7 files from `software/` (duplicates included) parse.

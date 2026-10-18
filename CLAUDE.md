@@ -8,11 +8,11 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 ## Project status
 
-Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model, and the CTM V7 and V9 readers and writers (#18, #19, #22, #23), tested by `tests/tctm.nim`. `src/batchpad/spd.nim` holds the SpritePad project model and the SPD V5 reader and writer (#38, #39), tested by `tests/tspd.nim`. Both use `src/batchpad/binio.nim` for reading and writing bytes. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
+Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model, and the CTM V7 and V9 readers and writers (#18, #19, #22, #23), tested by `tests/tctm.nim`. `src/batchpad/spd.nim` holds the SpritePad project model and the SPD V1 and V5 readers and writers (#30, #31, #38, #39), tested by `tests/tspd.nim`. Both use `src/batchpad/binio.nim` for reading and writing bytes. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
 ## Priorities
 
-Formats written by the releases currently on itch.io (subchristsoftware.itch.io) matter most: CTM V9 (CharPad C64 Pro 3.6+), CTM V7 (CharPad Free 2.86) and SPD V5 (SpritePad C64 Pro). Older versions come after these.
+Formats written by the releases currently on itch.io (subchristsoftware.itch.io) matter most: CTM V9 (CharPad C64 Pro 3.6+), CTM V7 (CharPad Free 2.86) and SPD V5 (SpritePad C64 Pro). The formats of the last free SpritePads matter as much: `.spr` + `.spr.inf` (1.5, 1.7), headerless `.spd` (1.8, 1.8.1), SPD V1 (2.0 Beta 1) and SPD V2 (2.3.0 Preview). Older versions come after these.
 
 ## Issue tracking
 

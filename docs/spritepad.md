@@ -192,7 +192,7 @@ From the decompiled loaders and savers.
   writes only bit 4. Our reader and writer keep the whole byte.
 - **Saving:** "Save" and "Save As" write V5, up to 65536 sprites (the count is
   a word, so 65536 is written as 0 and the file can't be loaded again; our
-  writer refuses more than 65535). The unused V3 and V4 savers drop tile tags
+  writer leaves out the sprites past 65535). The unused V3 and V4 savers drop tile tags
   and names. With tiles or animations off,
   their header fields are written as 0.
 

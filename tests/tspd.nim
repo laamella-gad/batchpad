@@ -18,6 +18,81 @@ let
   box = rows(proc (x, y: int): bool = x in [0, 23] or y in [0, 20])
   diagonal = rows(proc (x, y: int): bool = x == y)
 
+suite "SPD V1":
+  const dir = currentSourcePath().parentDir / "files" / "spd1"
+
+  test "sprites":
+    let p = readSpd(dir / "sprites.spd")
+    check p.version == 1
+    check p.colours == [6'u8, 10, 3]
+    check p.spriteOverlay == 1 and p.tileOverlay == 1
+    check p.sprites.len == 6
+    check p.sprites[0].data == box
+    check p.sprites[3].data == diagonal
+    check not p.tileSystem and p.tiles.len == 0 and p.tileAnims.len == 0
+    let s = p.sprites
+    check s[0].colour == 1 and not s[0].multicolour
+    check s[1].colour == 5 and s[1].multicolour and not s[1].overlay
+    check s[2].colour == 11 and s[2].multicolour and s[2].overlay
+    check s[4].colour == 14 and not s[4].multicolour
+    check s[5].colour == 4 and s[5].multicolour
+    check p.spriteAnims == @[Animation(first: 0, last: 5, timer: 4, attributes: 0x80)]
+
+  test "animations":
+    let p = readSpd(dir / "anims.spd")
+    check p.colours == [0'u8, 2, 8]
+    check p.sprites.len == 6
+    check p.spriteAnims == @[Animation(first: 0, last: 5, timer: 4, attributes: 0x80),
+                             Animation(first: 2, last: 4, timer: 10, attributes: 0x90),
+                             Animation(first: 1, last: 3, timer: 2)]
+    check p.spriteAnims[1].pingPong and not p.spriteAnims[2].pingPong
+
+  test "errors":
+    let sprite = newSeq[byte](64)
+    let one = @[byte('S'), byte('P'), byte('D'), 1, 0, 0, 6, 10, 3] & sprite & @[byte 0, 0, 1, 0x80]
+    check parseSpd(one).sprites.len == 1
+    expect SpdError: discard parseSpd(one[0 .. ^2])        # short
+    expect SpdError: discard parseSpd(one & @[byte 0])     # trailing byte
+
+  test "writing gives back the same bytes":
+    var files = 0
+    for kind, path in walkDir(dir):
+      if path.endsWith(".spd"):
+        checkpoint path
+        check readSpd(path).toSpd(version = 1) == cast[seq[byte]](readFile(path))
+        inc files
+    check files == 2
+
+  test "V5 to V1":
+    let p = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "sprite_anims.spd")
+    let q = parseSpd(p.toSpd(version = 1))
+    check q.sprites == p.sprites
+    check q.spriteAnims == p.spriteAnims
+
+  test "writer leaves out what doesn't fit":
+    let p = readSpd(dir / "anims.spd")
+    var q = p
+    q.sprites.setLen 257
+    check parseSpd(q.toSpd(version = 1)).sprites.len == 256
+    q = p
+    q.spriteAnims.setLen 0                                   # V1 needs one
+    check parseSpd(q.toSpd(version = 1)).spriteAnims == @[Animation()]
+    q = p
+    q.spriteAnims[0].last = 256
+    check parseSpd(q.toSpd(version = 1)).spriteAnims == p.spriteAnims[1..2]
+    q = p
+    q.spriteOverlay = 4
+    q.sprites[0].attributes = 0x11
+    check parseSpd(q.toSpd(version = 1)).sprites[0].attributes == 0x01
+    let t = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "tiles_anims.spd")
+    let r = parseSpd(t.toSpd(version = 1))
+    check not r.tileSystem and r.tiles.len == 0 and r.tileAnims.len == 0
+    check r.spriteAnims == t.spriteAnims
+    check r.sprites[0].attributes == 0x82                    # overlay distance was 4
+    q = p
+    q.sprites.setLen 0
+    expect SpdError: discard q.toSpd(version = 1)
+
 suite "SPD V5":
   const dir = currentSourcePath().parentDir / "files" / "spd5"
 
@@ -105,15 +180,29 @@ suite "SPD V5":
     q.tiles.setLen 0
     expect SpdError: discard q.toSpd
     q = p
-    q.tileSystem = false
-    expect SpdError: discard q.toSpd
-    q = p
     q.tiles[1].cells.add 0
     expect SpdError: discard q.toSpd
-    q = p
-    q.tiles[0].name = repeat('x', 33)
-    expect SpdError: discard q.toSpd
-    q = p
-    q.spriteAnims.setLen 257
-    expect SpdError: discard q.toSpd
     expect SpdError: discard p.toSpd(version = 4)
+
+  test "writer leaves out what doesn't fit":
+    let p = readSpd(dir / "tiles_anims.spd")
+    var q = p
+    q.tiles[0].name = repeat('x', 33)
+    q.tiles[1].name = "ab\0cd"
+    q.spriteAnims.setLen 257
+    var r = parseSpd(q.toSpd)
+    check r.tiles[0].name == repeat('x', 32)
+    check r.tiles[1].name == "ab"
+    check r.spriteAnims.len == 256
+    q = p
+    q.tileSystem = false
+    r = parseSpd(q.toSpd)
+    check r.tiles.len == 0 and r.tileAnims == p.tileAnims
+    q = p
+    q.tileWidth = 256
+    for t in q.tiles.mitems:
+      t.cells = newSeq[uint16](256)
+      t.cells[255] = 7
+      t.cells[1] = 3
+    r = parseSpd(q.toSpd)
+    check r.tileWidth == 255 and r.tiles[0].cells.len == 255 and r.tiles[0].cells[1] == 3

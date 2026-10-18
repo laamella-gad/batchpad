@@ -203,23 +203,63 @@ proc writeColours(w: var Writer, c: Colours, mode: DisplayMode) =
 proc fail(msg: string) {.noreturn.} =
   raise newException(CtmError, msg)
 
-proc check(p: Project, version: int) =
-  ## The limits V7 and V9 share.
-  let v = "V" & $version
-  if p.chars.len notin 1..65536: fail(v & " holds 1 to 65536 chars, not " & $p.chars.len)
+proc check(p: Project) =
+  ## What no version can write: a project that doesn't hold together.
+  if p.chars.len == 0: fail("no chars")
   if p.tileSystem:
-    if p.tiles.len notin 1..65536: fail(v & " holds 1 to 65536 tiles, not " & $p.tiles.len)
-    if p.tileWidth notin 1..255 or p.tileHeight notin 1..255:
-      fail("tile size " & $p.tileWidth & " x " & $p.tileHeight & " is not 1 to 255 each way")
+    if p.tiles.len == 0: fail("the tile system is on, but there are no tiles")
+    if p.tileWidth < 1 or p.tileHeight < 1:
+      fail("tile size " & $p.tileWidth & " x " & $p.tileHeight & " is under 1 x 1")
     for i, t in p.tiles:
       if t.cells.len != p.tileWidth * p.tileHeight:
         fail("tile " & $i & " has " & $t.cells.len & " cells, not " & $(p.tileWidth * p.tileHeight))
-      if t.name.len > 32: fail("tile " & $i & " name is longer than 32 chars")
-      if '\0' in t.name: fail("tile " & $i & " name holds a 0 byte")
-  if p.mapWidth notin 0..65535 or p.mapHeight notin 0..65535:
-    fail("map size " & $p.mapWidth & " x " & $p.mapHeight & " is over 65535 one way")
-  if p.map.len != p.mapWidth * p.mapHeight:
-    fail("map has " & $p.map.len & " cells, not " & $(p.mapWidth * p.mapHeight))
+  if p.mapWidth < 0 or p.mapHeight < 0 or p.map.len != p.mapWidth * p.mapHeight:
+    fail("map has " & $p.map.len & " cells, not " & $p.mapWidth & " x " & $p.mapHeight)
+
+proc fit(p: Project): Project =
+  ## Drops what V7 and V9 can't hold: chars and tiles past 65536, tile cells
+  ## past 255 either way, map cells past 65535 either way and name chars past
+  ## 32 or a 0 byte.
+  result = p
+  if result.chars.len > 65536: result.chars.setLen 65536
+  if not result.tileSystem: result.tiles = @[]
+  if result.tiles.len > 65536: result.tiles.setLen 65536
+  if result.tileWidth > 255 or result.tileHeight > 255:
+    let (w, h) = (min(p.tileWidth, 255), min(p.tileHeight, 255))
+    for t in result.tiles.mitems:
+      var cells = newSeq[uint16](w * h)
+      for y in 0..<h:
+        for x in 0..<w: cells[y * w + x] = t.cells[y * p.tileWidth + x]
+      t.cells = cells
+    result.tileWidth = w
+    result.tileHeight = h
+  for t in result.tiles.mitems:
+    let zero = t.name.find('\0')
+    if zero >= 0: t.name.setLen zero
+    if t.name.len > 32: t.name.setLen 32
+  if result.mapWidth > 65535 or result.mapHeight > 65535:
+    let (w, h) = (min(p.mapWidth, 65535), min(p.mapHeight, 65535))
+    result.map = newSeq[uint16](w * h)
+    for y in 0..<h:
+      for x in 0..<w: result.map[y * w + x] = p.map[y * p.mapWidth + x]
+    result.mapWidth = w
+    result.mapHeight = h
+
+proc fitV7(p: Project): Project =
+  ## Also drops the colour and material bits above 4, which only V8 and
+  ## later have. Bitmap modes are refused: as text they would be garbage.
+  if p.displayMode > dmEcmText: fail("V7 has no bitmap modes")
+  result = p.fit
+  result.colours[0] = result.colours[0] and 0x0f
+  for ch in result.chars.mitems:
+    ch.material = ch.material and 0x0f
+    ch.colours[0] = ch.colours[0] and 0x0f
+  for t in result.tiles.mitems: t.colours[0] = t.colours[0] and 0x0f
+
+proc fitV9(p: Project): Project =
+  ## Also drops key maps above 15, which don't fit in their 4 bits.
+  result = p.fit
+  if result.keyMap > 15: result.keyMap = 0
 
 proc writeChars(w: var Writer, p: Project) =
   w.blockMarker
@@ -249,11 +289,6 @@ proc writeMap(w: var Writer, p: Project) =
   for c in p.map: w.u16 c
 
 proc formatV7(p: Project): seq[byte] =
-  p.check(7)
-  if p.displayMode > dmEcmText: fail("V7 has no bitmap modes")
-  for i, ch in p.chars:
-    if ch.material > 15: fail("char " & $i & " material " & $ch.material & " does not fit in 4 bits")
-    if ch.colours[0] > 15: fail("char " & $i & " colour " & $ch.colours[0] & " does not fit in 4 bits")
   var w: Writer
   for c in "CTM": w.u8 ord(c)
   w.u8 7
@@ -278,8 +313,6 @@ proc formatV7(p: Project): seq[byte] =
   w.data
 
 proc formatV9(p: Project): seq[byte] =
-  p.check(9)
-  if p.keyMap > 15: fail("key map " & $p.keyMap & " does not fit in 4 bits")
   var w: Writer
   for c in "CTM": w.u8 ord(c)
   w.u8 9
@@ -310,13 +343,16 @@ proc formatV9(p: Project): seq[byte] =
   w.data
 
 proc toCtm*(p: Project, version = 9): seq[byte] =
-  ## Formats `p` as a .ctm file of version 7 or 9. Raises CtmError when the
-  ## version can't hold it. The colour bytes a display mode doesn't store
-  ## (e.g. colour RAM in hires bitmap) are dropped, and so are the key map,
-  ## the flexi-grid and screen colours in V7, which has none of them.
+  ## Formats `p` as a .ctm file of version 7 or 9. What the version can't
+  ## hold is left out (see `fit`, `fitV7` and `fitV9`), and so are the colour
+  ## bytes a display mode doesn't store (e.g. colour RAM in hires bitmap) and,
+  ## in V7, the key map, the flexi-grid and screen colours. Raises CtmError on
+  ## other versions, on projects that don't hold together, such as one
+  ## without chars, and on bitmap modes in V7.
+  p.check
   case version
-  of 7: formatV7(p)
-  of 9: formatV9(p)
+  of 7: formatV7(p.fitV7)
+  of 9: formatV9(p.fitV9)
   else: fail("writing CTM version " & $version & " is not supported yet")
 
 proc writeCtm*(path: string, p: Project, version = 9) =

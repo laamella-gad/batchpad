@@ -44,12 +44,30 @@ func pingPong*(a: Animation): bool = a.attributes.testBit(4)
 
 type Reader = binio.Reader[SpdError]
 
-proc readAnims(r: var Reader, anims: var seq[Animation]) =
+proc readSprites(r: var Reader, p: var SpriteProject, count: int) =
+  p.sprites.setLen count
+  for s in p.sprites.mitems:
+    for b in s.data.mitems: b = r.u8
+    s.attributes = r.u8
+
+proc readAnims(r: var Reader, anims: var seq[Animation], wordFrames = true) =
   ## Four lists in turn: first frames, last frames, timers, attributes.
-  for a in anims.mitems: a.first = r.u16
-  for a in anims.mitems: a.last = r.u16
+  for a in anims.mitems: a.first = (if wordFrames: r.u16 else: r.u8)
+  for a in anims.mitems: a.last = (if wordFrames: r.u16 else: r.u8)
   for a in anims.mitems: a.timer = r.u8
   for a in anims.mitems: a.attributes = r.u8
+
+proc parseV1(r: var Reader): SpriteProject =
+  ## V1 has no tiles and always at least one sprite animation. Overlay means
+  ## "the next sprite", so both overlay distances are 1.
+  result.version = 1
+  let sprites = r.u8.int + 1
+  result.spriteAnims.setLen(r.u8.int + 1)
+  for c in result.colours.mitems: c = r.u8
+  result.spriteOverlay = 1
+  result.tileOverlay = 1
+  r.readSprites(result, sprites)
+  r.readAnims(result.spriteAnims, wordFrames = false)
 
 proc parseV5(r: var Reader): SpriteProject =
   ## Counts whose flag is off are ignored, as SpritePad does.
@@ -67,10 +85,7 @@ proc parseV5(r: var Reader): SpriteProject =
   result.spriteOverlay = cast[int16](r.u16)
   result.tileOverlay = cast[int16](r.u16)
 
-  result.sprites.setLen sprites
-  for s in result.sprites.mitems:
-    for b in s.data.mitems: b = r.u8
-    s.attributes = r.u8
+  r.readSprites(result, sprites)
 
   if result.tileSystem:
     result.tileWidth = width
@@ -98,6 +113,7 @@ proc parseSpd*(data: openArray[byte]): SpriteProject =
   r.pos = 3
   let version = r.u8.int
   case version
+  of 1: result = parseV1(r)
   of 5: result = parseV5(r)
   else: r.fail("SPD version " & $version & " is not supported yet")
   if r.pos != r.data.len:
@@ -110,30 +126,87 @@ proc readSpd*(path: string): SpriteProject =
 proc fail(msg: string) {.noreturn.} =
   raise newException(SpdError, msg)
 
-proc checkV5(p: SpriteProject) =
-  if p.sprites.len notin 1..65535: fail("V5 holds 1 to 65535 sprites, not " & $p.sprites.len)
+proc check(p: SpriteProject) =
+  ## What no version can write: a project that doesn't hold together.
+  if p.sprites.len == 0: fail("no sprites")
   if p.tileSystem:
-    if p.tiles.len notin 1..65535: fail("V5 holds 1 to 65535 tiles, not " & $p.tiles.len)
-    if p.tileWidth notin 1..255 or p.tileHeight notin 1..255:
-      fail("tile size " & $p.tileWidth & " x " & $p.tileHeight & " is not 1 to 255 each way")
+    if p.tiles.len == 0: fail("the tile system is on, but there are no tiles")
+    if p.tileWidth < 1 or p.tileHeight < 1:
+      fail("tile size " & $p.tileWidth & " x " & $p.tileHeight & " is under 1 x 1")
     for i, t in p.tiles:
       if t.cells.len != p.tileWidth * p.tileHeight:
         fail("tile " & $i & " has " & $t.cells.len & " cells, not " & $(p.tileWidth * p.tileHeight))
-      if t.name.len > 32: fail("tile " & $i & " name is longer than 32 chars")
-      if '\0' in t.name: fail("tile " & $i & " name holds a 0 byte")
-  elif p.tiles.len > 0:
-    fail("tiles while the tile system is off")
-  if p.spriteAnims.len > 256: fail("V5 holds up to 256 sprite animations, not " & $p.spriteAnims.len)
-  if p.tileAnims.len > 256: fail("V5 holds up to 256 tile animations, not " & $p.tileAnims.len)
 
-proc writeAnims(w: var Writer, anims: seq[Animation]) =
-  for a in anims: w.u16 a.first
-  for a in anims: w.u16 a.last
+proc cropTiles(p: var SpriteProject, width, height: int) =
+  ## Keeps the top left `width` x `height` sprites of every tile.
+  if p.tileWidth <= width and p.tileHeight <= height: return
+  let (w, h) = (min(p.tileWidth, width), min(p.tileHeight, height))
+  for t in p.tiles.mitems:
+    var cells = newSeq[uint16](w * h)
+    for y in 0..<h:
+      for x in 0..<w: cells[y * w + x] = t.cells[y * p.tileWidth + x]
+    t.cells = cells
+  p.tileWidth = w
+  p.tileHeight = h
+
+proc fitV1(p: SpriteProject): SpriteProject =
+  ## Drops what V1 can't hold: tiles, tile animations, sprites and animations
+  ## past 256, animations with frames above 255, and overlays when the overlay
+  ## distance isn't 1. V1 always holds an animation, so a project without one
+  ## gets a blank one (not enabled).
+  result = p
+  if result.sprites.len > 256: result.sprites.setLen 256
+  result.tileSystem = false
+  result.tiles = @[]
+  result.tileAnims = @[]
+  result.spriteAnims = @[]
+  for a in p.spriteAnims:
+    if a.first <= 255 and a.last <= 255 and result.spriteAnims.len < 256:
+      result.spriteAnims.add a
+  if result.spriteAnims.len == 0: result.spriteAnims.add Animation()
+  if result.spriteOverlay != 1:
+    for s in result.sprites.mitems: s.attributes.clearBit(4)
+
+proc fitV5(p: SpriteProject): SpriteProject =
+  ## Drops what V5 can't hold: sprites and tiles past 65535, tile cells past
+  ## 255 either way, animations past 256 and name chars past 32 or a 0 byte.
+  result = p
+  if result.sprites.len > 65535: result.sprites.setLen 65535
+  if not result.tileSystem: result.tiles = @[]
+  if result.tiles.len > 65535: result.tiles.setLen 65535
+  result.cropTiles(255, 255)
+  for t in result.tiles.mitems:
+    let zero = t.name.find('\0')
+    if zero >= 0: t.name.setLen zero
+    if t.name.len > 32: t.name.setLen 32
+  if result.spriteAnims.len > 256: result.spriteAnims.setLen 256
+  if result.tileAnims.len > 256: result.tileAnims.setLen 256
+
+proc writeSprites(w: var Writer, p: SpriteProject) =
+  for s in p.sprites:
+    for b in s.data: w.u8 b
+    w.u8 s.attributes
+
+proc writeAnims(w: var Writer, anims: seq[Animation], wordFrames = true) =
+  for a in anims:
+    if wordFrames: w.u16 a.first else: w.u8 a.first
+  for a in anims:
+    if wordFrames: w.u16 a.last else: w.u8 a.last
   for a in anims: w.u8 a.timer
   for a in anims: w.u8 a.attributes
 
+proc formatV1(p: SpriteProject): seq[byte] =
+  var w: Writer
+  for c in "SPD": w.u8 ord(c)
+  w.u8 1
+  w.u8 p.sprites.len - 1
+  w.u8 p.spriteAnims.len - 1
+  for c in p.colours: w.u8 c
+  w.writeSprites(p)
+  w.writeAnims(p.spriteAnims, wordFrames = false)
+  w.data
+
 proc formatV5(p: SpriteProject): seq[byte] =
-  p.checkV5
   var w: Writer
   for c in "SPD": w.u8 ord(c)
   w.u8 5
@@ -150,9 +223,7 @@ proc formatV5(p: SpriteProject): seq[byte] =
   w.u16 cast[uint16](p.spriteOverlay)
   w.u16 cast[uint16](p.tileOverlay)
 
-  for s in p.sprites:
-    for b in s.data: w.u8 b
-    w.u8 s.attributes
+  w.writeSprites(p)
 
   if p.tileSystem:
     for t in p.tiles:
@@ -166,10 +237,13 @@ proc formatV5(p: SpriteProject): seq[byte] =
   w.data
 
 proc toSpd*(p: SpriteProject, version = 5): seq[byte] =
-  ## Formats `p` as a .spd file of the given version. Raises SpdError when the
-  ## version can't hold it.
+  ## Formats `p` as a .spd file of version 1 or 5. What the version can't hold
+  ## is left out (see `fitV1` and `fitV5`). Raises SpdError on other versions
+  ## and on projects that don't hold together, such as one without sprites.
+  p.check
   case version
-  of 5: formatV5(p)
+  of 1: formatV1(p.fitV1)
+  of 5: formatV5(p.fitV5)
   else: fail("writing SPD version " & $version & " is not supported yet")
 
 proc writeSpd*(path: string, p: SpriteProject, version = 5) =

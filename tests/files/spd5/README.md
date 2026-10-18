@@ -30,6 +30,6 @@ default) unless listed.
 
 Opened in SpritePad and found to look as described above:
 
-- `sprites.spd` (2026-10-19), in SpritePad Free
-- `sprite_anims.spd` (2026-10-19), in SpritePad Free
-- `tiles_anims.spd` (2026-10-19), in SpritePad Free
+- `sprites.spd` (2026-10-19), in SpritePad C64 Pro 3.80
+- `sprite_anims.spd` (2026-10-19), in SpritePad C64 Pro 3.80
+- `tiles_anims.spd` (2026-10-19), in SpritePad C64 Pro 3.80

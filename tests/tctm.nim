@@ -143,15 +143,36 @@ suite "CTM V9":
     q.tiles[2].cells.add 0
     expect CtmError: discard q.toCtm
     q = p
-    q.tiles[0].name = repeat('x', 33)
-    expect CtmError: discard q.toCtm
-    q = p
     q.map.add 0
     expect CtmError: discard q.toCtm
-    q = p
-    q.keyMap = 16
-    expect CtmError: discard q.toCtm
     expect CtmError: discard p.toCtm(version = 8)
+
+  test "writer leaves out what doesn't fit":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    var q = p
+    q.tiles[0].name = repeat('x', 33)
+    q.tiles[1].name = "ab\0cd"
+    q.keyMap = 16
+    let r = parseCtm(q.toCtm)
+    check r.tiles[0].name == repeat('x', 32)
+    check r.tiles[1].name == "ab"
+    check r.keyMap == 0
+    q = p
+    q.tileSystem = false
+    q.mapWidth = 6
+    q.mapHeight = 3
+    check parseCtm(q.toCtm).tiles.len == 0
+    q = p
+    q.tileHeight = 256
+    for t in q.tiles.mitems: t.cells = newSeq[uint16](2 * 256)
+    q.tiles[0].cells[3] = 5
+    q.mapWidth = 65536
+    q.mapHeight = 1
+    q.map = newSeq[uint16](65536)
+    q.map[1] = 2
+    let c = parseCtm(q.toCtm)
+    check c.tileHeight == 255 and c.tiles[0].cells.len == 510 and c.tiles[0].cells[3] == 5
+    check c.mapWidth == 65535 and c.map.len == 65535 and c.map[1] == 2
 
 suite "CTM V7":
   const dir = currentSourcePath().parentDir / "files" / "ctm7"
@@ -235,16 +256,21 @@ suite "CTM V7":
     p.flexiGrid = FlexiGrid()
     check q == p
 
+  test "writer leaves out what doesn't fit":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    var q = p
+    q.chars[2].material = 0x12
+    q.tiles[1].colours[0] = 0x1a
+    let r = parseCtm(q.toCtm(version = 7))
+    check r.chars[2].material == 2
+    check r.tiles[1].colours[0] == 10
+
   test "writer errors":
     let p = readCtm(dir / "mctext_pertile.ctm")
     var q = p
     q.displayMode = dmHiresBitmap
     expect CtmError: discard q.toCtm(version = 7)
-    q = p
-    q.chars[2].material = 16
-    expect CtmError: discard q.toCtm(version = 7)
-    q = p
-    q.chars[2].colours[0] = 16
+    q.displayMode = dmMulticolourBitmap
     expect CtmError: discard q.toCtm(version = 7)
     q = p
     q.chars.setLen 0
