@@ -6,9 +6,18 @@
   `Help/File Format - SPD (Vn).htm` for versions 1 to 5. The releases agree
   apart from wording. Older SpritePads have no spec, only a ReadMe. All
   releases are in `software/` (not in git).
-- **Samples.** 135 distinct example projects: 10 headerless (1.8), 13 SPD V1
-  (2.0 beta 1), 112 SPD V5 (Pro). A throwaway Python checker parsed every one
-  by the layouts below and consumed each file to its last byte (2026-10-18).
+- **Samples.** 149 distinct example projects: 10 headerless (1.8), 13 SPD V1
+  (2.0 beta 1), 14 SPD V2 (2.3.0 Preview), 112 SPD V5 (Pro). A throwaway Python
+  checker parsed every one by the layouts below and consumed each file to its
+  last byte (2026-10-18). None of the V2 samples use tiles, so the user saved
+  `software/spritepad23_tiles.spd` from 2.3.0 Preview: 32 sprites, 12 tiles of
+  2 x 2, 15 animations. It parses the same way.
+- **Missing.** No samples or releases for SPD V3 (never released), SPD V4 or
+  the `.inf`-colour `.spr` of 1.2 and before. V4 came with the paid SpritePad
+  Pro 2.76 to 2.90 builds (and possibly 3.01 to 3.20), which are no longer
+  sold; their download links were never archived. The 2.3.0 Preview and the
+  older free releases came from the Wayback Machine's copy of
+  `subchristsoftware.com/downloads/`.
 
 ## Versions
 

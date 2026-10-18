@@ -8,7 +8,7 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 ## Project status
 
-Freshly generated Nimble binary package (`nimble init` skeleton). The only source file is `src/charpad_spritepad_assistant.nim`, which currently prints "Hello, World!". No tests, README, or architecture exist yet — update this file as the project takes shape.
+Freshly generated Nimble binary package (`nimble init` skeleton). The only source file is `src/charpad_spritepad_assistant.nim`, which currently prints "Hello, World!". No tests or architecture exist yet; `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
 ## Issue tracking
 

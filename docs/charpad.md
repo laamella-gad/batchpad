@@ -7,10 +7,20 @@
   CharPad C64 Pro 3.88 (2025) documents all of V1 to V9. Older releases
   document fewer versions and word some fields less precisely, but no field
   moved between releases. The releases are in `software/` (not in git).
-- **Samples.** The releases come with 1359 distinct `.ctm` files: V1 (1),
-  V2 (24), V4 (110), V5 (282), V6 (13), V7 (277), V9 (652). None for V3 or V8.
+- **Samples.** The releases come with 1369 distinct `.ctm` files: V1 (1),
+  V2 (24), V4 (110), V5 (292), V6 (13), V7 (277), V9 (652). None for V3 or V8.
   A throwaway Python checker parsed every one of them by the specs below and
   consumed each file to its last byte, block markers included (2026-10-18).
+  The one V1 sample colours per tile, so the user saved two more from CharPad
+  1.0: `software/charpad1_per_tile.ctm` and `software/charpad1_per_char.ctm`
+  (colouring method 2, per tile cell). Both parse the same way.
+- **Missing.** No release found that writes V3: CSDb and the old Subchrist site
+  go from 1.7 straight to 1.8.3. V8 came with the paid CharPad Pro builds
+  between Free 2.86 and Pro 3.60 (2.84, 3.01, 3.09, 3.10, 3.19, 3.20, 3.30,
+  3.31, from archived itch.io pages), which are no longer sold; their download
+  links were never archived. `CharPad2_010915.zip` (a later 2.0 beta) and
+  `CharPadExamples276.zip` came from the Wayback Machine's copy of
+  `subchristsoftware.com/downloads/`.
 - **Earlier projects.** Two C64 rebuilds converted game data to and from CharPad
   projects with small Python scripts:
   - `reference/grotten_playfield.py`, from De grotten van Oberon
@@ -34,7 +44,7 @@ From the specs. Each release reads all older versions.
 | 2 | CharPad 1.7 | 1.7 |
 | 3 | CharPad 1.8 before Rev 3 | none |
 | 4 | CharPad 1.8 Rev 3 | 1.8.3, 2.0 beta (one) |
-| 5 | CharPad 2.0 | 2.0 beta, 2.3, Free 2.6, Free 2.72 |
+| 5 | CharPad 2.0 | 2.0 betas, 2.3, Free 2.6, Free 2.72 |
 | 6 | CharPad 2.6 ("Thalamus" edition) | a few, in Free 2.72, Free 2.86, Pro 3.60, 3.69 |
 | 7 | CharPad 2.8 | Free 2.76, Free 2.86 |
 | 8 | CharPad C64 3.0; the version byte may be 82, from a dropped prototype | none |
