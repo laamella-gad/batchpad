@@ -151,7 +151,7 @@ suite "CTM V9":
     q = p
     q.keyMap = 16
     expect CtmError: discard q.toCtm
-    expect CtmError: discard p.toCtm(version = 7)
+    expect CtmError: discard p.toCtm(version = 8)
 
 suite "CTM V7":
   const dir = currentSourcePath().parentDir / "files" / "ctm7"
@@ -213,3 +213,39 @@ suite "CTM V7":
     check p.chars[0].material == 5 and p.chars[0].colours[0] == 10
     trailing.add 0
     expect CtmError: discard parseCtm(trailing)
+
+  test "writing gives back the same bytes":
+    var files = 0
+    for kind, path in walkDir(dir):
+      if path.endsWith(".ctm"):
+        checkpoint path
+        let data = readFile(path)
+        check readCtm(path).toCtm(version = 7) == cast[seq[byte]](data)
+        inc files
+    check files == 4
+
+  test "V9 to V7":
+    # Keeps what V7 holds, drops the key map and the flexi-grid.
+    var p = readCtm(currentSourcePath().parentDir / "files" / "ctm9" / "mctext_pertile.ctm")
+    p.keyMap = 9
+    let q = parseCtm(p.toCtm(version = 7))
+    check q.version == 7
+    p.version = 7
+    p.keyMap = 0
+    p.flexiGrid = FlexiGrid()
+    check q == p
+
+  test "writer errors":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    var q = p
+    q.displayMode = dmHiresBitmap
+    expect CtmError: discard q.toCtm(version = 7)
+    q = p
+    q.chars[2].material = 16
+    expect CtmError: discard q.toCtm(version = 7)
+    q = p
+    q.chars[2].colours[0] = 16
+    expect CtmError: discard q.toCtm(version = 7)
+    q = p
+    q.chars.setLen 0
+    expect CtmError: discard q.toCtm(version = 7)

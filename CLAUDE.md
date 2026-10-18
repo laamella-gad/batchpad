@@ -8,7 +8,7 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 ## Project status
 
-Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model, the CTM V7 reader (#18) and the V9 reader and writer (#22, #23), tested by `tests/tctm.nim`. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
+Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model, and the CTM V7 and V9 readers and writers (#18, #19, #22, #23), tested by `tests/tctm.nim`. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
 ## Priorities
 

@@ -228,11 +228,12 @@ proc writeColours(w: var Writer, c: Colours, mode: DisplayMode) =
 proc fail(msg: string) {.noreturn.} =
   raise newException(CtmError, msg)
 
-proc checkV9(p: Project) =
-  if p.chars.len notin 1..65536: fail("V9 holds 1 to 65536 chars, not " & $p.chars.len)
-  if p.keyMap > 15: fail("key map " & $p.keyMap & " does not fit in 4 bits")
+proc check(p: Project, version: int) =
+  ## The limits V7 and V9 share.
+  let v = "V" & $version
+  if p.chars.len notin 1..65536: fail(v & " holds 1 to 65536 chars, not " & $p.chars.len)
   if p.tileSystem:
-    if p.tiles.len notin 1..65536: fail("V9 holds 1 to 65536 tiles, not " & $p.tiles.len)
+    if p.tiles.len notin 1..65536: fail(v & " holds 1 to 65536 tiles, not " & $p.tiles.len)
     if p.tileWidth notin 1..255 or p.tileHeight notin 1..255:
       fail("tile size " & $p.tileWidth & " x " & $p.tileHeight & " is not 1 to 255 each way")
     for i, t in p.tiles:
@@ -245,8 +246,67 @@ proc checkV9(p: Project) =
   if p.map.len != p.mapWidth * p.mapHeight:
     fail("map has " & $p.map.len & " cells, not " & $(p.mapWidth * p.mapHeight))
 
+proc writeChars(w: var Writer, p: Project) =
+  w.blockMarker
+  w.u16 p.chars.len - 1
+  for ch in p.chars:
+    for b in ch.data: w.u8 b
+
+proc writeTiles(w: var Writer, p: Project) =
+  ## The tile block up to, not including, the tile colours.
+  w.blockMarker
+  w.u16 p.tiles.len - 1
+  w.u8 p.tileWidth
+  w.u8 p.tileHeight
+  for t in p.tiles:
+    for c in t.cells: w.u16 c
+
+proc writeTagsAndNames(w: var Writer, p: Project) =
+  w.blockMarker
+  for t in p.tiles: w.u8 t.tag
+  w.blockMarker
+  for t in p.tiles:
+    for c in t.name: w.u8 ord(c)
+    w.u8 0
+
+proc writeMap(w: var Writer, p: Project) =
+  w.blockMarker
+  w.u16 p.mapWidth
+  w.u16 p.mapHeight
+  for c in p.map: w.u16 c
+
+proc formatV7(p: Project): seq[byte] =
+  p.check(7)
+  if p.displayMode > dmEcmText: fail("V7 has no bitmap modes")
+  for i, ch in p.chars:
+    if ch.material > 15: fail("char " & $i & " material " & $ch.material & " does not fit in 4 bits")
+    if ch.colours[0] > 15: fail("char " & $i & " colour " & $ch.colours[0] & " does not fit in 4 bits")
+  var w: Writer
+  for c in "CTM": w.u8 ord(c)
+  w.u8 7
+  for c in p.chipColours: w.u8 c
+  w.u8 p.colours[0]
+  w.u8 ord(p.colouring)
+  w.u8 ord(p.displayMode)
+  w.u8 uint8(p.tileSystem)
+
+  w.writeChars(p)
+  w.blockMarker
+  for ch in p.chars: w.u8((ch.material shl 4) or ch.colours[0])
+
+  if p.tileSystem:
+    w.writeTiles(p)
+    if p.colouring == cmPerTile:
+      w.blockMarker
+      for t in p.tiles: w.u8 t.colours[0]
+    w.writeTagsAndNames(p)
+
+  w.writeMap(p)
+  w.data
+
 proc formatV9(p: Project): seq[byte] =
-  p.checkV9
+  p.check(9)
+  if p.keyMap > 15: fail("key map " & $p.keyMap & " does not fit in 4 bits")
   var w: Writer
   for c in "CTM": w.u8 ord(c)
   w.u8 9
@@ -259,10 +319,7 @@ proc formatV9(p: Project): seq[byte] =
   for c in p.chipColours: w.u8 c
   for c in p.colours: w.u8 c
 
-  w.blockMarker
-  w.u16 p.chars.len - 1
-  for ch in p.chars:
-    for b in ch.data: w.u8 b
+  w.writeChars(p)
   w.blockMarker
   for ch in p.chars: w.u8 ch.material
   if p.colouring == cmPerChar:
@@ -270,33 +327,22 @@ proc formatV9(p: Project): seq[byte] =
     for ch in p.chars: w.writeColours(ch.colours, p.displayMode)
 
   if p.tileSystem:
-    w.blockMarker
-    w.u16 p.tiles.len - 1
-    w.u8 p.tileWidth
-    w.u8 p.tileHeight
-    for t in p.tiles:
-      for c in t.cells: w.u16 c
+    w.writeTiles(p)
     if p.colouring == cmPerTile:
       w.blockMarker
       for t in p.tiles: w.writeColours(t.colours, p.displayMode)
-    w.blockMarker
-    for t in p.tiles: w.u8 t.tag
-    w.blockMarker
-    for t in p.tiles:
-      for c in t.name: w.u8 ord(c)
-      w.u8 0
+    w.writeTagsAndNames(p)
 
-  w.blockMarker
-  w.u16 p.mapWidth
-  w.u16 p.mapHeight
-  for c in p.map: w.u16 c
+  w.writeMap(p)
   w.data
 
 proc toCtm*(p: Project, version = 9): seq[byte] =
-  ## Formats `p` as a .ctm file of the given version. Raises CtmError when the
+  ## Formats `p` as a .ctm file of version 7 or 9. Raises CtmError when the
   ## version can't hold it. The colour bytes a display mode doesn't store
-  ## (e.g. colour RAM in hires bitmap) are dropped.
+  ## (e.g. colour RAM in hires bitmap) are dropped, and so are the key map,
+  ## the flexi-grid and screen colours in V7, which has none of them.
   case version
+  of 7: formatV7(p)
   of 9: formatV9(p)
   else: fail("writing CTM version " & $version & " is not supported yet")
 
