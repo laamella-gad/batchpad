@@ -30,13 +30,17 @@
   without samples. What the loaders do differently from the specs is under
   "What CharPad Pro 3.88 does with each version". The decompiled source is not
   kept in the repo.
+- **CharPad Free 2.86**, decompiled too (2026-10-18): it tries V7, V6, V5,
+  V4, V2 and V1 in that order, saves V7 and has "Export Project" for V5 and
+  V6. Its V2 loader also drops colouring method 2, like Pro's. It has no ECM:
+  an ECM project opens as hires text, with a warning.
 - **CharPad Glaze C64** (free on itch.io, 1.60 from June 2026) builds parallax
   scrolling data from a foreground and a background CharPad project. Its 55
   examples are all V9 (11 not in the other releases); they parse like the rest.
-  Its exe has a loader class per version, `CPV_FileIO_CTM1` to `CTM9` with no
-  `CTM3`, so Glaze can't open V3 files. It exports chars, maps and
-  tiles as binaries (8 bpc, 12 bpc as LSB + MSN files, 16 bpc as LSB + MSB
-  files), assembler source and text.
+  Decompiled (2026-10-18): it shares Pro's loaders but only calls V4 to V9, so
+  it can't open V1 to V3 files, and it saves no project. It exports the
+  parallax data (four char sets, attributes, two maps, 8 bit) as binaries and
+  64tass source; see `import-export.md`.
 - **Earlier projects.** Two C64 rebuilds converted game data to and from CharPad
   projects with small Python scripts:
   - `reference/grotten_playfield.py`, from De grotten van Oberon

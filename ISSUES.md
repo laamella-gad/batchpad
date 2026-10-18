@@ -29,7 +29,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Colouring method 2: the spec has a per-tile-cell colour block, CharPad Pro 3.88's loader doesn't read one. See #52.
 - #9 [feature, low] CharPad CTM V2 writer
 - #10 [feature, low] CharPad CTM V3 reader
-  - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Glaze has no V3 loader either.
+  - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
 - #11 [feature, low] CharPad CTM V3 writer
 - #12 [feature, normal] CharPad CTM V4 reader
   - CharPad 1.8 Rev 3. 110 samples.
@@ -76,7 +76,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
-  - CharPad Glaze C64 already checked: it reads CTM V1-V9 (no V3) and its examples are V9; see `docs/charpad.md`.
+  - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
 - #41 [feature, high] Write raw binary files
   - Same layouts as CharPad/SpritePad "Export": chars, char attributes L1/L2/M, tiles, tile attributes, map, map area; sprites, sprite attributes, sprite tiles, tile attributes. See `docs/import-export.md`.
   - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address (#54).
@@ -85,6 +85,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #43 [feature, high] Write assembler source for several assemblers
   - 64tass first, matching CharPad/SpritePad's template (labels, `colr_*`, `*_count`, `addr_`/`size_` constants, animation lists). Then ACME, KickAssembler, ca65, ... Ties into #3.
   - Template details in `docs/import-export.md`. CharPad's 12/16-bit output uses `addr_*_lo`/`_hi`/`_hi_packed` labels its header never defines; ours should define them.
+  - CharPad Free 2.86 writes an older template (upper-case `COLR_*`/`SZ_*` constants, no `* =` lines, other label names); also in `docs/import-export.md`. Decide whether to offer it as a variant.
 - #44 [feature, normal] Export flexi-grid sub-maps
   - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
 - #45 [feature, normal] Export colour map
