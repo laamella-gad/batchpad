@@ -18,7 +18,8 @@
   go from 1.7 straight to 1.8.3. V8 came with the paid CharPad Pro builds
   between Free 2.86 and Pro 3.60 (2.84, 3.01, 3.09, 3.10, 3.19, 3.20, 3.30,
   3.31, from archived itch.io pages), which are no longer sold; their download
-  links were never archived. `CharPad2_010915.zip` (a later 2.0 beta) and
+  links were never archived. CharPad Pro 3.88's "Export Project (CTM version
+  8)" can still make V8 files (see `import-export.md`). `CharPad2_010915.zip` (a later 2.0 beta) and
   `CharPadExamples276.zip` came from the Wayback Machine's copy of
   `subchristsoftware.com/downloads/`.
 - **CharPad Glaze C64** (free on itch.io, 1.60 from June 2026) builds parallax

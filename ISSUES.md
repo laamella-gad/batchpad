@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#41**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#52**.
 
 ## Open
 
@@ -42,7 +42,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad 2.8 / Free 2.86 (still on itch.io). 277 samples; writer already proven in Python references.
 - #19 [feature, high] CharPad CTM V7 writer
 - #20 [feature, normal] CharPad CTM V8 reader
-  - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes.
+  - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some.
 - #21 [feature, low] CharPad CTM V8 writer
 - #22 [feature, high] CharPad CTM V9 reader
   - CharPad Pro 3.5+ (current on itch.io). 652 samples; flexi-grid, key map, bitmap modes.
@@ -74,6 +74,29 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad Glaze C64 already checked: it reads CTM V1-V9 (no V3) and its examples are V9; see `docs/charpad.md`.
+- #41 [feature, high] Write raw binary files
+  - Same layouts as CharPad/SpritePad "Export": chars, char attributes L1/L2/M, tiles, tile attributes, map, map area; sprites, sprite attributes, sprite tiles, tile attributes. See `docs/import-export.md`.
+  - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address.
+- #42 [feature, normal] Read raw binary files
+  - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites). Tile/map sizes come from options.
+- #43 [feature, high] Write assembler source for several assemblers
+  - 64tass first, matching CharPad/SpritePad's template (labels, `colr_*`, `*_count`, `addr_`/`size_` constants, animation lists). Then ACME, KickAssembler, ca65, ... Ties into #3.
+- #44 [feature, normal] Export flexi-grid sub-maps
+  - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
+- #45 [feature, normal] Export colour map
+  - 1 byte per map char cell, the colour matrix low nibble (for $d800). Binary and asm (`colourmap_data`).
+- #46 [feature, normal] Export tile event jump table
+  - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
+- #47 [feature, low] Export usage statistics
+  - How often each char is used in tiles and map, and each tile in the map. Plain text.
+- #48 [feature, normal] Export PNG previews
+  - Char set, tile set and map (CharPad); sprite and tile sheets (SpritePad). Honour display mode and colours.
+- #49 [feature, low] Export SpritePad animations as animated GIFs
+  - Sprite and tile animations, using their timing; optional scaling.
+- #50 [feature, low] Read `.pal` palettes for previews
+  - Text, 16 `#RRGGBB` per line, optional quoted name per line. Built-in default (e.g. Pepto) when none given. Used by #48 and #49.
+- #51 [feature, low] Read CharPad C16 `.ctt` projects
+  - Decide after #40.
 
 ## In progress
 
