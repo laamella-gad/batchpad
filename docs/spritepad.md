@@ -183,9 +183,17 @@ From the decompiled loaders and savers.
 - **Animation attributes:** only bit 4 (ping-pong) is read and written. The
   enabled and overlay bits of V1 to V3 are dropped, and the savers write 0 or
   `$10`.
+- **V5 loader:** files under 84 bytes (header and one sprite) and a sprite
+  count of 0 are refused; bytes after the last part are ignored.
 - **V5 tile names:** read up to 33 bytes or the 0, then trimmed.
-- **Saving:** "Save" and "Save As" write V5, up to 65536 sprites. The unused
-  V3 and V4 savers drop tile tags and names. With tiles or animations off,
+- **V5 tile attributes in older builds:** 30 of the 112 V5 samples (e.g. examples
+  of 3.52 and 3.79) have tile attribute bytes of 3 or `$13`: the tile's
+  colour (default 3, cyan) in the low nibble, next to the overlay bit. 3.80
+  writes only bit 4. Our reader and writer keep the whole byte.
+- **Saving:** "Save" and "Save As" write V5, up to 65536 sprites (the count is
+  a word, so 65536 is written as 0 and the file can't be loaded again; our
+  writer refuses more than 65535). The unused V3 and V4 savers drop tile tags
+  and names. With tiles or animations off,
   their header fields are written as 0.
 
 ## SpritePad 1.8 format (no header)

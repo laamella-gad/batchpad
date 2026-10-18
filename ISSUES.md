@@ -21,6 +21,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #5 [feature, high] Shared in-memory model for all SpritePad formats
   - One model every SpritePad reader fills and every writer reads: sprites with 64th-byte attributes, colours, tiles with attributes/tags/names, sprite and tile animations, overlay distances.
   - Keep unused bits of the 64th byte for round trips; writers report what the target format can't hold.
+  - Started: `SpriteProject` in `src/batchpad/spd.nim` (#38), filled by the V5 reader. Keeps the 64th byte and the tile and animation attribute bytes as stored.
 - #6 [feature, low] CharPad CTM V1 reader
   - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
 - #7 [feature, low] CharPad CTM V1 writer
@@ -64,9 +65,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #36 [feature, normal] SPD V4 reader
   - SpritePad 2.8. No samples; overlay distances. Layout confirmed by SpritePad Pro 3.80's decompiled V4 loader and saver (no menu item saves V4).
 - #37 [feature, low] SPD V4 writer
-- #38 [feature, high] SPD V5 reader
-  - SpritePad 2.9 / Pro (current on itch.io). 112 samples.
-- #39 [feature, high] SPD V5 writer
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
@@ -129,6 +127,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #38 [feature, high] SPD V5 reader
+  - SpritePad 2.9 / Pro (current on itch.io). 112 samples.
+  - Done: `parseSpd` / `readSpd` in `src/batchpad/spd.nim`, tested on the three `tests/files/spd5/` files.
+- #39 [feature, high] SPD V5 writer
+  - Done: `toSpd` / `writeSpd` in `src/batchpad/spd.nim`; the three `tests/files/spd5/` files come back byte for byte. One-off check: all 237 V5 files from `software/` (112 distinct) do too.
 - #19 [feature, high] CharPad CTM V7 writer
   - Done: `toCtm(p, version = 7)` in `src/batchpad/ctm.nim`; the four `tests/files/ctm7/` files come back byte for byte. Refuses bitmap modes and materials or char colours above 15; drops the key map, flexi-grid and screen colours. One-off check: all 741 V7 files from `software/` (duplicates included) come back byte for byte.
 - #18 [feature, high] CharPad CTM V7 reader
