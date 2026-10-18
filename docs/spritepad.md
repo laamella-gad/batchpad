@@ -17,8 +17,9 @@
   the headerless 1.8 format and SPD V1 to V5, and a saver for each, though the
   menus only ever save V5. The V3 and V4 code matches the layouts below, so
   those two are confirmed without samples. See "What SpritePad Pro 3.80 does".
-  SpritePad 1.5 is a native Borland C++ Builder exe; Ghidra 12.1.4 decompiled it
-  to C (2026-10-18). See "What SpritePad 1.5 does".
+  SpritePad 1.5 and 1.8 are native Borland C++ Builder exes; Ghidra 12.1.4
+  decompiled them to C (2026-10-18). See "What SpritePad 1.5 does" and "What
+  SpritePad 1.8 does".
 - **Missing.** No samples or releases for SPD V3 (never released), SPD V4 or
   Sprite Painter 1.0-1.2 (1.5 can't read 1.2's `.inf`). SpritePad Pro 3.80 has V3 and V4
   savers but no menu item that calls them. V4 came with the paid SpritePad
@@ -237,14 +238,48 @@ To tell this format apart: SpritePad 2.0 and later write files that start with
 the magic `SPD`. A 1.8 file starts with a colour byte (0-15). So treat a file as
 1.8 when it doesn't start with `SPD` and its length is 3 mod 64.
 
-## Other formats SpritePad 1.8 can export
+## What SpritePad 1.8 does
 
-From the exe's strings, not tried:
-- `Sprites.prg` and `Sprites.raw`. Probably a load address plus the 64-byte
-  blocks, and the bare blocks.
-- SEUCK `.a` sprite files: always 127 sprites, and the file name must be 16
-  characters ending in `.A` on the D64.
-- Rips sprites from a VICE snapshot (`.vsf`).
+From the decompiled exe (native Borland C++ Builder; Ghidra 12.1.4,
+2026-10-18). Every routine works on a 256-sprite (16 KB) buffer.
+
+- **Open / Save** (`.spd`): the format above. The loader wants the file size
+  minus 3 to be a positive multiple of 64 and at most 65536, so it accepts up
+  to 1024 sprites although its buffer holds 256. "New" fills the buffer with 0
+  and sets every 64th byte to `$85` (multicolour, colour 5).
+- **Old `.spr`:** 1.5's loader is still there, with the same rules (64 to 16384
+  bytes, a multiple of 64; colours from `<file>.inf` only when it is exactly 3
+  bytes), called only from start-up code, not from Open. The `.spr` saver's
+  strings are left over, its code is gone.
+- **Export sprites** (dialog: Raw or PRG; SpritePad or SEUCK attributes):
+  all sprites, 64 bytes each. PRG puts a 2-byte load address first, typed as
+  hex digits (`0`-`9`, `A`-`F` only; anything else or nothing means no load
+  address). Default names `Sprites.raw` and `Sprites.prg`. The 64th byte is
+  kept, or with SEUCK attributes written as `000M CCCC`: colour, plus `$10`
+  if multicolour.
+- **Import sprites** (Raw, PRG or Auto; SpritePad, SEUCK or Ignore
+  attributes): PRG skips 2 bytes; Auto skips them when the size is 2 mod 64.
+  At least 64 bytes (raw) or 66 (PRG); count = size / 64, at most 256. SEUCK
+  attributes move bit 4 (multicolour) to bit 7 and drop bits 5-7 (`(b & $0f) +
+  (b & $10) * 8`); Ignore sets every 64th byte to `$8c`. The same three styles
+  as Pro (see `docs/import-export.md`).
+- **SEUCK `.a`:** save writes `$42 $00`, then the sprites with SEUCK
+  attributes, padded with zero blocks to 127 sprites (8130 bytes); more than
+  127 sprites is refused. Load is the import above with Auto and SEUCK.
+- **Text data** (Decimal or Hex): the selected range, written to
+  `spritedata.txt` next to the exe and opened with the shell. Per sprite a
+  blank line, `; Sprite n`, a blank line, then all 64 bytes on one line:
+  `0,12,255,...` or `$00,$0C,$FF,...` (upper case). No `.byte` keyword; text
+  mode, so CRLF on Windows.
+- **VICE Snapshot Ripper** (`.vsf`): reads the whole file, finds the
+  `VICE Snapshot File` signature and then the `C64MEM` module; the 64 KB RAM
+  starts 26 bytes after the module name. It shows one 16 KB VIC bank at a time
+  as 256 sprite blocks to copy from. A file without both strings gives
+  "Invalid VICE snapshot file".
+- **Palettes** (`palettes.pal`): per palette a quoted name (up to 32 chars),
+  then 16 colours, each `#` followed by exactly 6 hex digits (either case). A
+  palette counts only when all 16 colours parse.
+- **Save Bitmap:** a `.bmp` of the sprites; not looked at.
 
 ## From earlier projects
 

@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#56**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#58**.
 
 ## Open
 
@@ -118,6 +118,13 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - List every import and export option (`docs/import-export.md`, #41-#54) and every setting in the CharPad and SpritePad files (display mode, colouring method, colours, tile system, flexi-grid, key map, overlay distances, animations, ...).
   - From that, come up with a consistent set of commands and arguments: input/output files, what to export, cell width (8/12/16 bit), load address, assembler or C dialect, label names, sub-maps, overrides of project settings.
   - Write it down in a doc and check it against the build pipelines it's meant for. Supersedes the CLI part of #3.
+- #56 [feature, low] Read and write SEUCK `.A` sprite files
+  - `$42 $00`, then 127 sprites of 64 bytes (8130 bytes); the 64th byte is `000M CCCC`. Layout in `docs/import-export.md`, conversions in `docs/spritepad.md` (SpritePad 1.8 and Pro agree).
+  - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
+  - Also as an attribute style for raw sprite export/import (#41, #42): SpritePad, SEUCK or Ignore (`$8c` on import, 0 on export).
+- #57 [feature, low] Read and write SEUCK `.B` background files
+  - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; 9 x `$ff`, `$cf`. Layout in `docs/import-export.md`.
+  - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
 
 ## In progress
 

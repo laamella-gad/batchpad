@@ -485,7 +485,9 @@ Decided 2026-10-18; issues #41-#51, #53 and #54.
   palettes for colouring both (#50).
 - CharPad C16 `.ctt`: decide after #40 (#51).
 - A load address option shared by binary exports and imports (#54).
-- Skipped: SEUCK, Koala / Art Studio / Advanced Art Studio, image import,
+- SEUCK `.A` sprites and `.B` backgrounds, and the SEUCK attribute style for
+  raw sprites (#56, #57; added 2026-10-18).
+- Skipped: Koala / Art Studio / Advanced Art Studio, image import,
   VICE snapshots, Glaze's parallax build.
 
 ## Glaze
