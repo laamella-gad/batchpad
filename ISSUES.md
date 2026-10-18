@@ -26,7 +26,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #7 [feature, low] CharPad CTM V1 writer
 - #8 [feature, low] CharPad CTM V2 reader
   - CharPad 1.7. 9-byte chars (material), byte map.
-  - Colouring method 2: the spec has a per-tile-cell colour block, CharPad Pro 3.88's loader doesn't read one. See #52.
+  - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
 - #9 [feature, low] CharPad CTM V2 writer
 - #10 [feature, low] CharPad CTM V3 reader
   - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
@@ -104,9 +104,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Text, 16 `#RRGGBB` per line, optional quoted name per line. Built-in default (e.g. Pepto) when none given. Used by #48 and #49.
 - #51 [feature, low] Read CharPad C16 `.ctt` projects
   - Decide after #40.
-- #52 [task, low] Get a CTM V2 sample with colouring per tile cell
-  - Save one from CharPad 1.7 (`software/CharPad 1.7.zip`, runs under wine?) to see whether a per-tile-cell colour block follows the tiles, as the spec says, or not, as CharPad Pro 3.88's loader assumes.
-
 - #53 [feature, normal] Write C source for oscar64
   - Same content as the assembler output (#43): every labelled block becomes a `const` array (`charset_data`, `map_data`, `spriteset_data`, ...), the `colr_*`, `*_count`, `size_*` values become constants, names become a string table.
   - Tile events (#46): the jump table becomes an array of function pointers, `void (* const chartileset_events[])(void)`, one per tile, pointing at a function named after the tile (`chtl_<name>_event`, or `chtl_null_event`). Our output declares them; the user's code defines them. Optionally also write empty default functions.
@@ -125,3 +122,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 ## In progress
 
 ## Closed
+
+- #52 [task, low] Get a CTM V2 sample with colouring per tile cell
+  - Save one from CharPad 1.7 (`software/CharPad 1.7.zip`, runs under wine?) to see whether a per-tile-cell colour block follows the tiles, as the spec says, or not, as CharPad Pro 3.88's loader assumes.
+  - Settled: CharPad 1.7's UI and bundled V2 spec offer only global or per-tile colouring. The user saved `software/charpad_1_7.ctm` (method 1, 128 chars, 8 tiles of 4 x 4, 5 x 5 map, 1461 bytes), which parses by that layout.

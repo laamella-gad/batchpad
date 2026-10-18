@@ -14,6 +14,8 @@
   The one V1 sample colours per tile, so the user saved two more from CharPad
   1.0: `software/charpad1_per_tile.ctm` and `software/charpad1_per_char.ctm`
   (colouring method 2, per tile cell). Both parse the same way.
+  `software/charpad_1_7.ctm` is a V2 file the user saved from CharPad 1.7
+  (per tile colouring); it parses the same way too.
 - **Missing.** No release found that writes V3: CSDb and the old Subchrist site
   go from 1.7 straight to 1.8.3. V8 came with the paid CharPad Pro builds
   between Free 2.86 and Pro 3.60 (2.84, 3.01, 3.09, 3.10, 3.19, 3.20, 3.30,
@@ -120,8 +122,11 @@ Data, in this order:
   is per tile cell, a colour byte per tile cell; if per tile, a colour byte per
   tile; the map, a byte per cell.
 - **V2:** chars, 9 bytes each (the 9th is the material); tiles, a word per cell;
-  if per tile, a colour byte per tile; if per tile cell, a colour byte per tile
-  cell; the map, a byte per cell. Note the colour blocks swap order from V1.
+  if per tile, a colour byte per tile; the map, a byte per cell. The Pro spec
+  adds a colour byte per tile cell for method 2, after the per-tile block, but
+  no V2 file has one: CharPad 1.7's own spec (`Docs/CharPad - CTM (V2)
+  Format.txt`) allows only 0 (global) and 1 (per tile), and its UI has just a
+  "Use Global Tile Colour" checkbox.
 - **V3:** chars (8 bytes); tiles, a word per cell, left out when the char set is
   expanded; an attribute byte per tile cell, always there (colour bits only
   meaningful when colouring is per tile cell); if per tile, a colour byte per
@@ -213,11 +218,10 @@ reader of ours should follow the spec, but these are the cases to test.
 - **V2:** the 9th char byte goes through the same attribute decoder as V4 and
   later (material in the high nibble, colour in the low nibble, colour kept
   only when colouring is per char). Pro reads the per-tile colour block for
-  method 1, but **no per-tile-cell block for method 2**, which the spec says is
-  there; method 2 then turns into per project. None of the 24 V2 samples uses
-  method 2, so this is untested; a file saved that way from CharPad 1.7 would
-  settle it. Tile size 1 turns the tile system off (per tile then becomes per
-  char).
+  method 1, and no per-tile-cell block for method 2; method 2 then turns into
+  per project. That matches CharPad 1.7, which can't write method 2 (see the V2
+  layout above). Tile size 1 turns the tile system off (per tile then becomes
+  per char).
 - **V4:** the per-char attribute block straight after the chars is read and
   thrown away. The tile-cell attribute block is applied to the chars the cells
   point at. With 1 x 1 tiles the tile words are char numbers, used to rebuild
