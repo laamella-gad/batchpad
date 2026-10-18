@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/charpad_spritepad_assistant.iml" filepath="$PROJECT_DIR$/.idea/charpad_spritepad_assistant.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/batchpad.iml" filepath="$PROJECT_DIR$/.idea/batchpad.iml" />
     </modules>
   </component>
 </project>

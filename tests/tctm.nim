@@ -1,0 +1,115 @@
+import std/[os, unittest]
+import batchpad/ctm
+
+proc words(values: varargs[int]): seq[byte] =
+  for v in values:
+    result.add byte(v and 0xff)
+    result.add byte(v shr 8)
+
+proc v9(mode, colouring, flags: int, body: seq[byte]): seq[byte] =
+  result = @[byte('C'), byte('T'), byte('M'), 9, byte(mode), byte(colouring), byte(flags)]
+  result.add words(40, 25)
+  result.add 0x81           # flexi-grid on, red
+  result.add @[byte 6, 11, 12, 15, 1, 2, 3]
+  result.add body
+
+suite "CTM V9":
+  const dir = currentSourcePath().parentDir / "files" / "ctm9"
+  const charData = [
+    [0x00'u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    [0xff'u8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+    [0xaa'u8, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55],
+    [0xff'u8, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff],
+    [0x80'u8, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01],
+    [0x00'u8, 0x00, 0x55, 0x55, 0xaa, 0xaa, 0xff, 0xff]]
+  const tileMap = @[1'u16, 2, 3, 1, 2, 3,
+                    2, 3, 1, 2, 3, 1,
+                    0, 1, 0, 1, 0, 1]
+  const charMap = @[1'u16, 2, 3, 4, 5, 0,
+                    5, 4, 3, 2, 1, 0]
+
+  proc checkChars(p: Project) =
+    check p.chars.len == 6
+    for i, ch in p.chars:
+      check ch.data == charData[i]
+      check ch.material == uint8(i)
+
+  proc checkTiles(p: Project) =
+    check p.tileSystem
+    check p.tileWidth == 2 and p.tileHeight == 2
+    check p.tiles.len == 4
+    check p.tiles[3].cells == @[5'u16, 2, 2, 5]
+    for i, name in ["empty", "solid", "box", "bands"]:
+      check p.tiles[i].name == name
+      check p.tiles[i].tag == uint8(i)
+    check p.mapWidth == 6 and p.mapHeight == 3
+    check p.map == tileMap
+
+  proc checkNoTiles(p: Project) =
+    check not p.tileSystem
+    check p.tiles.len == 0
+    check p.mapWidth == 6 and p.mapHeight == 2
+    check p.map == charMap
+
+  test "multicolour text, per tile":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerTile
+    check p.flexiGrid == FlexiGrid(width: 10, height: 10, settings: 0x40)
+    check p.chipColours == [6'u8, 11, 12, 0]
+    check p.colours == [14'u8, 0, 0]
+    p.checkChars
+    p.checkTiles
+    for i, c in [9'u8, 10, 13, 15]:
+      check p.tiles[i].colours == [c, 0, 0]
+
+  test "hires text, per char, no tiles":
+    let p = readCtm(dir / "hirestext_perchar_notiles.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerChar
+    p.checkChars
+    p.checkNoTiles
+    for i, c in [1'u8, 2, 5, 7, 13, 14]:
+      check p.chars[i].colours == [c, 0, 0]
+
+  test "multicolour bitmap, per tile":
+    let p = readCtm(dir / "mcbitmap_pertile.ctm")
+    check p.displayMode == dmMulticolourBitmap
+    check p.colouring == cmPerTile
+    check p.colours == [1'u8, 2, 3]
+    p.checkChars
+    p.checkTiles
+    check p.tiles[0].colours == [1'u8, 2, 3]
+    check p.tiles[3].colours == [10'u8, 11, 12]
+
+  test "hires bitmap, per char, flexi-grid":
+    let p = readCtm(dir / "hiresbitmap_perchar.ctm")
+    check p.displayMode == dmHiresBitmap
+    check p.colouring == cmPerChar
+    check p.flexiGrid == FlexiGrid(width: 3, height: 2, settings: 0x81)
+    p.checkChars
+    p.checkTiles
+    check p.chars[1].colours == [0'u8, 2, 7]
+    check p.chars[5].colours == [0'u8, 0, 1]
+
+  test "ECM text, per project, key map":
+    let p = readCtm(dir / "ecm_perproject_notiles.ctm")
+    check p.displayMode == dmEcmText
+    check p.colouring == cmPerProject
+    check p.keyMap == 9
+    check p.chipColours == [0'u8, 2, 5, 6]
+    check p.colours == [1'u8, 0, 0]
+    p.checkChars
+    p.checkNoTiles
+
+  test "errors":
+    expect CtmError: discard parseCtm(cast[seq[byte]]("CTX\9"))
+    expect CtmError: discard parseCtm(@[byte('C'), byte('T'), byte('M'), 3])
+    expect CtmError: discard parseCtm(v9(0, 0, 0, @[byte 0xda]))
+    expect CtmError: discard parseCtm(v9(5, 0, 0, @[]))
+    expect CtmError: discard parseCtm(v9(0, 3, 0, @[]))
+    var trailing = v9(0, 0, 0, @[byte 0xda, 0xb0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                  0xda, 0xb1, 0, 0xda, 0xb2, 1, 0, 1, 0, 0, 0])
+    discard parseCtm(trailing)
+    trailing.add 0
+    expect CtmError: discard parseCtm(trailing)

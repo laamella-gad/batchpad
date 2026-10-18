@@ -1,1 +1,4 @@
 /software/
+/bin/
+/tests/t*
+!/tests/t*.nim

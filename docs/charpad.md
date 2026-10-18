@@ -270,6 +270,12 @@ are those of CTM V8 and V9; the header and colours differ:
   So more than 256 chars in a version 7 file works.
 - Copter Duel's tile-less version 7 export works in CharPad Free 2.86.
 - Export, then import with no edits, gives back the same bytes in both projects.
+- CharPad C64 Pro 3.88 shows tile 1's tag as 0 right after loading a V9 file,
+  although the file holds another value and Pro's loader reads it unchanged.
+  Setting it, saving and reloading gives 0 again; the saved file does hold the
+  new tag. A CharPad bug, probably in the Tile Editor (its tag field writes to
+  the selected tiles, and loading selects tile 1). Other tiles keep their tag
+  (checked by the user, 2026-10-18).
 
 ## Colours per cell: char copies
 

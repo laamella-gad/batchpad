@@ -1,11 +1,11 @@
 # Package
 version = "0.1.0"
 author = "matozoid"
-description = ""
+description = "Converts CharPad and SpritePad projects into build artifacts"
 license = "MIT"
 srcDir = "src"
 binDir = "bin"
-bin = @["charpad_spritepad_assistant"]
+bin = @["batchpad"]
 
 # Dependencies
 requires "nim >= 2.2.8"

@@ -8,7 +8,7 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 ## Project status
 
-Freshly generated Nimble binary package (`nimble init` skeleton). The only source file is `src/charpad_spritepad_assistant.nim`, which currently prints "Hello, World!". No tests or architecture exist yet; `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
+Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model and the CTM V9 reader (#22), tested by `tests/tctm.nim`. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
 ## Priorities
 
@@ -20,24 +20,24 @@ Issues live in `ISSUES.md` (format described at its top). When finishing work on
 
 ## Toolchain
 
-- Nim >= 2.2.8 (declared in `charpad_spritepad_assistant.nimble`), managed with Nimble.
+- Nim >= 2.2.8 (declared in `batchpad.nimble`), managed with Nimble.
 - Project is opened in IntelliJ IDEA with the Nim plugin (`.idea/`).
 
 ## Commands
 
 ```sh
-nimble build                 # compile to bin/charpad_spritepad_assistant
+nimble build                 # compile to bin/batchpad
 nimble run                   # build and run
-nim c -r src/charpad_spritepad_assistant.nim   # compile + run directly
-nim check src/charpad_spritepad_assistant.nim  # type-check without building
-nimble test                  # runs tests/t*.nim (no tests/ dir yet)
-nim c -r tests/tfoo.nim      # run a single test file once tests exist
+nim c -r src/batchpad.nim   # compile + run directly
+nim check src/batchpad.nim  # type-check without building
+nimble test                  # runs tests/t*.nim
+nim c -r -p:src tests/tctm.nim   # run a single test file
 ```
 
 ## Layout
 
-- `srcDir = "src"`, `binDir = "bin"`; the binary entry point is `src/charpad_spritepad_assistant.nim` (code under `when isMainModule:`).
-- Library modules for the package should go in `src/charpad_spritepad_assistant/`; tests in `tests/` with `t` prefix (Nimble convention picked up by `nimble test`).
+- `srcDir = "src"`, `binDir = "bin"`; the binary entry point is `src/batchpad.nim` (code under `when isMainModule:`).
+- Library modules for the package should go in `src/batchpad/`; tests in `tests/` with `t` prefix (Nimble convention picked up by `nimble test`). Tests build their input bytes themselves: they must never need `software/` or other commercial downloads. Work on a format version includes making a few small test files for it ourselves, in `tests/files/<format><version>/` with a README saying what they hold (e.g. `tests/files/ctm9/`).
 - `docs/spritepad.md`: SpritePad formats: 1.x `.spr`+`.inf`, headerless 1.8 `.spd`, SPD V1-V5.
 - `docs/import-export.md`: every import/export format of the current CharPad, SpritePad and Glaze releases, and which we support.
 - `docs/charpad.md`: CTM V1-V9 format (from CharPad's official specs, checked against all bundled samples) and lessons from earlier projects; `docs/reference/` holds the Python scripts they came from.

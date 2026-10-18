@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#58**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#59**.
 
 ## Open
 
@@ -46,8 +46,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #20 [feature, normal] CharPad CTM V8 reader
   - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some. Layout confirmed by Pro 3.88's decompiled V8 loader and saver.
 - #21 [feature, low] CharPad CTM V8 writer
-- #22 [feature, high] CharPad CTM V9 reader
-  - CharPad Pro 3.5+ (current on itch.io). 652 samples; flexi-grid, key map, bitmap modes.
 - #23 [feature, high] CharPad CTM V9 writer
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
@@ -123,7 +121,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
   - Also as an attribute style for raw sprite export/import (#41, #42): SpritePad, SEUCK or Ignore (`$8c` on import, 0 on export).
 - #57 [feature, low] Read and write SEUCK `.B` background files
-  - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; 9 x `$ff`, `$cf`. Layout in `docs/import-export.md`.
+  - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; `$3f`, 9 x `$ff`. Layout in `docs/import-export.md`.
   - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
   - CharPad 1.7 also wrote backgrounds for the "sideways SEUCK mod" (819 x 5 map), same file layout with the map bytes reordered; see docs/import-export.md. The file doesn't say which kind it is, so this needs an option.
 
@@ -131,6 +129,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #58 [task, high] Our own test files for every CTM and SPD version
+  - Dropped as a separate task: each version's reader or writer issue makes its own small test files when we work on it (see CLAUDE.md).
+- #22 [feature, high] CharPad CTM V9 reader
+  - CharPad Pro 3.5+ (current on itch.io). 652 samples; flexi-grid, key map, bitmap modes.
+  - Done: `src/batchpad/ctm.nim`; every V9 sample from `software/` parsed in a one-off check (3673 files extracted, duplicates included).
 - #52 [task, low] Get a CTM V2 sample with colouring per tile cell
   - Save one from CharPad 1.7 (`software/CharPad 1.7.zip`, runs under wine?) to see whether a per-tile-cell colour block follows the tiles, as the spec says, or not, as CharPad Pro 3.88's loader assumes.
   - Settled: CharPad 1.7's UI and bundled V2 spec offer only global or per-tile colouring. The user saved `software/charpad_1_7.ctm` (method 1, 128 chars, 8 tiles of 4 x 4, 5 x 5 map, 1461 bytes), which parses by that layout.
