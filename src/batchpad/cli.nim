@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils]
 import argparse
-import ctm, rawbin, spd
+import asmout, ctm, rawbin, spd
 
 type
   CliError* = object of CatchableError
@@ -221,6 +221,17 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
     if a >= 0: data = @[byte(a and 0xff), byte(a shr 8)] & data
     result.add Output(path: path, data: data.toStr)
 
+proc asmOutput(input: Input, o: AsmOptions): string =
+  case input.kind
+  of kCtm: input.ctm.toAsm(o)
+  of kSpd: input.spd.toAsm(o)
+
+proc parseOrg(specs: seq[string]): seq[(string, int)] =
+  for spec in specs:
+    let eq = spec.find('=')
+    if eq < 1 or eq == spec.high: usage("--org needs part=ADDR, not " & spec)
+    result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
+
 template common() =
   option("--input-format", choices = @["ctm", "spd"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
@@ -265,6 +276,8 @@ let parser = newParser("batchpad"):
     option("--eol", choices = @["lf", "crlf"], default = some("lf"))
     option("--cells", choices = @["8", "12", "16", "word"], default = some("8"))
     option("--area", help = "Only this part of the map: X,Y,W,H")
+    option("--sprite-attribs", choices = @["spritepad", "seuck", "blank"],
+           default = some("spritepad"), help = "64th byte style of sprites")
     common()
     arg("input")
   command("c"):
@@ -353,7 +366,18 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
                           spriteAttribs: parseEnum[SpriteAttribStyle](o.spriteAttribs))
       if o.area != "": bo.area = some(parseArea(o.area))
       outputs.add load(o.input, o.inputFormat, o.set).binOutputs(o.parts, bo, o.loadAddress)
-    of "asm": notYet("#43")
+    of "asm":
+      let o = opts.argparse_asm_opts.get
+      alwaysWrite = o.alwaysWrite
+      if o.eventLabels != "normal": notYet("#46")
+      var ao = AsmOptions(dialect: parseEnum[Dialect](o.dialect), prefix: o.prefix,
+                          org: parseOrg(o.org), segment: o.segment, crlf: o.eol == "crlf",
+                          bin: BinOptions(cells: parseEnum[CellFormat](o.cells),
+                                          spriteAttribs: parseEnum[SpriteAttribStyle](o.spriteAttribs)),
+                          source: if o.input == "-": "stdin" else: o.input.extractFilename)
+      if o.area != "": ao.bin.area = some(parseArea(o.area))
+      if o.parts != "": ao.parts = o.parts.split(',')
+      outputs.add Output(path: o.output, data: load(o.input, o.inputFormat, o.set).asmOutput(ao))
     of "c": notYet("#53")
     of "png": notYet("#48")
     of "gif": notYet("#49")
@@ -373,7 +397,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     errors.writeLine "batchpad: " & e.msg
     errors.flush
     return 2
-  except CliError, CtmError, SpdError, BinError:
+  except CliError, CtmError, SpdError, BinError, AsmError:
     let e = getCurrentException()
     errors.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
     errors.flush

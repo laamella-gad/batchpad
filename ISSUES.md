@@ -2,10 +2,12 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#61**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#62**.
 
 ## Open
 
+- #61 [task, normal] Check the assembler output with ACME and KickAssembler
+  - Neither was installed when #43 was done; only the syntax was written from their manuals. Check that the `asm` output of every test file assembles, with `--org`, `--prefix`, names and (KickAssembler) `--segment`. Also compare labels and data with an "Export All (one file)" text export from CharPad and SpritePad Pro.
 - #1 [feature, high] Parse CharPad project files (.ctm)
   - Header, charset, tiles, map, colours.
   - Umbrella: model #4, per-version readers/writers #6-#23. Specs for V1-V9: `docs/charpad.md`.
@@ -65,10 +67,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
-- #43 [feature, high] Write assembler source for several assemblers
-  - 64tass first, matching CharPad/SpritePad's template (labels, `colr_*`, `*_count`, `addr_`/`size_` constants, animation lists). Then ACME, KickAssembler, ca65, ... Ties into #3.
-  - Template details in `docs/import-export.md`. CharPad's 12/16-bit output uses `addr_*_lo`/`_hi`/`_hi_packed` labels its header never defines; ours should define them.
-  - CharPad Free 2.86 writes an older template (upper-case `COLR_*`/`SZ_*` constants, no `* =` lines, other label names); also in `docs/import-export.md`. Not offered: we write the newest template only (decided 2026-10-19).
 - #44 [feature, normal] Export flexi-grid sub-maps
   - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
 - #45 [feature, normal] Export colour map
@@ -115,6 +113,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #43 [feature, high] Write assembler source for several assemblers
+  - 64tass first, matching CharPad/SpritePad's template (labels, `colr_*`, `*_count`, `addr_`/`size_` constants, animation lists). Then ACME, KickAssembler, ca65, ... Ties into #3.
+  - Template details in `docs/import-export.md`. CharPad's 12/16-bit output uses `addr_*_lo`/`_hi`/`_hi_packed` labels its header never defines; ours should define them.
+  - CharPad Free 2.86 writes an older template (upper-case `COLR_*`/`SZ_*` constants, no `* =` lines, other label names); also in `docs/import-export.md`. Not offered: we write the newest template only (decided 2026-10-19).
+  - Done 2026-10-19: `batchpad asm` (`src/batchpad/asmout.nim`), with the data from `rawbin.binPart`. Labels, constants, comments and Export All's part order follow CharPad Pro 3.88's and SpritePad Pro 3.80's decompiled text writers. Split cells get `_lo` and `_hi` or `_hi_packed` blocks, each with its own `size_` constant; `addr_` constants and `* =` lines only for the parts `--org` names. Dialects 64tass, ACME, KickAssembler and ca65; tile names as `.text` in 64tass and ACME, as bytes in KickAssembler and ca65 (which may translate strings). Every test file assembles with 64tass 1.6 and ca65 in all cell widths; ACME and KickAssembler are not installed here (#61). Tile events, sub-maps and the colour map are #46, #44, #45.
 - #60 [feature, normal] Warn about what writers leave out
   - The fit procs in `ctm.nim` and `spd.nim` drop what a version can't hold without saying so. Make them report each thing dropped, so the command line can print it on stderr (`--quiet` hides it, `--strict` makes it an error; `docs/cli.md`). Until then `--quiet` and `--strict` do nothing.
   - Done 2026-10-19: `toCtm` and `toSpd` take a `leftOut` list that the fit procs fill, one line per thing left out (counts, the version that lacks it). `convert` prints them as `batchpad: <output>: warning: left out ...`; `--quiet` hides them, `--strict` fails with exit 1 and writes nothing. Colour bytes a display mode doesn't use are left out without a line, and so are tiles with the tile system off. `bin` refuses rather than leaving out, so it has no warnings yet.

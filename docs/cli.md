@@ -1,9 +1,10 @@
 # Command line (#55)
 
 How batchpad is meant to be called. `src/batchpad/cli.nim` has every
-command and option below, parsed with argparse; `info`, `convert` and `bin` work
-(`bin` without `submaps` and `colour-map` yet), the others say which issue
-they wait for. Raw binary layouts are in `src/batchpad/rawbin.nim`. This is the design the exports
+command and option below, parsed with argparse; `info`, `convert`, `bin` and
+`asm` work (without `submaps`, `colour-map` and `tile-events` yet), the others
+say which issue they wait for. Raw binary layouts are in
+`src/batchpad/rawbin.nim`, assembler source in `src/batchpad/asmout.nim`. This is the design the exports
 (#41-#54, #56, #57) are written against. Decided
 2026-10-19; the choices are listed at the end.
 
@@ -194,8 +195,9 @@ batchpad asm level.ctm -o build/level.asm --dialect kickass --parts chars,map --
 | `--dialect` | `64tass`, `acme`, `kickass`, `ca65`, ... (#43) | `64tass` |
 | `--parts LIST` | What to include | what CharPad's "Export All (one file)" writes |
 | `--prefix TEXT` | Put before every label and constant, so two projects can go in one program | none |
-| `--org part=ADDR` | Writes a `* =` (or the dialect's) line before that part; can repeat | none: the data follows on where the file is included |
-| `--segment NAME` | ca65 `.segment`, KickAssembler `.segment` | none |
+| `--org part=ADDR` | Writes an `addr_` constant and a `* =` (ca65: `.org`) line before that part; can repeat. For split cells `map` names the low half, `map-hi` the high one. | none: the data follows on where the file is included |
+| `--segment NAME` | ca65 `.segment`, KickAssembler `.segment`; an error for the others | none |
+| `--cells`, `--area`, `--sprite-attribs` | As for `bin`. Animation frames are bytes with `--cells 8`, words otherwise. | |
 | `--event-labels normal\|alt` | `chtl_<name>_event` or `<name>` (#46) | `normal` |
 | `--eol lf\|crlf` | Line endings | `lf` |
 
@@ -205,7 +207,18 @@ upper-case template is not offered.
 
 Unlike CharPad, every label the file uses is defined, and without `--org` there
 are no `* =` lines with dummy addresses, so the file assembles as it is when
-included.
+included. Split cells get a block each, `map_data_lo` and `map_data_hi` (or
+`map_data_hi_packed` for 12 bit), each with its own `size_` constant.
+
+| Dialect | Constants | Labels | Data | Comments |
+| --- | --- | --- | --- | --- |
+| `64tass` | `x = 1` | `name` | `.byte`, names as `.text "..", 0` | `;` |
+| `acme` | `x = 1` | `name` | `!byte`, names as `!text "..", 0` | `;` |
+| `kickass` | `.const x = 1` | `name:` | `.byte`, names as bytes | `//` |
+| `ca65` | `x = 1` | `name:` | `.byte`, names as bytes | `;` |
+
+KickAssembler and ca65 may translate the characters of a string, so names are
+written there as their bytes, with the name in a comment above.
 
 ### c
 
