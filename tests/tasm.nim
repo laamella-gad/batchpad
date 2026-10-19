@@ -169,6 +169,59 @@ suite "CharPad assembler source":
       discard charProject().toAsm(AsmOptions(parts: @["colour-map"],
                                              bin: BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1)))))
 
+  test "tile events":
+    var p = charProject()
+    p.tiles.add Tile(cells: @[0'u16, 0], name: "floor")
+    p.tiles.add Tile(cells: @[0'u16, 0], name: "Lava")
+    p.tiles.add Tile(cells: @[0'u16, 0], name: "chtl")
+    p.tiles[1].name = "null"    # the same label as a tile without a name
+    let s = p.toAsm(AsmOptions(parts: @["tile-events"], org: @[("tile-events", 0x2000)]))
+    check "; 6 pointers (one per tile), 16 bits per pointer, total size is 12 ($c) bytes." in s.lines
+    check "addr_chartileset_eventjumptable = $2000" in s.lines
+    check "* = addr_chartileset_eventjumptable" in s.lines
+    check ".word chtl_floor_event, chtl_null_event, chtl_null_event, chtl_floor_event" in s.lines
+    check ".word chtl_Lava_event, chtl_chtl_event" in s.lines
+    check "; CharTileSet Events (4)..." in s.lines
+    check "size_chartileset_events = $4 ; (4 bytes)" in s.lines
+    check "; event: chartile \"Lava\"." in s.lines
+    check "chtl_Lava_event" in s.lines
+    check s.count("rts\n") == 4
+    check s.everyOrgDefined
+    let alt = p.toAsm(AsmOptions(dialect: dKickAss, parts: @["tile-events"], altEventLabels: true,
+                                 prefix: "lv_"))
+    check ".word lv_floor, lv_null, lv_null_event, lv_floor" in alt.lines
+    check "lv_null_event:" in alt.lines
+    check "lv_Lava:" in alt.lines
+    let bare = p.toAsm(AsmOptions(dialect: dAcme, parts: @["tile-events"], eventStubs: false))
+    check "!word chtl_Lava_event, chtl_chtl_event" in bare.lines
+    check not bare.defines("chartileset_events")
+    check not bare.defines("chtl_null_event")
+
+  test "tile names that can't be event labels":
+    for name in ["say \"hi\"", "a-b", "ünï"]:
+      var p = charProject()
+      p.tiles[0].name = name
+      expect AsmError: discard p.toAsm(AsmOptions(parts: @["tile-events"]))
+    for name in ["x", "LDA", "rts", "_up", "3d", "lax"]:
+      var p = charProject()
+      p.tiles = @[Tile(cells: @[0'u16, 0], name: name)]
+      check p.toAsm(AsmOptions(parts: @["tile-events"])).defines("chtl_" & name & "_event")
+      expect AsmError:
+        discard p.toAsm(AsmOptions(parts: @["tile-events"], altEventLabels: true))
+    var p = charProject()
+    p.tiles = @[Tile(cells: @[0'u16, 0], name: "x")]
+    check p.toAsm(AsmOptions(parts: @["tile-events"], altEventLabels: true,
+                             prefix: "lv_")).defines("lv_x")
+    # Names that only differ in case are the same label in 64tass; names
+    # can't take the labels of other parts.
+    p.tiles = @[Tile(cells: @[0'u16, 0], name: "door"), Tile(cells: @[0'u16, 0], name: "Door")]
+    expect AsmError: discard p.toAsm(AsmOptions(parts: @["tile-events"]))
+    p.tiles = @[Tile(cells: @[0'u16, 0], name: "map_data")]
+    expect AsmError:
+      discard p.toAsm(AsmOptions(parts: @["map", "tile-events"], altEventLabels: true))
+    p.tileSystem = false
+    expect AsmError: discard p.toAsm(AsmOptions(parts: @["tile-events"]))
+
   test "mistakes":
     let p = charProject()
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["sprites"]))
@@ -280,6 +333,12 @@ suite "assembling":
     level.flexiGrid = FlexiGrid(width: 1, height: 2)
     writeFile(dir / "level.s", level.toAsm(o))
     writeFile(dir / "sprites.s", spriteProject().toAsm(AsmOptions(dialect: d, prefix: "sp_")))
+    var events = charProject()
+    events.tiles[1].name = "say_hi"
+    writeFile(dir / "events.s",
+              events.toAsm(AsmOptions(dialect: d, prefix: "ev_", parts: @["tile-events"])) &
+              events.toAsm(AsmOptions(dialect: d, prefix: "alt_", parts: @["tile-events"],
+                                      altEventLabels: true)))
     writeFile(dir / "main.s", main)
     let (output, code) = execCmdEx("cd " & quoteShell(dir) & " && " & command)
     check code == 0
@@ -292,25 +351,26 @@ suite "assembling":
   test "64tass, ACME, KickAssembler and ca65 give the same bytes":
     var made: seq[(string, string)]
     if findExe("64tass") != "":
-      made.add ("64tass", assemble(d64tass, "* = $1000\n.include \"level.s\"\n.include \"sprites.s\"\n",
+      made.add ("64tass", assemble(d64tass, "* = $1000\n.include \"level.s\"\n.include \"sprites.s\"\n.include \"events.s\"\n",
                                    "64tass -q -b -o out.bin main.s"))
     if findExe("acme") != "":
-      made.add ("acme", assemble(dAcme, "* = $1000\n!source \"level.s\"\n!source \"sprites.s\"\n",
+      made.add ("acme", assemble(dAcme, "* = $1000\n!source \"level.s\"\n!source \"sprites.s\"\n!source \"events.s\"\n",
                                  "acme -f plain -o out.bin main.s"))
     if findExe("ca65") != "" and findExe("ld65") != "":
-      made.add ("ca65", assemble(dCa65, ".include \"level.s\"\n.include \"sprites.s\"\n",
+      made.add ("ca65", assemble(dCa65, ".include \"level.s\"\n.include \"sprites.s\"\n.include \"events.s\"\n",
                                  "ca65 -o main.o main.s && ld65 -t none -o out.bin main.o"))
     let kickAss = getEnv("KICKASS_JAR")
     if kickAss != "" and findExe("java") != "":
-      made.add ("kickass", assemble(dKickAss, "* = $1000\n#import \"level.s\"\n#import \"sprites.s\"\n",
+      made.add ("kickass", assemble(dKickAss, "* = $1000\n#import \"level.s\"\n#import \"sprites.s\"\n#import \"events.s\"\n",
                                     "java -jar " & quoteShell(kickAss) & " main.s -binfile -o out.bin"))
     if made.len == 0: skip()
     for (name, bytes) in made:
       checkpoint name
       # chars, attributes, tiles, tile attributes, tags, names, map, sub-maps,
       # colour map; sprites, attributes, tiles, tile attributes, tags, two lots
-      # of animations
-      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 9 + 12 + 192 + 3 + 4 + 2 + 2 + 4 + 4
+      # of animations; two lots of tile events (jump table, rts stubs)
+      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 9 + 12 + 192 + 3 + 4 + 2 + 2 + 4 + 4 +
+                         2 * (6 + 3)
       check bytes == made[0][1]
 
   test "64tass with --org":

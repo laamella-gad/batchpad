@@ -5,7 +5,7 @@
 ## Unlike the templates, every label the file uses is defined, and there are
 ## no `* =` lines unless asked for, so the file assembles as it is.
 
-import std/[options, strutils]
+import std/[options, sets, strutils]
 import binio, ctm, rawbin, spd
 
 type
@@ -23,6 +23,8 @@ type
     crlf*: bool
     bin*: BinOptions               ## cells, area, sprite attributes
     source*: string                ## named in the first line
+    altEventLabels*: bool          ## tile event labels `<name>`, not `chtl_<name>_event`
+    eventStubs* = true             ## an `rts` per tile event label
 
   Chunk = object
     label: string                  ## a label inside the block, or ""
@@ -34,11 +36,13 @@ type
     comments: seq[string]
     chunks: seq[Chunk]
     names: seq[string]             ## zero-terminated strings instead of chunks
+    words: seq[string]             ## `.word` entries, labels
+    stubs: seq[(string, string)]   ## comment and label of an `rts` each
 
 const
   ctmAsmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                   "tiles", "tile-attribs", "tile-attribs-l2", "tile-tags",
-                  "tile-names", "map", "submaps", "colour-map"]
+                  "tile-names", "tile-events", "map", "submaps", "colour-map"]
   spdAsmParts* = ["sprites", "sprite-attribs", "tiles", "tile-attribs",
                   "tile-tags", "tile-names", "sprite-anims", "tile-anims"]
 
@@ -47,6 +51,7 @@ proc fail(msg: string) {.noreturn.} = raise newException(AsmError, msg)
 func size(b: Block): int =
   for c in b.chunks: result += c.data.len
   for n in b.names: result += n.len + 1
+  result += 2 * b.words.len + b.stubs.len
 
 func hex(n: int): string =
   result = toHex(n).toLowerAscii.strip(trailing = false, chars = {'0'})
@@ -95,9 +100,56 @@ func mapSize(p: ctm.Project, o: BinOptions): (int, int) =
 proc names(tiles: seq[ctm.Tile] | seq[SpriteTile]): seq[string] =
   for t in tiles: result.add t.name
 
+const reserved = toHashSet([
+  # Registers and mnemonics, illegal ones included, can't be labels in some
+  # of the dialects.
+  "a", "x", "y",
+  "adc", "and", "asl", "bcc", "bcs", "beq", "bit", "bmi", "bne", "bpl", "brk",
+  "bvc", "bvs", "clc", "cld", "cli", "clv", "cmp", "cpx", "cpy", "dec", "dex",
+  "dey", "eor", "inc", "inx", "iny", "jmp", "jsr", "lda", "ldx", "ldy", "lsr",
+  "nop", "ora", "pha", "php", "pla", "plp", "rol", "ror", "rti", "rts", "sbc",
+  "sec", "sed", "sei", "sta", "stx", "sty", "tax", "tay", "tsx", "txa", "txs",
+  "tya", "ahx", "alr", "anc", "ane", "arr", "asr", "axs", "dcp", "dcm", "hlt",
+  "isb", "isc", "ins", "jam", "kil", "lae", "las", "lax", "lxa", "rla", "rra",
+  "sax", "sbx", "sha", "shs", "shx", "shy", "slo", "sre", "tas", "xaa"])
+
+func isLabel(s: string): bool =
+  s.len > 0 and s[0] in Letters and s.allCharsInSet(IdentChars) and s.toLowerAscii notin reserved
+
+proc eventBlocks(p: ctm.Project, ao: AsmOptions): seq[Block] =
+  ## CharPad's tile event jump table: a pointer per tile to a label made from
+  ## its name, and an `rts` stub per label unless `eventStubs` is off.
+  if not p.tileSystem: fail("the project has no tiles")
+  let null = if ao.altEventLabels: "null_event" else: "chtl_null_event"
+  var table = Block(part: "tile-events", label: "chartileset_eventjumptable", comments: @[
+      "CharTileSet Event Jump Table...",
+      count(p.tiles.len, "pointers") & " (one per tile), 16 bits per pointer, " &
+      sizeText(2 * p.tiles.len)])
+  var stubs = Block(label: "chartileset_events", stubs: @[
+      ("chartile \"null\" event (for tiles with blank names).", null)])
+  var seen = toHashSet([null])
+  for i, t in p.tiles:
+    var label = null
+    if t.name != "":
+      label = if ao.altEventLabels: t.name else: "chtl_" & t.name & "_event"
+      if not isLabel(ao.prefix & label):
+        fail("tile " & $i & " is named \"" & t.name & "\", which can't be the label " &
+             ao.prefix & label & ": event labels need a letter, then letters, digits and _, " &
+             "and no register or mnemonic")
+    table.words.add label
+    if label notin seen:
+      seen.incl label
+      stubs.stubs.add ("event: chartile \"" & t.name & "\".", label)
+  result.add table
+  if ao.eventStubs:
+    stubs.comments = @["CharTileSet Events (" & $stubs.stubs.len & ")...",
+        "nb. the event \"type\" is unspecific but could represent ie. a player/tile contact event."]
+    result.add stubs
+
 const vmxNote = "nb. Upper nybbles = colour (video matrix high), lower nybbles = colour (video matrix low)."
 
-proc blocks(p: ctm.Project, part: string, o: BinOptions): seq[Block] =
+proc blocks(p: ctm.Project, part: string, ao: AsmOptions): seq[Block] =
+  let o = ao.bin
   let n = p.chars.len
   let c = p.tiles.len
   let hiresBitmap = p.displayMode == dmHiresBitmap
@@ -171,7 +223,7 @@ proc blocks(p: ctm.Project, part: string, o: BinOptions): seq[Block] =
     let (w, h) = (p.charsWide, p.charsHigh)
     one("colourmap_data", @["ColourMap Data...",
         $w & "x" & $h & " (" & $(w * h) & ") cells, 8 bits per cell, " & sizeText(w * h)])
-  of "tile-events": fail("tile events are not written yet (#46)")
+  of "tile-events": result = p.eventBlocks(ao)
   else: fail("a CharPad project has no part " & part)
 
 func defaultParts(p: ctm.Project): seq[string] =
@@ -206,7 +258,8 @@ proc animBlock(anims: seq[Animation], part, label, sub: string, comment: string,
   result.chunks.add Chunk(label: sub & "_timereload", data: data[2 * f ..< 2 * f + n])
   result.chunks.add Chunk(label: sub & "_attrib", data: data[2 * f + n .. ^1])
 
-proc blocks(p: SpriteProject, part: string, o: BinOptions): seq[Block] =
+proc blocks(p: SpriteProject, part: string, ao: AsmOptions): seq[Block] =
+  let o = ao.bin
   let n = p.sprites.len
   let c = p.tiles.len
   template one(name: string, notes: seq[string]) =
@@ -263,6 +316,13 @@ func defaultParts(p: SpriteProject): seq[string] =
 type Writer = object
   o: AsmOptions
   text: string
+  defined: HashSet[string]       ## labels and constants so far, lower case
+
+proc define(w: var Writer, name: string) =
+  ## 64tass ignores case, so names that only differ in case clash too.
+  let n = (w.o.prefix & name).toLowerAscii
+  if n in w.defined: fail(w.o.prefix & name & " would be defined twice")
+  w.defined.incl n
 
 proc line(w: var Writer, s = "") = w.text.add s & "\n"
 
@@ -270,11 +330,13 @@ proc comment(w: var Writer, s: string) =
   w.line (if w.o.dialect == dKickAss: "// " else: "; ") & s
 
 proc constant(w: var Writer, name, value: string, note = "") =
+  w.define name
   var s = (if w.o.dialect == dKickAss: ".const " else: "") & w.o.prefix & name & " = " & value
   if note != "": s.add (if w.o.dialect == dKickAss: " // " else: " ; ") & note
   w.line s
 
 proc label(w: var Writer, name: string) =
+  w.define name
   w.line w.o.prefix & name & (if w.o.dialect in {dKickAss, dCa65}: ":" else: "")
 
 func byteDirective(d: Dialect): string = (if d == dAcme: "!byte " else: ".byte ")
@@ -284,6 +346,13 @@ proc bytes(w: var Writer, data: openArray[byte]) =
     var vals: seq[string]
     for b in data[i .. min(i + 15, data.high)]: vals.add "$" & toHex(b).toLowerAscii
     w.line byteDirective(w.o.dialect) & vals.join(",")
+
+proc words(w: var Writer, labels: openArray[string]) =
+  ## Four to a line, as CharPad writes them.
+  for i in countup(0, labels.high, 4):
+    var vals: seq[string]
+    for l in labels[i .. min(i + 3, labels.high)]: vals.add w.o.prefix & l
+    w.line (if w.o.dialect == dAcme: "!word " else: ".word ") & vals.join(", ")
 
 proc name(w: var Writer, s: string) =
   ## A zero-terminated name, as the bytes stored, with the name in a comment
@@ -334,6 +403,12 @@ proc body(w: var Writer, blocks: seq[Block]) =
         w.label c.label
       w.bytes c.data
     for n in b.names: w.name n
+    w.words b.words
+    for (comment, label) in b.stubs:
+      w.line
+      w.comment comment
+      w.label label
+      w.line "rts"
 
 proc start(w: var Writer, program: string) =
   w.comment "Generated by batchpad" & (if w.o.source != "": " from " & w.o.source else: "") &
@@ -356,7 +431,7 @@ proc collect[P](p: P, o: AsmOptions): seq[Block] =
   let parts = if o.parts.len > 0: o.parts else: p.defaultParts
   for i, part in parts:
     if part in parts[0 ..< i]: fail(part & " is named twice")
-    result.add p.blocks(part, o.bin)
+    result.add p.blocks(part, o)
   for (part, _) in o.org:
     var found = false
     for b in result:

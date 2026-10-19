@@ -175,5 +175,13 @@ suite "command line":
     check batchpad("asm", files / "spd5" / "tiles_anims.spd", "--org", "map=$1000")[0] == 1
     check batchpad("asm", files / "spd5" / "tiles_anims.spd", "--org", "sprites")[0] == 2
     check batchpad("asm", files / "ctm9" / "mctext_perchar_big.ctm")[0] == 1
+    let (ecode, events) = batchpad("asm", files / "ctm9" / "mctext_pertile.ctm",
+                                   "--parts", "tile-events", "--event-labels", "alt",
+                                   "--no-event-stubs")
+    check ecode == 0
+    check ".word empty, solid, box, bands\n" in events
+    check "rts" notin events
+    check batchpad("asm", files / "ctm9" / "hirestext_perchar_notiles.ctm",
+                   "--parts", "tile-events")[0] == 1
 
 removeDir(tmp)

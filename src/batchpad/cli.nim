@@ -292,6 +292,7 @@ let parser = newParser("batchpad"):
     option("--org", multiple = true, help = "part=ADDR: a * = line before that part")
     option("--segment", help = "Segment for ca65 and KickAssembler")
     option("--event-labels", choices = @["normal", "alt"], default = some("normal"))
+    flag("--no-event-stubs", help = "Leaves out the rts per tile event; the program defines them")
     option("--eol", choices = @["lf", "crlf"], default = some("lf"))
     option("--cells", choices = @["8", "12", "16", "word"], default = some("8"))
     option("--area", help = "Only this part of the map: X,Y,W,H")
@@ -388,12 +389,12 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     of "asm":
       let o = opts.argparse_asm_opts.get
       alwaysWrite = o.alwaysWrite
-      if o.eventLabels != "normal": notYet("#46")
       var ao = AsmOptions(dialect: parseEnum[Dialect](o.dialect), prefix: o.prefix,
                           org: parseOrg(o.org), segment: o.segment, crlf: o.eol == "crlf",
                           bin: BinOptions(cells: parseEnum[CellFormat](o.cells),
                                           spriteAttribs: parseEnum[SpriteAttribStyle](o.spriteAttribs)),
-                          source: if o.input == "-": "stdin" else: o.input.extractFilename)
+                          source: if o.input == "-": "stdin" else: o.input.extractFilename,
+                          altEventLabels: o.eventLabels == "alt", eventStubs: not o.noEventStubs)
       if o.area != "": ao.bin.area = some(parseArea(o.area))
       if o.parts != "": ao.parts = o.parts.split(',')
       outputs.add Output(path: o.output, data: load(o.input, o.inputFormat, o.set).asmOutput(ao))

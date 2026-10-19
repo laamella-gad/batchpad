@@ -2,7 +2,7 @@
 
 How batchpad is meant to be called. `src/batchpad/cli.nim` has every
 command and option below, parsed with argparse; `info`, `convert`, `bin` and
-`asm` work (without `tile-events` yet), the others
+`asm` work, the others
 say which issue they wait for. Raw binary layouts are in
 `src/batchpad/rawbin.nim`, assembler source in `src/batchpad/asmout.nim`. This is the design the exports
 (#41-#54, #56, #57) are written against. Decided
@@ -75,7 +75,7 @@ CharPad:
 | `tile-attribs-l2` | video matrix nibbles per tile | TileAttribs_L2 |
 | `tile-tags` | tag per tile | |
 | `tile-names` | names (asm and C only) | |
-| `tile-events` | event jump table (asm and C only, #46) | |
+| `tile-events` | event jump table and `rts` stubs (asm and C only) | |
 | `map` | the map, or the area given by `--area` | Map, MapArea |
 | `submaps` | flexi-grid sub-maps (#44) | SubMaps, SubMap |
 | `colour-map` | colour matrix colour per char cell of the whole map (#45) | ColourMap |
@@ -215,7 +215,8 @@ batchpad asm level.ctm -o build/level.asm --dialect kickass --parts chars,map --
 | `--org part=ADDR` | Writes an `addr_` constant and a `* =` (ca65: `.org`) line before that part; can repeat. For split cells `map` names the low half, `map-hi` the high one. | none: the data follows on where the file is included |
 | `--segment NAME` | ca65 `.segment`, KickAssembler `.segment`; an error for the others. The program defines the segment: ld65's config, or KickAssembler's `.segmentdef` (KickAssembler refuses one it doesn't know). | none |
 | `--cells`, `--area`, `--sprite-attribs` | As for `bin`. Animation frames are bytes with `--cells 8`, words otherwise. | |
-| `--event-labels normal\|alt` | `chtl_<name>_event` or `<name>` (#46) | `normal` |
+| `--event-labels normal\|alt` | `chtl_<name>_event` or `<name>` | `normal` |
+| `--no-event-stubs` | Leaves out the `rts` stubs of `tile-events`, so the program can define the labels itself | stubs written |
 | `--eol lf\|crlf` | Line endings | `lf` |
 
 Labels and constants follow the newest CharPad and SpritePad Pro template
@@ -235,6 +236,25 @@ only; the others follow on.
 
 `colour-map` writes `colourmap_data`, as CharPad's text export of the colour
 map. It is not in the default parts, as CharPad's Export All leaves it out.
+
+`tile-events` writes CharPad's "Export Tile Events": `chartileset_eventjumptable`,
+a `.word` per tile pointing at `chtl_<name>_event` (`<name>` with
+`--event-labels alt`), or at `chtl_null_event` (`null_event`) for a tile
+without a name, four to a line; then `chartileset_events` with an `rts` stub
+for the null event and for each distinct label, in the order the tiles first
+use them. A tile name whose label would be the null label shares its stub.
+`--org tile-events=ADDR` places the jump table; the stubs follow on. It is not
+in the default parts either.
+
+CharPad puts tile names into labels as they are, so a name with a space gives
+a file that won't assemble. Ours refuses with an error, naming the tile, when a
+label (with `--prefix`) doesn't start with a letter or holds anything but
+letters, digits and `_`, or is a register or 6502 mnemonic (illegal ones
+included), which only happens with `alt` and no prefix: those break in at
+least one dialect, and a leading `_` is a local label in 64tass. Names that
+only differ in case are refused too (64tass ignores case), as is any label or
+constant the output would define twice, such as an `alt` tile named
+`map_data`. Checked 2026-10-19 with all four assemblers.
 
 | Dialect | Constants | Labels | Data | Comments |
 | --- | --- | --- | --- | --- |

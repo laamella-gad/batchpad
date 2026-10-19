@@ -53,10 +53,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
-- #46 [feature, normal] Export tile event jump table
-  - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
-  - CharPad puts names into labels as they are; ours should reject or clean names that aren't valid labels.
-  - C output: see #53.
 - #47 [feature, low] Export usage statistics
   - How often each char is used in tiles and map, and each tile in the map. Plain text.
 - #48 [feature, normal] Export PNG previews
@@ -95,6 +91,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #46 [feature, normal] Export tile event jump table
+  - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
+  - CharPad puts names into labels as they are; ours should reject or clean names that aren't valid labels.
+  - C output: see #53.
+  - Done 2026-10-19: `tile-events` part in `asm`, as CharPad Pro 3.88's decompiled `WriteTileEventData` (normal and alt labels, 4 pointers per `.word` line, a null stub, a stub per distinct name in first-use order). Unlike Pro: names that can't be labels are refused (letter first, then letters, digits and `_`; no register or mnemonic), any name defined twice is an error (case ignored, as 64tass does), the stub count in the comment counts each stub once, and `--no-event-stubs` leaves the stubs out. All four dialects assemble it to the same bytes. C output is still #53.
 - #7 [feature, low] CharPad CTM V1 writer
   - Merged into #6 (2026-10-19): one issue per format for reading and writing.
 - #9 [feature, low] CharPad CTM V2 writer
