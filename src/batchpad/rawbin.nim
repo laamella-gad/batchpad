@@ -1,7 +1,7 @@
 ## Raw binary parts of a project, as CharPad and SpritePad export them.
 ## Layouts are described in docs/import-export.md, part names in docs/cli.md.
 
-import std/[options, strutils]
+import std/[bitops, options, strutils]
 import ctm, spd
 
 type
@@ -16,6 +16,10 @@ type
   Area* = object
     x*, y*, width*, height*: int
 
+  SubMaps* = object
+    width*, height*: int          ## cells per sub-map
+    across*, down*: int           ## sub-maps per row and per column
+
   BinOptions* = object
     cells*: CellFormat
     area*: Option[Area]           ## only this part of the map
@@ -24,7 +28,8 @@ type
 const
   ctmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                "tiles", "tiles-lo", "tiles-hi", "tile-attribs", "tile-attribs-l2",
-               "tile-tags", "map", "map-lo", "map-hi"]
+               "tile-tags", "map", "map-lo", "map-hi",
+               "submaps", "submaps-lo", "submaps-hi"]
   spdParts* = ["sprites", "sprite-attribs", "tiles", "tiles-lo", "tiles-hi",
                "tile-attribs", "tile-tags", "sprite-anims", "tile-anims"]
 
@@ -73,6 +78,35 @@ proc mapCells(p: ctm.Project, o: BinOptions): seq[uint16] =
   for y in a.y ..< a.y + a.height:
     result.add p.map[y * p.mapWidth + a.x ..< y * p.mapWidth + a.x + a.width]
 
+proc subMaps*(p: ctm.Project): SubMaps =
+  ## How the flexi-grid cuts the whole map: whole cells only, row by row. As
+  ## in CharPad Pro, the grid needn't be switched on, only sized.
+  if p.tileSystem and p.flexiGrid.settings.testBit(5):
+    fail("the flexi-grid is measured in chars; sub-maps need it in map cells")
+  let (w, h) = (int(p.flexiGrid.width), int(p.flexiGrid.height))
+  if w == 0 or h == 0:
+    fail("the project's flexi-grid has no size; use --set flexi-grid=W,H")
+  result = SubMaps(width: w, height: h, across: p.mapWidth div w, down: p.mapHeight div h)
+  if result.across == 0 or result.down == 0:
+    fail("the flexi-grid cell (" & $w & " x " & $h & ") is bigger than the " &
+         $p.mapWidth & " x " & $p.mapHeight & " map")
+
+proc subMapCells(p: ctm.Project, s: SubMaps, y, x: int): seq[uint16] =
+  for row in y * s.height ..< (y + 1) * s.height:
+    let at = row * p.mapWidth + x * s.width
+    result.add p.map[at ..< at + s.width]
+
+proc needWholeMap(o: BinOptions) =
+  if o.area.isSome: fail("--area is for map, not submaps")
+
+proc binSubMap*(p: ctm.Project, y, x: int, part: string, o = BinOptions()): seq[byte] =
+  ## One sub-map, `part` being `submaps`, `submaps-lo` or `submaps-hi`.
+  o.needWholeMap
+  let s = p.subMaps
+  if y notin 0 ..< s.down or x notin 0 ..< s.across:
+    fail("there is no sub-map " & $y & "," & $x)
+  cells(p.subMapCells(s, y, x), "submaps", part, o)
+
 func isBitmap(p: ctm.Project): bool = p.displayMode in {dmHiresBitmap, dmMulticolourBitmap}
 
 func l1(c: Colours, p: ctm.Project, colouring: ColouringMethod): byte =
@@ -116,6 +150,13 @@ proc binPart*(p: ctm.Project, part: string, o = BinOptions()): seq[byte] =
     for t in p.tiles: result.add t.tag
   of "map", "map-lo", "map-hi":
     result = cells(p.mapCells(o), "map", part, o)
+  of "submaps", "submaps-lo", "submaps-hi":
+    o.needWholeMap
+    let s = p.subMaps
+    var all: seq[uint16]
+    for y in 0 ..< s.down:
+      for x in 0 ..< s.across: all.add p.subMapCells(s, y, x)
+    result = cells(all, "submaps", part, o)
   else:
     fail("a CharPad project has no part " & part)
 

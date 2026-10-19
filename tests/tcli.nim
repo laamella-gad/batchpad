@@ -125,6 +125,23 @@ suite "command line":
                    "chars=" & tmp / "y.bin", "tiles=" & tmp / "z.bin")[0] == 1
     check not fileExists(tmp / "y.bin")
 
+  test "bin sub-maps":
+    let src = files / "ctm9" / "hiresbitmap_perchar.ctm"   # 6 x 3 map, 3 x 2 grid
+    check batchpad("bin", src, "submaps=" & tmp / "all.bin",
+                   "submaps=" & tmp / "room_{y}_{x}.prg@$c000")[0] == 0
+    check readFile(tmp / "all.bin").len == 12
+    check readFile(tmp / "room_0_0.prg")[0..1] == "\x00\xc0"
+    check readFile(tmp / "room_0_1.prg").len == 2 + 6
+    check readFile(tmp / "all.bin")[6..^1] == readFile(tmp / "room_0_1.prg")[2..^1]
+    check not fileExists(tmp / "room_1_0.prg")
+    check batchpad("bin", src, "submaps=" & tmp / "room_{y}.bin")[0] == 2
+    check batchpad("bin", src, "--set", "flexi-grid=7,1", "submaps=" & tmp / "x.bin")[0] == 1
+    check batchpad("bin", src, "--set", "flexi-grid=0,1", "submaps=" & tmp / "x.bin")[0] == 1
+    check batchpad("bin", files / "spd5" / "tiles_anims.spd", "submaps=" & tmp / "x.bin")[0] == 1
+    check not fileExists(tmp / "x.bin")
+    let (code, info) = batchpad("info", src)
+    check code == 0 and "subMapsAcross: 2\nsubMapsDown: 1\n" in info
+
   test "asm":
     let (code, text) = batchpad("asm", files / "ctm9" / "mctext_pertile.ctm",
                                 "--prefix", "lv_", "--parts", "chars,tile-names,map",

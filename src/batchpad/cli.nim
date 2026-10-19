@@ -79,10 +79,12 @@ proc applySet(p: var ctm.Project, name, value: string) =
       let wh = value.split(',')
       try:
         if wh.len != 2: raise newException(ValueError, "")
-        p.flexiGrid.width = uint16(parseInt(wh[0]))
-        p.flexiGrid.height = uint16(parseInt(wh[1]))
-      except ValueError, RangeDefect:
-        fail("flexi-grid must be W,H or off, not " & value)
+        let (w, h) = (parseInt(wh[0]), parseInt(wh[1]))
+        if w notin 1..256 or h notin 1..256: raise newException(ValueError, "")
+        p.flexiGrid.width = uint16(w)
+        p.flexiGrid.height = uint16(h)
+      except ValueError:
+        fail("flexi-grid must be W,H (1-256 each) or off, not " & value)
       p.flexiGrid.settings = p.flexiGrid.settings or 0x80
   else: fail("unknown CharPad setting: " & name)
 
@@ -141,6 +143,11 @@ proc info(input: Input): JsonNode =
       result["keyMap"] = %p.keyMap
       if p.flexiGrid.settings.testBit(7):
         result["flexiGrid"] = %*{"width": p.flexiGrid.width, "height": p.flexiGrid.height}
+        try:
+          let s = p.subMaps
+          result["subMapsAcross"] = %s.across
+          result["subMapsDown"] = %s.down
+        except BinError: discard
   of kSpd:
     let p = input.spd
     result = %*{"format": "spd", "version": p.version, "colours": p.colours,
@@ -208,18 +215,31 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
     if at > 0:
       a = parseAddress(path[at + 1 .. ^1])
       path = path[0 ..< at]
-    for earlier in result:
-      if path != "-" and earlier.path == path: usage(path & " is named twice")
     case part
-    of "submaps", "submaps-lo", "submaps-hi": notYet("#44")
     of "colour-map": notYet("#45")
     of "tile-names", "tile-events": usage(part & " is only written by asm and c")
     elif part notin ctmParts and part notin spdParts: usage("unknown part: " & part)
-    var data = case input.kind
-               of kCtm: input.ctm.binPart(part, o)
-               of kSpd: input.spd.binPart(part, o)
-    if a >= 0: data = @[byte(a and 0xff), byte(a shr 8)] & data
-    result.add Output(path: path, data: data.toStr)
+    template add(file: string, bytes: seq[byte]) =
+      let p = file
+      for earlier in result:
+        if p != "-" and earlier.path == p: usage(p & " is named twice")
+      var data = bytes
+      if a >= 0: data = @[byte(a and 0xff), byte(a shr 8)] & data
+      result.add Output(path: p, data: data.toStr)
+    if part.startsWith("submaps") and ("{y}" in path or "{x}" in path):
+      # One file per sub-map.
+      if input.kind != kCtm: fail("a SpritePad project has no part " & part)
+      let s = input.ctm.subMaps
+      if ("{y}" notin path and s.down > 1) or ("{x}" notin path and s.across > 1):
+        usage(path & ": the grid makes " & $s.across & " x " & $s.down &
+              " sub-maps; name them with {x} and {y}")
+      for y in 0 ..< s.down:
+        for x in 0 ..< s.across:
+          add(path.replace("{y}", $y).replace("{x}", $x), input.ctm.binSubMap(y, x, part, o))
+    else:
+      add(path, case input.kind
+                of kCtm: input.ctm.binPart(part, o)
+                of kSpd: input.spd.binPart(part, o))
 
 proc asmOutput(input: Input, o: AsmOptions): string =
   case input.kind

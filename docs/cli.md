@@ -2,7 +2,7 @@
 
 How batchpad is meant to be called. `src/batchpad/cli.nim` has every
 command and option below, parsed with argparse; `info`, `convert`, `bin` and
-`asm` work (without `submaps`, `colour-map` and `tile-events` yet), the others
+`asm` work (without `colour-map` and `tile-events` yet), the others
 say which issue they wait for. Raw binary layouts are in
 `src/batchpad/rawbin.nim`, assembler source in `src/batchpad/asmout.nim`. This is the design the exports
 (#41-#54, #56, #57) are written against. Decided
@@ -100,8 +100,18 @@ L2 in a text mode) is an error when asked for by name.
 
 `submaps=file` writes them all in one file, as CharPad's consolidated export.
 With `{y}` and `{x}` in the name it writes one file per sub-map:
-`submaps=build/room_{y}_{x}.bin`. Those names can't be known without reading
-the project, so that form is for scripts more than for make.
+`submaps=build/room_{y}_{x}.bin` (numbers from 0, not padded). Those names
+can't be known without reading the project, so that form is for scripts more
+than for make; `info` gives `subMapsAcross` and `subMapsDown`.
+
+Sub-maps follow CharPad Pro 3.88: the flexi-grid's cell size cuts the whole map
+into whole cells, row by row, and a part cell at the right or bottom is left
+out. The grid needn't be switched on, only sized; a V7 project has no size, so
+it needs `--set flexi-grid=W,H`. It is an error when no whole cell fits, when
+the grid is measured in chars in a project with tiles (as CharPad refuses), and
+with `--area`. The one-file form in 12 bit packs the nibbles of all sub-maps
+together, so with an odd cell count per sub-map it differs from the per-file
+form.
 
 ## Options shared by the export commands
 
@@ -134,7 +144,7 @@ CharPad:
 | `vmx-lo`, `vmx-hi` | project video matrix nibbles (bitmap modes) |
 | `tiles` | `off` expands the tiles into a char map |
 | `key-map` | 0-15 |
-| `flexi-grid` | `W,H` in the units the project uses, or `off` |
+| `flexi-grid` | `W,H` (1-256 each) in the units the project uses, or `off` |
 
 SpritePad:
 
@@ -209,6 +219,12 @@ Unlike CharPad, every label the file uses is defined, and without `--org` there
 are no `* =` lines with dummy addresses, so the file assembles as it is when
 included. Split cells get a block each, `map_data_lo` and `map_data_hi` (or
 `map_data_hi_packed` for 12 bit), each with its own `size_` constant.
+
+`submaps` writes a block per sub-map with CharPad's labels,
+`submap_y{i}_x{j}_data` (or with `_lo`, `_hi`, `_hi_packed`), plus the
+constants `submap_wid`, `submap_hei` (cells per sub-map), `submap_count_x` and
+`submap_count_y`. `--org submaps=ADDR` puts the `* =` line before the first one
+only; the others follow on.
 
 | Dialect | Constants | Labels | Data | Comments |
 | --- | --- | --- | --- | --- |

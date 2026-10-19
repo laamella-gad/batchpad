@@ -38,7 +38,7 @@ type
 const
   ctmAsmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                   "tiles", "tile-attribs", "tile-attribs-l2", "tile-tags",
-                  "tile-names", "map"]
+                  "tile-names", "map", "submaps"]
   spdAsmParts* = ["sprites", "sprite-attribs", "tiles", "tile-attribs",
                   "tile-tags", "tile-names", "sprite-anims", "tile-anims"]
 
@@ -65,17 +65,21 @@ func cellText(o: BinOptions): string =
   of cf16: "16 bits per cell, split"
   of cfWord: "16 bits per cell, little-endian words"
 
-proc cellBlocks[P](p: P, part, label: string, comments: seq[string], o: BinOptions): seq[Block] =
+proc cellBlocks(part, label: string, comments: seq[string], o: BinOptions,
+                data: proc (part: string): seq[byte]): seq[Block] =
   ## One block, or two for split cells: `label_lo` and `label_hi` (or
-  ## `label_hi_packed` for 12 bit).
+  ## `label_hi_packed` for 12 bit). `data` gives the bytes of a part.
   if not o.split:
     return @[Block(part: part, label: label, comments: comments,
-                   chunks: @[Chunk(data: p.binPart(part, o))])]
+                   chunks: @[Chunk(data: data(part))])]
   let hi = if o.cells == cf12: "_hi_packed" else: "_hi"
   result.add Block(part: part & "-lo", label: label & "_lo", comments: comments,
-                   chunks: @[Chunk(data: p.binPart(part & "-lo", o))])
+                   chunks: @[Chunk(data: data(part & "-lo"))])
   result.add Block(part: part & "-hi", label: label & hi,
-                   chunks: @[Chunk(data: p.binPart(part & "-hi", o))])
+                   chunks: @[Chunk(data: data(part & "-hi"))])
+
+proc cellBlocks[P](p: P, part, label: string, comments: seq[string], o: BinOptions): seq[Block] =
+  cellBlocks(part, label, comments, o, proc (q: string): seq[byte] = p.binPart(q, o))
 
 proc cellSize[P](p: P, part: string, o: BinOptions): int =
   if o.split: p.binPart(part & "-lo", o).len + p.binPart(part & "-hi", o).len
@@ -144,7 +148,24 @@ proc blocks(p: ctm.Project, part: string, o: BinOptions): seq[Block] =
     result = p.cellBlocks(part, "map_data", @["Map Data...",
         $w & "x" & $h & " (" & $(w * h) & ") cells, " & o.cellText & ", " &
         sizeText(p.cellSize(part, o))], o)
-  of "submaps": fail("submaps are not written yet (#44)")
+  of "submaps":
+    # Labels as CharPad's text export of sub-maps; `--org submaps` puts its
+    # `* =` line before the first one only.
+    if o.area.isSome: fail("--area is for map, not submaps")
+    let s = p.subMaps
+    let a = s.width * s.height
+    var size = a * (if o.cells in {cf16, cfWord}: 2 else: 1)
+    if o.cells == cf12: size += (a + 1) div 2
+    for y in 0 ..< s.down:
+      for x in 0 ..< s.across:
+        let first = y == 0 and x == 0
+        var bs = cellBlocks(part, "submap_y" & $y & "_x" & $x & "_data",
+            @["SubMap (" & $y & "," & $x & ")...", $s.width & "x" & $s.height & " (" & $a &
+              ") cells, " & o.cellText & ", " & sizeText(size)], o,
+            proc (q: string): seq[byte] = p.binSubMap(y, x, q, o))
+        for b in bs.mitems:
+          if not first: b.part = ""
+        result.add bs
   of "colour-map": fail("the colour map is not written yet (#45)")
   of "tile-events": fail("tile events are not written yet (#46)")
   else: fail("a CharPad project has no part " & part)
@@ -403,6 +424,12 @@ proc toAsm*(p: ctm.Project, o: AsmOptions): string =
     w.constant("map_hei_chrs", $(mh * p.tileHeight))
     w.constant("map_wid_pxls", $(mw * p.tileWidth * 8))
     w.constant("map_hei_pxls", $(mh * p.tileHeight * 8))
+  if "submaps" in o.parts:
+    let s = p.subMaps
+    w.constant("submap_wid", $s.width)
+    w.constant("submap_hei", $s.height)
+    w.constant("submap_count_x", $s.across)
+    w.constant("submap_count_y", $s.down)
   w.header(blocks)
   w.body(blocks)
   w.finish

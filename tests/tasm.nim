@@ -130,13 +130,39 @@ suite "CharPad assembler source":
     check "map_wid = 2" in s.lines
     check ".byte $01,$02,$01,$00" in s.lines
 
+  test "sub-maps":
+    var p = charProject()
+    p.flexiGrid = FlexiGrid(width: 2, height: 1)
+    let s = p.toAsm(AsmOptions(parts: @["map", "submaps"], org: @[("submaps", 0x4000)]))
+    check "submap_wid = 2" in s.lines
+    check "submap_hei = 1" in s.lines
+    check "submap_count_x = 1" in s.lines
+    check "submap_count_y = 2" in s.lines
+    check "; SubMap (1,0)..." in s.lines
+    check "; 2x1 (2) cells, 8 bits per cell, total size is 2 ($2) bytes." in s.lines
+    check "submap_y0_x0_data" in s.lines
+    check "submap_y1_x0_data" in s.lines
+    check ".byte $02,$01" in s.lines
+    check "size_submap_y1_x0_data = $2 ; (2 bytes)" in s.lines
+    # Only the first sub-map gets the org.
+    check "* = addr_submap_y0_x0_data" in s.lines
+    check s.everyOrgDefined
+    check not s.defines("addr_submap_y1_x0_data")
+    let w = p.toAsm(AsmOptions(parts: @["submaps"], bin: BinOptions(cells: cf12)))
+    check "submap_y1_x0_data_hi_packed" in w.lines
+    check "; 2x1 (2) cells, 12 bits per cell, split, high nybbles packed, total size is 3 ($3) bytes." in w.lines
+    check not p.toAsm(AsmOptions(parts: @["map"])).defines("submap_wid")
+    expect AsmError:
+      discard p.toAsm(AsmOptions(parts: @["submaps"],
+                                 bin: BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1)))))
+
   test "mistakes":
     let p = charProject()
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["sprites"]))
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["chars", "chars"]))
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["chars"], org: @[("map", 0x1000)]))
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["chars"], segment: "DATA"))
-    expect AsmError: discard p.toAsm(AsmOptions(parts: @["submaps"]))
+    expect BinError: discard p.toAsm(AsmOptions(parts: @["submaps"]))   # no flexi-grid size
     var n = p
     n.tileSystem = false
     n.tiles = @[]
@@ -231,13 +257,15 @@ suite "assembling":
   let dir = getTempDir() / "batchpad_tasm"
   let parts = AsmOptions(prefix: "lv_", bin: BinOptions(cells: cf12),
                          parts: @["chars", "char-attribs", "tiles", "tile-attribs",
-                                  "tile-tags", "tile-names", "map"])
+                                  "tile-tags", "tile-names", "map", "submaps"])
 
   proc assemble(d: Dialect, main, command: string): string =
     ## The bytes the assembler makes of both projects, after `main`.
     var o = parts
     o.dialect = d
-    writeFile(dir / "level.s", charProject().toAsm(o))
+    var level = charProject()
+    level.flexiGrid = FlexiGrid(width: 1, height: 2)
+    writeFile(dir / "level.s", level.toAsm(o))
     writeFile(dir / "sprites.s", spriteProject().toAsm(AsmOptions(dialect: d, prefix: "sp_")))
     writeFile(dir / "main.s", main)
     let (output, code) = execCmdEx("cd " & quoteShell(dir) & " && " & command)
@@ -266,9 +294,9 @@ suite "assembling":
     if made.len == 0: skip()
     for (name, bytes) in made:
       checkpoint name
-      # chars, attributes, tiles, tile attributes, tags, names, map; sprites,
-      # attributes, tiles, tile attributes, tags, two lots of animations
-      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 192 + 3 + 4 + 2 + 2 + 4 + 4
+      # chars, attributes, tiles, tile attributes, tags, names, map, sub-maps;
+      # sprites, attributes, tiles, tile attributes, tags, two lots of animations
+      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 9 + 192 + 3 + 4 + 2 + 2 + 4 + 4
       check bytes == made[0][1]
 
   test "64tass with --org":
@@ -277,7 +305,10 @@ suite "assembling":
     else:
       var o = parts
       o.org = @[("chars", 0x2000), ("tiles", 0x3000)]
-      writeFile(dir / "main.s", "* = $1000\n" & charProject().toAsm(o))
+      var level = charProject()
+      level.flexiGrid = FlexiGrid(width: 1, height: 2)
+      o.org.add ("submaps", 0x4000)
+      writeFile(dir / "main.s", "* = $1000\n" & level.toAsm(o))
       let (output, code) = execCmdEx("cd " & quoteShell(dir) & " && 64tass -q -o out.prg main.s")
       check code == 0
       if code != 0: echo output

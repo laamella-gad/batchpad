@@ -77,6 +77,37 @@ suite "CharPad parts":
     expect BinError:
       discard p.binPart("map", BinOptions(area: some(Area(x: 2, y: 0, width: 2, height: 1))))
 
+  test "sub-maps":
+    var p = charProject()
+    p.mapWidth = 5
+    p.mapHeight = 3
+    p.map = @[]
+    for i in 0'u16 ..< 15: p.map.add i * 0x11
+    p.flexiGrid = FlexiGrid(width: 2, height: 1)    # needn't be switched on
+    check p.subMaps == SubMaps(width: 2, height: 1, across: 2, down: 3)
+    # Row by row of sub-maps; the column the grid doesn't fill is left out.
+    check p.binPart("submaps", BinOptions(cells: cfWord)) ==
+      @[byte 0x00, 0, 0x11, 0, 0x22, 0, 0x33, 0, 0x55, 0, 0x66, 0, 0x77, 0, 0x88, 0,
+        0xaa, 0, 0xbb, 0, 0xcc, 0, 0xdd, 0]
+    check p.binSubMap(1, 1, "submaps") == @[byte 0x77, 0x88]
+    p.map[14] = 0x123
+    p.flexiGrid = FlexiGrid(width: 1, height: 3)
+    check p.binSubMap(0, 4, "submaps-hi", BinOptions(cells: cf12)) == @[byte 0x00, 0x10]
+    check p.binPart("submaps-hi", BinOptions(cells: cf16)) == @[byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    expect BinError: discard p.binSubMap(1, 0, "submaps")
+
+  test "sub-maps the flexi-grid can't make":
+    var p = charProject()
+    expect BinError: discard p.binPart("submaps")             # no size (as V7)
+    p.flexiGrid = FlexiGrid(width: 4, height: 1)
+    expect BinError: discard p.binPart("submaps")             # wider than the map
+    p.flexiGrid = FlexiGrid(width: 1, height: 1, settings: 0x20)
+    expect BinError: discard p.binPart("submaps")             # measured in chars
+    p.tileSystem = false
+    check p.binPart("submaps") == @[byte 0, 1, 2, 2, 1, 0]    # chars are map cells
+    expect BinError:
+      discard p.binPart("submaps", BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1))))
+
   test "no tiles":
     var p = charProject()
     p.tileSystem = false

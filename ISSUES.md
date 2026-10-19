@@ -65,8 +65,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
-- #44 [feature, normal] Export flexi-grid sub-maps
-  - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
 - #45 [feature, normal] Export colour map
   - 1 byte per map char cell, the colour matrix low nibble (for $d800). Binary and asm (`colourmap_data`).
 - #46 [feature, normal] Export tile event jump table
@@ -111,6 +109,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #44 [feature, normal] Export flexi-grid sub-maps
+  - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
+  - Done 2026-10-19: `submaps` part in `bin` (one file, or one per sub-map with `{y}`/`{x}` in the name) and `asm` (`submap_y{i}_x{j}_data` blocks, `submap_wid`/`_hei`/`_count_x`/`_count_y` constants), in every cell width; `rawbin.subMaps`/`binSubMap`. Cut as CharPad Pro 3.88's decompiled `CPV_FileIO_TextSubMaps` and its checks: whole grid cells only, the grid's "on" bit ignored, refused when measured in chars with tiles. `info` gives `subMapsAcross`/`subMapsDown`. `--set flexi-grid` now takes 1-256 only. Bytes not yet compared with a CharPad export by hand.
 - #62 [task, normal] Compare the asm output with CharPad and SpritePad Pro's text export
   - "Export All (one file)" as text from CharPad Pro 3.88 and SpritePad Pro 3.80 for the test files; check that labels, constants and data match ours, apart from the differences we chose (`docs/cli.md`, asm: no dummy `* =` lines, split-cell sizes, names as bytes, LF).
   - Done 2026-10-19, against the decompiled text writers of CharPad Pro 3.88 (`CPV_FileIO_Text*`, `SUBC_FileIO_TextTools`, `SUBC_ArrayOfByte`) and SpritePad Pro 3.80 (`SPV_FileIO_Text*`) rather than exports made by hand (too much clicking for the user). Our output for every display mode, colouring method, with and without tiles, at 8/12/16 bits, and for sprites with and without tiles and animations has the same constants, labels, part order, comments and bytes, apart from the chosen differences and these: we add the total size to the 12/16-bit block comments, Pro's 12-bit tile comment leaves out "high nybbles packed", we write "1 animation" where Pro writes "1 animations", and where Pro silently cuts cells to 8 or 12 bits we refuse with an error (as `bin` does). 12-bit packing is the same (even cell in the high nibble, odd count rounded up). Pro's `size_chartileset_data` is count x area even at 12/16 bits; ours is per block.
