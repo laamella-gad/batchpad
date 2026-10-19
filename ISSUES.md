@@ -6,8 +6,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Open
 
-- #62 [task, normal] Compare the asm output with CharPad and SpritePad Pro's text export
-  - "Export All (one file)" as text from CharPad Pro 3.88 and SpritePad Pro 3.80 for the test files; check that labels, constants and data match ours, apart from the differences we chose (`docs/cli.md`, asm: no dummy `* =` lines, split-cell sizes, names as bytes, LF).
 - #1 [feature, high] Parse CharPad project files (.ctm)
   - Header, charset, tiles, map, colours.
   - Umbrella: model #4, per-version readers/writers #6-#23. Specs for V1-V9: `docs/charpad.md`.
@@ -113,6 +111,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #62 [task, normal] Compare the asm output with CharPad and SpritePad Pro's text export
+  - "Export All (one file)" as text from CharPad Pro 3.88 and SpritePad Pro 3.80 for the test files; check that labels, constants and data match ours, apart from the differences we chose (`docs/cli.md`, asm: no dummy `* =` lines, split-cell sizes, names as bytes, LF).
+  - Done 2026-10-19, against the decompiled text writers of CharPad Pro 3.88 (`CPV_FileIO_Text*`, `SUBC_FileIO_TextTools`, `SUBC_ArrayOfByte`) and SpritePad Pro 3.80 (`SPV_FileIO_Text*`) rather than exports made by hand (too much clicking for the user). Our output for every display mode, colouring method, with and without tiles, at 8/12/16 bits, and for sprites with and without tiles and animations has the same constants, labels, part order, comments and bytes, apart from the chosen differences and these: we add the total size to the 12/16-bit block comments, Pro's 12-bit tile comment leaves out "high nybbles packed", we write "1 animation" where Pro writes "1 animations", and where Pro silently cuts cells to 8 or 12 bits we refuse with an error (as `bin` does). 12-bit packing is the same (even cell in the high nibble, odd count rounded up). Pro's `size_chartileset_data` is count x area even at 12/16 bits; ours is per block.
 - #61 [task, normal] Check the assembler output with ACME and KickAssembler
   - Neither was installed when #43 was done; only the syntax was written from their manuals. Check that the `asm` output of every test file assembles, with `--org`, `--prefix`, names and (KickAssembler) `--segment`. Also compare labels and data with an "Export All (one file)" text export from CharPad and SpritePad Pro.
   - 2026-10-19: ACME 0.97 (Ubuntu's package, unpacked into a scratch dir): every test file in every cell width assembles and gives the same bytes as 64tass 1.6 and ca65. That showed 64tass `-a` turning `.text` names into PETSCII, so tile names are now bytes with the name in a comment, in every dialect. `tests/tasm.nim` assembles with whichever of 64tass, ACME and ca65 are installed and checks they agree.
