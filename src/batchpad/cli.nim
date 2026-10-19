@@ -1,8 +1,8 @@
 ## The command line, as designed in docs/cli.md.
 
-import std/[bitops, json, os, streams, strutils]
+import std/[bitops, json, options, os, streams, strutils]
 import argparse
-import ctm, spd
+import ctm, rawbin, spd
 
 type
   CliError* = object of CatchableError
@@ -175,6 +175,52 @@ proc convert(input: Input, path, to: string): Output =
              of kSpd: input.spd.toSpd(v)
   Output(path: path, data: data.toStr)
 
+proc usage(msg: string) {.noreturn.} = raise newException(UsageError, msg)
+
+proc parseAddress(s: string): int =
+  ## `$c000`, `0xc000` or `49152`.
+  result = try:
+             if s.startsWith("$"): parseHexInt(s[1 .. ^1])
+             elif s.toLowerAscii.startsWith("0x"): parseHexInt(s)
+             else: parseInt(s)
+           except ValueError: -1
+  if result notin 0..0xffff: usage("not an address (0-65535): " & s)
+
+proc parseArea(s: string): Area =
+  let n = s.split(',')
+  try:
+    if n.len != 4: raise newException(ValueError, "")
+    Area(x: parseInt(n[0]), y: parseInt(n[1]), width: parseInt(n[2]), height: parseInt(n[3]))
+  except ValueError:
+    usage("--area must be X,Y,W,H, not " & s)
+
+proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: string): seq[Output] =
+  ## `specs` are `part=file`, or `part=file@ADDR` for a load address of its own.
+  if specs.len == 0: usage("nothing to write: give part=file")
+  let address = if loadAddress == "": -1 else: parseAddress(loadAddress)
+  for spec in specs:
+    let eq = spec.find('=')
+    if eq < 1 or eq == spec.high: usage("expected part=file, not " & spec)
+    let part = spec[0 ..< eq]
+    var path = spec[eq + 1 .. ^1]
+    var a = address
+    let at = path.rfind('@')
+    if at > 0:
+      a = parseAddress(path[at + 1 .. ^1])
+      path = path[0 ..< at]
+    for earlier in result:
+      if path != "-" and earlier.path == path: usage(path & " is named twice")
+    case part
+    of "submaps", "submaps-lo", "submaps-hi": notYet("#44")
+    of "colour-map": notYet("#45")
+    of "tile-names", "tile-events": usage(part & " is only written by asm and c")
+    elif part notin ctmParts and part notin spdParts: usage("unknown part: " & part)
+    var data = case input.kind
+               of kCtm: input.ctm.binPart(part, o)
+               of kSpd: input.spd.binPart(part, o)
+    if a >= 0: data = @[byte(a and 0xff), byte(a shr 8)] & data
+    result.add Output(path: path, data: data.toStr)
+
 template common() =
   option("--input-format", choices = @["ctm", "spd"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
@@ -201,7 +247,7 @@ let parser = newParser("batchpad"):
     option("--cells", choices = @["8", "12", "16", "word"], default = some("8"),
            help = "Cell width of tiles, map and sub-maps")
     option("--area", help = "Only this part of the map: X,Y,W,H")
-    option("--sprite-attribs", choices = @["spritepad", "seuck", "ignore"],
+    option("--sprite-attribs", choices = @["spritepad", "seuck", "blank"],
            default = some("spritepad"), help = "64th byte style of sprites")
     option("--load-address", help = "Writes a PRG load address in front of every file")
     common()
@@ -265,7 +311,7 @@ let parser = newParser("batchpad"):
     option("--tile-size", help = "WxH")
     option("--map-size", help = "WxH")
     option("--cells", choices = @["8", "12", "16", "word"], default = some("8"))
-    option("--sprite-attribs", choices = @["spritepad", "seuck", "ignore"], default = some("spritepad"))
+    option("--sprite-attribs", choices = @["spritepad", "seuck", "blank"], default = some("spritepad"))
     option("--load-address", choices = @["skip", "detect", "none"], default = some("detect"))
     option("--set", multiple = true, help = "Sets a project setting: name=value")
     flag("--always-write", help = "Writes the output even when unchanged")
@@ -293,7 +339,13 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout)): int =
       let o = opts.argparse_convert_opts.get
       alwaysWrite = o.alwaysWrite
       outputs.add load(o.input, o.inputFormat, o.set).convert(o.output, o.to)
-    of "bin": notYet("#41")
+    of "bin":
+      let o = opts.argparse_bin_opts.get
+      alwaysWrite = o.alwaysWrite
+      var bo = BinOptions(cells: parseEnum[CellFormat](o.cells),
+                          spriteAttribs: parseEnum[SpriteAttribStyle](o.spriteAttribs))
+      if o.area != "": bo.area = some(parseArea(o.area))
+      outputs.add load(o.input, o.inputFormat, o.set).binOutputs(o.parts, bo, o.loadAddress)
     of "asm": notYet("#43")
     of "c": notYet("#53")
     of "png": notYet("#48")
@@ -311,7 +363,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout)): int =
   except UsageError as e:
     stderr.writeLine "batchpad: " & e.msg
     return 2
-  except CliError, CtmError, SpdError:
+  except CliError, CtmError, SpdError, BinError:
     let e = getCurrentException()
     stderr.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
     return 1

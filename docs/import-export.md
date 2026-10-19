@@ -160,7 +160,7 @@ Sprite export and import ask for an attribute style for the 64th byte:
 | --- | --- | --- |
 | SpritePad | `MYXVCCCC` | taken as it is |
 | SEUCK | colour, plus `$10` if multicolour | bit 4 becomes multicolour; the other high bits are dropped |
-| Ignore | 0 | every sprite multicolour, colour 12 (`$8c`) |
+| Blank (`Ignore` in the code) | 0 | every sprite multicolour, colour 12 (`$8c`) |
 
 Import of sprites: count = file size / 64, 2 bytes skipped first when the size
 is 2 mod 64. The sprite set is resized and all sprite animations are reset.

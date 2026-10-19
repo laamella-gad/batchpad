@@ -37,7 +37,7 @@ suite "command line":
   test "input errors exit with 1":
     check batchpad("info", files / "spd5" / "README.md")[0] == 1
     check batchpad("info", tmp / "missing.ctm")[0] == 1
-    check batchpad("bin", files / "spd5" / "sprites.spd", "sprites=" & tmp / "s.bin")[0] == 1
+    check batchpad("bin", files / "spd5" / "sprites.spd", "tiles=" & tmp / "s.bin")[0] == 1
 
   test "convert":
     let src = files / "ctm9" / "mctext_pertile.ctm"
@@ -71,5 +71,40 @@ suite "command line":
     check getLastModificationTime(path) == old
     check batchpad("convert", src, path, "--always-write")[0] == 0
     check getLastModificationTime(path) != old
+
+  test "bin":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("bin", src, "chars=" & tmp / "chars.bin", "map=" & tmp / "map.bin")[0] == 0
+    check readFile(tmp / "chars.bin").len == 6 * 8
+    check readFile(tmp / "map.bin") == "\x01\x02\x03\x01\x02\x03\x02\x03\x01\x02\x03\x01\x00\x01\x00\x01\x00\x01"
+    let (code, area) = batchpad("bin", src, "map=-", "--area", "1,1,2,2")
+    check code == 0 and area == "\x03\x01\x01\x00"
+
+  test "bin load addresses":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("bin", src, "--load-address", "$2000", "chars=" & tmp / "a.prg",
+                   "tile-tags=" & tmp / "b.prg@0x4000", "tile-attribs=" & tmp / "c.prg@49152")[0] == 0
+    check readFile(tmp / "a.prg")[0..1] == "\x00\x20"
+    check readFile(tmp / "b.prg") == "\x00\x40\x00\x01\x02\x03"
+    check readFile(tmp / "c.prg")[0..1] == "\x00\xc0"
+    check batchpad("bin", src, "chars=" & tmp / "x.prg@$10000")[0] == 2
+
+  test "bin argument errors":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("bin", src)[0] == 2
+    check batchpad("bin", src, "frob=" & tmp / "x.bin")[0] == 2
+    check batchpad("bin", src, "chars")[0] == 2
+    check batchpad("bin", src, "chars=" & tmp / "x.bin", "map=" & tmp / "x.bin")[0] == 2
+    check batchpad("bin", src, "tile-names=" & tmp / "x.bin")[0] == 2
+    check batchpad("bin", src, "--area", "1,2", "map=" & tmp / "x.bin")[0] == 2
+    check not fileExists(tmp / "x.bin")
+
+  test "bin writes nothing when one part fails":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("bin", src, "chars=" & tmp / "y.bin", "map-lo=" & tmp / "z.bin")[0] == 1
+    check not fileExists(tmp / "y.bin")
+    check batchpad("bin", files / "ctm9" / "ecm_perproject_notiles.ctm",
+                   "chars=" & tmp / "y.bin", "tiles=" & tmp / "z.bin")[0] == 1
+    check not fileExists(tmp / "y.bin")
 
 removeDir(tmp)

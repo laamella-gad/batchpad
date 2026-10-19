@@ -1,8 +1,9 @@
 # Command line (#55)
 
 How batchpad is meant to be called. `src/batchpad/cli.nim` has every
-command and option below, parsed with argparse; `info` and `convert` work, the
-others say which issue they wait for. This is the design the exports
+command and option below, parsed with argparse; `info`, `convert` and `bin` work
+(`bin` without `submaps` and `colour-map` yet), the others say which issue
+they wait for. Raw binary layouts are in `src/batchpad/rawbin.nim`. This is the design the exports
 (#41-#54, #56, #57) are written against. Decided
 2026-10-19; the choices are listed at the end.
 
@@ -88,7 +89,7 @@ SpritePad:
 | `tile-attribs` | overlay bit per tile |
 | `tile-tags` | tag per tile |
 | `tile-names` | names (asm and C only) |
-| `sprite-anims` | four lists: from, to, timer, attributes |
+| `sprite-anims` | four lists: first frames, last frames, timers, attributes; frames as `--cells` says (8 or `word` only) |
 | `tile-anims` | the same for tile animations |
 
 Cell parts (`tiles`, `map`, `submaps` and SpritePad `tiles`) in 12- or 16-bit
@@ -108,7 +109,7 @@ the project, so that form is for scripts more than for make.
 | `--cells 8\|12\|16\|word` | Cell width of tiles, map and sub-maps. `word` is one little-endian word per cell, not split. | `8`; a value that doesn't fit is an error |
 | `--area X,Y,W,H` | Only this part of the map (MapArea) | whole map |
 | `--set <name>=<value>` | Overrides a project setting first (below); can repeat | |
-| `--sprite-attribs spritepad\|seuck\|ignore` | 64th byte style of `sprites` | `spritepad` |
+| `--sprite-attribs spritepad\|seuck\|blank` | 64th byte style of `sprites` | `spritepad` |
 | `--quiet`, `--strict`, `--always-write` | See Goals | |
 
 Why 8 and refuse, not the smallest width that fits: a fixed width keeps the

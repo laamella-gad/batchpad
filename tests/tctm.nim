@@ -92,6 +92,21 @@ suite "CTM V9":
     check p.chars[1].colours == [0'u8, 2, 7]
     check p.chars[5].colours == [0'u8, 0, 1]
 
+  test "multicolour text, per char, values above 255":
+    let p = readCtm(dir / "mctext_perchar_big.ctm")
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerChar
+    check p.chars.len == 300
+    check p.chars[299].material == 11
+    check p.chars[299].colours[0] == 11
+    check p.tiles.len == 261
+    check p.tiles[100].cells == @[0'u16, 1, 2]
+    check p.tiles[260].tag == 4
+    check p.tiles[260].name == "t260"
+    check p.mapWidth == 21 and p.mapHeight == 13
+    check p.map[38] == 5
+    check p.map[37] == 259
+
   test "ECM text, per project, key map":
     let p = readCtm(dir / "ecm_perproject_notiles.ctm")
     check p.displayMode == dmEcmText
@@ -122,7 +137,7 @@ suite "CTM V9":
         let data = readFile(path)
         check readCtm(path).toCtm == cast[seq[byte]](data)
         inc files
-    check files == 5
+    check files == 6
 
   test "writeCtm":
     let path = getTempDir() / "batchpad_tctm.ctm"

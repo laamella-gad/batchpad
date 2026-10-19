@@ -63,9 +63,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
-- #41 [feature, high] Write raw binary files
-  - Same layouts as CharPad/SpritePad "Export": chars, char attributes L1/L2/M, tiles, tile attributes, map, map area; sprites, sprite attributes, sprite tiles, tile attributes. See `docs/import-export.md`.
-  - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address (#54).
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
 - #43 [feature, high] Write assembler source for several assemblers
@@ -100,10 +97,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
   - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found.
   - Could also feed the asm (#43) and C (#53) output, instead of CharPad's dummy `addr_* = $1000`.
+  - Export side done with #41: `--load-address`, and `part=file@ADDR` per file.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
   - `$42 $00`, then 127 sprites of 64 bytes (8130 bytes); the 64th byte is `000M CCCC`. Layout in `docs/import-export.md`, conversions in `docs/spritepad.md` (SpritePad 1.8 and Pro agree).
   - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
-  - Also as an attribute style for raw sprite export/import (#41, #42): SpritePad, SEUCK or Ignore (`$8c` on import, 0 on export).
+  - Also as an attribute style for raw sprite export/import (#41, #42): SpritePad, SEUCK or Blank (`Ignore` in the code) (`$8c` on import, 0 on export).
 - #57 [feature, low] Read and write SEUCK `.B` background files
   - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; `$3f`, 9 x `$ff`. Layout in `docs/import-export.md`.
   - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
@@ -119,6 +117,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #41 [feature, high] Write raw binary files
+  - Same layouts as CharPad/SpritePad "Export": chars, char attributes L1/L2/M, tiles, tile attributes, map, map area; sprites, sprite attributes, sprite tiles, tile attributes. See `docs/import-export.md`.
+  - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address (#54).
+  - Done 2026-10-19: `batchpad bin` (`src/batchpad/rawbin.nim`). Attribute bytes match CharPad Pro 3.88's decompiled `GetAttributeByte_L1`/`_L2` and nibble packing. Compared with CharPad Pro 3.88's "Export All" (2026-10-19) for `tests/files/ctm9/mctext_pertile.ctm` in 8, 12 and 16 bpc and `hiresbitmap_perchar.ctm` in 8 bpc: all 28 files the same. Also the same (2026-10-19): `mcbitmap_pertile.ctm` in 8 bpc (tile L2 included, 7 files) and `mctext_perchar_big.ctm` (300 chars, 261 tiles, cells up to 260, odd cell counts) in 12 and 16 bpc (14 files). Map area (Export All with a map selection, 3 x 5 at 2,3) the same as `--area 2,3,3,5`, compared as `map-lo` at 16 bpc because CharPad cuts the values above 255 to 8 bits without a warning. SpritePad C64 Pro 3.80's "Export All" of `tests/files/spd5/tiles_anims.spd` (2026-10-19): sprites, sprite attributes, tiles and tile attributes the same; Binary > Export Sprite Set with the SEUCK and Blank styles the same too. Also SpritePad tags and animation lists. Sub-maps and colour map are #44, #45.
 - #55 [task, high] Design the command line arguments
   - List every import and export option (`docs/import-export.md`, #41-#54) and every setting in the CharPad and SpritePad files (display mode, colouring method, colours, tile system, flexi-grid, key map, overlay distances, animations, ...).
   - From that, come up with a consistent set of commands and arguments: input/output files, what to export, cell width (8/12/16 bit), load address, assembler or C dialect, label names, sub-maps, overrides of project settings.

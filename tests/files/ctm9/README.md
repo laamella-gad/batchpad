@@ -3,7 +3,8 @@
 Made by us, byte by byte from the V9 layout in `docs/charpad.md`; `tests/tctm.nim`
 checks that they read back as described here.
 
-All five share the same 6 chars, each with its char number as material:
+The first five share the same 6 chars, each with its char number as material
+(`mctext_perchar_big.ctm` is different, see its row below):
 
 | Char | Pattern |
 | --- | --- |
@@ -45,6 +46,7 @@ only `tests/tctm.nim` checks them.
 | `mcbitmap_pertile.ctm` | multicolour bitmap | per tile | black | white, red, cyan | Tiles as colour RAM / screen low / screen high: 0 white / red / cyan (1, 2, 3), 1 purple / green / blue (4, 5, 6), 2 yellow / orange / brown (7, 8, 9), 3 light red / dark grey / grey (10, 11, 12). |
 | `hiresbitmap_perchar.ctm` | hires bitmap | per char | black | screen white / black | Chars as screen low / screen high: 0 white / black (1, 0), 1 red / yellow (2, 7), 2 blue / light blue (6, 14), 3 brown / orange (9, 8), 4 dark grey / light grey (11, 15), 5 black / white (0, 1). Flexi-grid on, 3 x 2, thin green line. |
 | `ecm_perproject_notiles.ctm` | ECM text | per project | black, red, green, blue | white (1), all chars | -. Key map 9 (C64 ROM upper case). |
+| `mctext_perchar_big.ctm` | multicolour text | per char | blue, dark grey, grey, black | light blue | 300 chars, char n has colour and material n % 16. 261 tiles of 3 x 1, tile t holds chars 3t..3t+2 (mod 300) and tag t & 255. Map 21 x 13, cell i holds tile 7i % 261. For values above 255 and the odd counts of 12-bit packing. |
 
 ## Checked in CharPad
 
