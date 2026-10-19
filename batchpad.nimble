@@ -9,3 +9,4 @@ bin = @["batchpad"]
 
 # Dependencies
 requires "nim >= 2.2.8"
+requires "argparse >= 4.0.2"

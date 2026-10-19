@@ -8,7 +8,7 @@ Command-line tool that converts CharPad and SpritePad project files into artifac
 
 ## Project status
 
-Early. `src/batchpad.nim` still prints "Hello, World!". `src/batchpad/ctm.nim` holds the CharPad project model, and the CTM V7 and V9 readers and writers (#18, #19, #22, #23), tested by `tests/tctm.nim`. `src/batchpad/spd.nim` holds the SpritePad project model and the SPD V1, V2 and V5 readers and writers (#30-#33, #38, #39), tested by `tests/tspd.nim`. Both use `src/batchpad/binio.nim` for reading and writing bytes. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
+Early. `src/batchpad.nim` runs the command line in `src/batchpad/cli.nim` (argparse; design in `docs/cli.md`), tested by `tests/tcli.nim`: `info` and `convert` work, the other commands are stubs. `src/batchpad/ctm.nim` holds the CharPad project model, and the CTM V7 and V9 readers and writers (#18, #19, #22, #23), tested by `tests/tctm.nim`. `src/batchpad/spd.nim` holds the SpritePad project model and the SPD V1, V2 and V5 readers and writers (#30-#33, #38, #39), tested by `tests/tspd.nim`. Both use `src/batchpad/binio.nim` for reading and writing bytes. `README.md` holds the purpose and the format version tables — update this file as the project takes shape.
 
 ## Priorities
 
@@ -31,7 +31,7 @@ nimble run                   # build and run
 nim c -r src/batchpad.nim   # compile + run directly
 nim check src/batchpad.nim  # type-check without building
 nimble test                  # runs tests/t*.nim
-nim c -r -p:src tests/tctm.nim   # run a single test file (also tests/tspd.nim)
+nim c -r -p:src tests/tctm.nim   # run a single test file (also tests/tspd.nim, tests/tcli.nim)
 ```
 
 ## Layout

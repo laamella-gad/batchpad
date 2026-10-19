@@ -1,7 +1,9 @@
 # Command line (#55)
 
-How batchpad is meant to be called. Nothing here is built yet; this is the
-design the exports (#41-#54, #56, #57) are written against. Decided
+How batchpad is meant to be called. `src/batchpad/cli.nim` has every
+command and option below, parsed with argparse; `info` and `convert` work, the
+others say which issue they wait for. This is the design the exports
+(#41-#54, #56, #57) are written against. Decided
 2026-10-19; the choices are listed at the end.
 
 ## Goals
