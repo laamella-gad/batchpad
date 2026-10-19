@@ -189,6 +189,19 @@ suite "CTM V9":
     check c.tileHeight == 255 and c.tiles[0].cells.len == 510 and c.tiles[0].cells[3] == 5
     check c.mapWidth == 65535 and c.map.len == 65535 and c.map[1] == 2
 
+
+  test "writer says what it leaves out":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    var leftOut: seq[string]
+    discard p.toCtm(9, leftOut)
+    check leftOut.len == 0
+    var q = p
+    q.tiles[0].name = repeat('x', 33)
+    q.keyMap = 16
+    discard q.toCtm(9, leftOut)
+    check leftOut == @["the end of 1 tile name (past 32 chars or a 0 byte)",
+                       "key map 16 (V9 holds 0-15)"]
+
 suite "CTM V7":
   const dir = currentSourcePath().parentDir / "files" / "ctm7"
 
@@ -279,6 +292,20 @@ suite "CTM V7":
     let r = parseCtm(q.toCtm(version = 7))
     check r.chars[2].material == 2
     check r.tiles[1].colours[0] == 10
+
+
+  test "writer says what it leaves out":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    var leftOut: seq[string]
+    discard p.toCtm(7, leftOut)
+    check leftOut.len == 0
+    var q = p
+    q.chars[2].material = 0x12
+    q.keyMap = 9
+    q.flexiGrid.settings = 0x81
+    discard q.toCtm(7, leftOut)
+    check leftOut == @["colour and material bits above the low 4 (V7 has 4)",
+                       "key map 9 (V7 has none)", "the flexi-grid (V7 has none)"]
 
   test "writer errors":
     let p = readCtm(dir / "mctext_pertile.ctm")

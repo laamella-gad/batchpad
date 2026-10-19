@@ -94,6 +94,23 @@ suite "SPD V1":
     q.sprites.setLen 0
     expect SpdError: discard q.toSpd(version = 1)
 
+
+  test "writer says what it leaves out":
+    let p = readSpd(dir / "anims.spd")
+    var leftOut: seq[string]
+    discard p.toSpd(1, leftOut)
+    check leftOut.len == 0
+    var q = p
+    q.sprites.setLen 257
+    q.spriteAnims[0].last = 256
+    discard q.toSpd(1, leftOut)
+    check leftOut == @["1 sprite past 256", "1 sprite animation with frames above 255"]
+    leftOut.setLen 0
+    let t = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "tiles_anims.spd")
+    discard t.toSpd(1, leftOut)
+    check leftOut == @["the tiles (V1 has none)", "the tile animations (V1 has none)",
+                       "the overlay of 4 sprites (overlay distance 4; up to V3 overlay means the next sprite)"]
+
 suite "SPD V2":
   const dir = currentSourcePath().parentDir / "files" / "spd2"
 
@@ -170,6 +187,21 @@ suite "SPD V2":
       t.cells[5] = 3
     r = parseSpd(q.toSpd(version = 2))
     check r.tileWidth == 4 and r.tiles[0].cells == @[0'u16, 0, 0, 0, 3, 0, 0, 0]
+
+
+  test "writer says what it leaves out":
+    let p = readSpd(dir / "tiles.spd")
+    var leftOut: seq[string]
+    discard p.toSpd(2, leftOut)
+    check leftOut.len == 0
+    var q = p
+    q.tileWidth = 5
+    for t in q.tiles.mitems: t.cells = newSeq[uint16](10)
+    q.tiles[1].tag = 4
+    q.tiles[2].name = "door"
+    discard q.toSpd(2, leftOut)
+    check leftOut == @["tile cells past 4 x 4 (the tiles are 5 x 2)",
+                       "the tags of 1 tile (V2 has none)", "the names of 1 tile (V2 has none)"]
 
 suite "SPD V5":
   const dir = currentSourcePath().parentDir / "files" / "spd5"
@@ -284,3 +316,16 @@ suite "SPD V5":
       t.cells[1] = 3
     r = parseSpd(q.toSpd)
     check r.tileWidth == 255 and r.tiles[0].cells.len == 255 and r.tiles[0].cells[1] == 3
+
+
+  test "writer says what it leaves out":
+    let p = readSpd(dir / "tiles_anims.spd")
+    var leftOut: seq[string]
+    discard p.toSpd(5, leftOut)
+    check leftOut.len == 0
+    var q = p
+    q.tiles[1].name = "ab\0cd"
+    q.spriteAnims.setLen 258
+    discard q.toSpd(5, leftOut)
+    check leftOut == @["the end of 1 tile name (past 32 chars or a 0 byte)",
+                       "2 sprite animations past 256"]

@@ -169,9 +169,11 @@ proc check(p: SpriteProject) =
       if t.cells.len != p.tileWidth * p.tileHeight:
         fail("tile " & $i & " has " & $t.cells.len & " cells, not " & $(p.tileWidth * p.tileHeight))
 
-proc cropTiles(p: var SpriteProject, width, height: int) =
+proc cropTiles(p: var SpriteProject, width, height: int, leftOut: var seq[string]) =
   ## Keeps the top left `width` x `height` sprites of every tile.
-  if p.tileWidth <= width and p.tileHeight <= height: return
+  if not p.tileSystem or p.tileWidth <= width and p.tileHeight <= height: return
+  leftOut.add "tile cells past " & $width & " x " & $height & " (the tiles are " &
+              $p.tileWidth & " x " & $p.tileHeight & ")"
   let (w, h) = (min(p.tileWidth, width), min(p.tileHeight, height))
   for t in p.tiles.mitems:
     var cells = newSeq[uint16](w * h)
@@ -188,60 +190,93 @@ proc enableAnims(p: var SpriteProject, fromVersion: int) =
   if fromVersion notin 1..3:
     for a in p.spriteAnims.mitems: a.attributes.setBit(7)
 
-proc dropOverlays(p: var SpriteProject) =
+proc dropOverlays(p: var SpriteProject, leftOut: var seq[string]) =
   ## Up to V3 overlay means the next sprite, so overlays at another distance
   ## are left out.
   if p.spriteOverlay != 1:
-    for s in p.sprites.mitems: s.attributes.clearBit(4)
+    var n = 0
+    for s in p.sprites.mitems:
+      if s.overlay: inc n
+      s.attributes.clearBit(4)
+    if n > 0:
+      leftOut.add "the overlay of " & count(n, "sprites") & " (overlay distance " & $p.spriteOverlay &
+                  "; up to V3 overlay means the next sprite)"
 
-proc fitV1(p: SpriteProject): SpriteProject =
+proc limit[T](s: var seq[T], n: int, what: string, leftOut: var seq[string]) =
+  if s.len > n:
+    leftOut.add count(s.len - n, what) & " past " & $n
+    s.setLen n
+
+proc dropNames(p: var SpriteProject, leftOut: var seq[string]) =
+  var cut = 0
+  for t in p.tiles.mitems:
+    let zero = t.name.find('\0')
+    if zero >= 0 or t.name.len > 32: inc cut
+    if zero >= 0: t.name.setLen zero
+    if t.name.len > 32: t.name.setLen 32
+  if cut > 0: leftOut.add "the end of " & count(cut, "tile names") & " (past 32 chars or a 0 byte)"
+
+proc fitV1(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
   ## Drops what V1 can't hold: tiles, tile animations, sprites and animations
   ## past 256, animations with frames above 255, and overlays when the overlay
-  ## distance isn't 1. V1 always holds an animation, so a project without one
-  ## gets a blank one (not enabled). See `enableAnims` for the enabled bit.
+  ## distance isn't 1. Adds a line to `leftOut` for each. V1 always holds an
+  ## animation, so a project without one gets a blank one (not enabled). See
+  ## `enableAnims` for the enabled bit.
   result = p
-  if result.sprites.len > 256: result.sprites.setLen 256
+  result.sprites.limit(256, "sprites", leftOut)
+  if p.tileSystem: leftOut.add "the tiles (V1 has none)"
+  if p.tileAnims.len > 0: leftOut.add "the tile animations (V1 has none)"
   result.tileSystem = false
   result.tiles = @[]
   result.tileAnims = @[]
   result.spriteAnims = @[]
+  var high = 0
   for a in p.spriteAnims:
-    if a.first <= 255 and a.last <= 255 and result.spriteAnims.len < 256:
-      result.spriteAnims.add a
+    if a.first > 255 or a.last > 255: inc high
+    else: result.spriteAnims.add a
+  if high > 0: leftOut.add count(high, "sprite animations") & " with frames above 255"
+  result.spriteAnims.limit(256, "sprite animations", leftOut)
   result.enableAnims(p.version)
   if result.spriteAnims.len == 0: result.spriteAnims.add Animation()
-  result.dropOverlays
+  result.dropOverlays(leftOut)
 
-proc fitV2(p: SpriteProject): SpriteProject =
+proc fitV2(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
   ## Drops what V2 can't hold, or SpritePad 2.3 won't load: sprites past 4096,
   ## tiles and animations past 256, tile cells past 4 either way, tile
   ## animations, and overlays when the overlay distance isn't 1. Tile
-  ## attributes, tags and names are not written. See `enableAnims` for the
-  ## enabled bit.
+  ## attributes, tags and names are not written. Adds a line to `leftOut` for
+  ## each. See `enableAnims` for the enabled bit.
   result = p
-  if result.sprites.len > 4096: result.sprites.setLen 4096
+  result.sprites.limit(4096, "sprites", leftOut)
   if not result.tileSystem: result.tiles = @[]
-  if result.tiles.len > 256: result.tiles.setLen 256
-  result.cropTiles(4, 4)
+  result.tiles.limit(256, "tiles", leftOut)
+  result.cropTiles(4, 4, leftOut)
+  var overlays, tags, names = 0
+  for t in result.tiles:
+    if t.overlay: inc overlays
+    if t.tag != 0: inc tags
+    if t.name != "": inc names
+  if overlays > 0: leftOut.add "the overlay of " & count(overlays, "tiles") & " (V2 has no tile attributes)"
+  if tags > 0: leftOut.add "the tags of " & count(tags, "tiles") & " (V2 has none)"
+  if names > 0: leftOut.add "the names of " & count(names, "tiles") & " (V2 has none)"
+  if p.tileAnims.len > 0: leftOut.add "the tile animations (V2 has none)"
   result.tileAnims = @[]
-  if result.spriteAnims.len > 256: result.spriteAnims.setLen 256
+  result.spriteAnims.limit(256, "sprite animations", leftOut)
   result.enableAnims(p.version)
-  result.dropOverlays
+  result.dropOverlays(leftOut)
 
-proc fitV5(p: SpriteProject): SpriteProject =
+proc fitV5(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
   ## Drops what V5 can't hold: sprites and tiles past 65535, tile cells past
   ## 255 either way, animations past 256 and name chars past 32 or a 0 byte.
+  ## Adds a line to `leftOut` for each.
   result = p
-  if result.sprites.len > 65535: result.sprites.setLen 65535
+  result.sprites.limit(65535, "sprites", leftOut)
   if not result.tileSystem: result.tiles = @[]
-  if result.tiles.len > 65535: result.tiles.setLen 65535
-  result.cropTiles(255, 255)
-  for t in result.tiles.mitems:
-    let zero = t.name.find('\0')
-    if zero >= 0: t.name.setLen zero
-    if t.name.len > 32: t.name.setLen 32
-  if result.spriteAnims.len > 256: result.spriteAnims.setLen 256
-  if result.tileAnims.len > 256: result.tileAnims.setLen 256
+  result.tiles.limit(65535, "tiles", leftOut)
+  result.cropTiles(255, 255, leftOut)
+  result.dropNames(leftOut)
+  result.spriteAnims.limit(256, "sprite animations", leftOut)
+  result.tileAnims.limit(256, "tile animations", leftOut)
 
 proc writeSprites(w: var Writer, p: SpriteProject) =
   for s in p.sprites:
@@ -317,16 +352,22 @@ proc formatV5(p: SpriteProject): seq[byte] =
   w.writeAnims(p.tileAnims)
   w.data
 
-proc toSpd*(p: SpriteProject, version = 5): seq[byte] =
+proc toSpd*(p: SpriteProject, version: int, leftOut: var seq[string]): seq[byte] =
   ## Formats `p` as a .spd file of version 1, 2 or 5. What the version can't
-  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`). Raises SpdError on other versions
-  ## and on projects that don't hold together, such as one without sprites.
+  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`), with a line in
+  ## `leftOut` for each. Raises SpdError on other versions and on projects
+  ## that don't hold together, such as one without sprites.
   p.check
   case version
-  of 1: formatV1(p.fitV1)
-  of 2: formatV2(p.fitV2)
-  of 5: formatV5(p.fitV5)
+  of 1: formatV1(p.fitV1(leftOut))
+  of 2: formatV2(p.fitV2(leftOut))
+  of 5: formatV5(p.fitV5(leftOut))
   else: fail("writing SPD version " & $version & " is not supported yet")
+
+proc toSpd*(p: SpriteProject, version = 5): seq[byte] =
+  ## `toSpd` without the list of what is left out.
+  var leftOut: seq[string]
+  p.toSpd(version, leftOut)
 
 proc writeSpd*(path: string, p: SpriteProject, version = 5) =
   let data = p.toSpd(version)

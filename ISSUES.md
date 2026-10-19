@@ -110,13 +110,14 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - ECM shows only 64 shapes; CharPad Pro treats chars 64-255 as copies of chars 0-63 in the other three background colour banks, each with its own colour and material (3.88 help, "ECM Mode Tips"). Pixel edits and transforms on char 64+ go to char & 63.
   - Open: does a saved CTM hold the same 8 bytes for char n and n & 63, or the char's own (possibly stale) data? What happens with more than 256 chars? Matters for char set exports and for what our readers and writers should do with ECM projects.
   - Check with a CharPad Pro 3.88 ECM project of more than 64 chars, saved after editing a char in the first bank, and in the decompiled code (`Form_CPV_CharEdit`, the set operations).
-- #60 [feature, normal] Warn about what writers leave out
-  - The fit procs in `ctm.nim` and `spd.nim` drop what a version can't hold without saying so. Make them report each thing dropped, so the command line can print it on stderr (`--quiet` hides it, `--strict` makes it an error; `docs/cli.md`). Until then `--quiet` and `--strict` do nothing.
 
 ## In progress
 
 ## Closed
 
+- #60 [feature, normal] Warn about what writers leave out
+  - The fit procs in `ctm.nim` and `spd.nim` drop what a version can't hold without saying so. Make them report each thing dropped, so the command line can print it on stderr (`--quiet` hides it, `--strict` makes it an error; `docs/cli.md`). Until then `--quiet` and `--strict` do nothing.
+  - Done 2026-10-19: `toCtm` and `toSpd` take a `leftOut` list that the fit procs fill, one line per thing left out (counts, the version that lacks it). `convert` prints them as `batchpad: <output>: warning: left out ...`; `--quiet` hides them, `--strict` fails with exit 1 and writes nothing. Colour bytes a display mode doesn't use are left out without a line, and so are tiles with the tile system off. `bin` refuses rather than leaving out, so it has no warnings yet.
 - #41 [feature, high] Write raw binary files
   - Same layouts as CharPad/SpritePad "Export": chars, char attributes L1/L2/M, tiles, tile attributes, map, map area; sprites, sprite attributes, sprite tiles, tile attributes. See `docs/import-export.md`.
   - Tile/map cells in 8 bit, 12 bit split packed (LSBs + MSNs) or 16 bit split (LSBs + MSBs). Optional PRG load address (#54).

@@ -5,8 +5,14 @@ const files = currentSourcePath().parentDir / "files"
 
 proc batchpad(args: varargs[string]): (int, string) =
   let output = newStringStream()
-  let code = run(@args, output)
+  let code = run(@args, output, newStringStream())
   (code, output.data)
+
+proc warnings(args: varargs[string]): (int, string) =
+  ## Exit code and what goes to stderr.
+  let errors = newStringStream()
+  let code = run(@args, newStringStream(), errors)
+  (code, errors.data)
 
 let tmp = getTempDir() / "batchpad_tcli"
 removeDir(tmp)
@@ -60,6 +66,18 @@ suite "command line":
     check batchpad("convert", src, tmp / "b.spd", "--set", "mc1=99")[0] == 1
     check batchpad("convert", src, tmp / "b.spd", "--set", "frob=1")[0] == 1
     check not fileExists(tmp / "b.spd")
+
+  test "convert warns about what is left out":
+    let src = files / "spd5" / "tiles_anims.spd"
+    let (code, text) = warnings("convert", src, tmp / "w.spd", "--to", "spd1")
+    check code == 0 and fileExists(tmp / "w.spd")
+    check text.splitLines.len == 4
+    check text.startsWith("batchpad: " & tmp / "w.spd" & ": warning: left out the tiles (V1 has none)\n")
+    check warnings("convert", src, tmp / "w5.spd") == (0, "")
+    check warnings("convert", src, tmp / "q.spd", "--to", "spd1", "--quiet") == (0, "")
+    let (scode, stext) = warnings("convert", src, tmp / "s.spd", "--to", "spd1", "--strict")
+    check scode == 1 and "--strict" in stext and "the tiles (V1 has none)" in stext
+    check not fileExists(tmp / "s.spd")
 
   test "unchanged output is not written again":
     let src = files / "ctm9" / "mctext_pertile.ctm"

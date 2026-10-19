@@ -216,15 +216,20 @@ proc check(p: Project) =
   if p.mapWidth < 0 or p.mapHeight < 0 or p.map.len != p.mapWidth * p.mapHeight:
     fail("map has " & $p.map.len & " cells, not " & $p.mapWidth & " x " & $p.mapHeight)
 
-proc fit(p: Project): Project =
+proc fit(p: Project, leftOut: var seq[string]): Project =
   ## Drops what V7 and V9 can't hold: chars and tiles past 65536, tile cells
   ## past 255 either way, map cells past 65535 either way and name chars past
-  ## 32 or a 0 byte.
+  ## 32 or a 0 byte. Adds a line to `leftOut` for each.
   result = p
-  if result.chars.len > 65536: result.chars.setLen 65536
+  if result.chars.len > 65536:
+    leftOut.add count(p.chars.len - 65536, "chars") & " past 65536"
+    result.chars.setLen 65536
   if not result.tileSystem: result.tiles = @[]
-  if result.tiles.len > 65536: result.tiles.setLen 65536
-  if result.tileWidth > 255 or result.tileHeight > 255:
+  if result.tiles.len > 65536:
+    leftOut.add count(result.tiles.len - 65536, "tiles") & " past 65536"
+    result.tiles.setLen 65536
+  if result.tileSystem and (result.tileWidth > 255 or result.tileHeight > 255):
+    leftOut.add "tile cells past 255 x 255 (the tiles are " & $p.tileWidth & " x " & $p.tileHeight & ")"
     let (w, h) = (min(p.tileWidth, 255), min(p.tileHeight, 255))
     for t in result.tiles.mitems:
       var cells = newSeq[uint16](w * h)
@@ -233,11 +238,15 @@ proc fit(p: Project): Project =
       t.cells = cells
     result.tileWidth = w
     result.tileHeight = h
+  var cut = 0
   for t in result.tiles.mitems:
     let zero = t.name.find('\0')
+    if zero >= 0 or t.name.len > 32: inc cut
     if zero >= 0: t.name.setLen zero
     if t.name.len > 32: t.name.setLen 32
+  if cut > 0: leftOut.add "the end of " & count(cut, "tile names") & " (past 32 chars or a 0 byte)"
   if result.mapWidth > 65535 or result.mapHeight > 65535:
+    leftOut.add "map cells past 65535 x 65535 (the map is " & $p.mapWidth & " x " & $p.mapHeight & ")"
     let (w, h) = (min(p.mapWidth, 65535), min(p.mapHeight, 65535))
     result.map = newSeq[uint16](w * h)
     for y in 0..<h:
@@ -245,21 +254,30 @@ proc fit(p: Project): Project =
     result.mapWidth = w
     result.mapHeight = h
 
-proc fitV7(p: Project): Project =
+proc fitV7(p: Project, leftOut: var seq[string]): Project =
   ## Also drops the colour and material bits above 4, which only V8 and
-  ## later have. Bitmap modes are refused: as text they would be garbage.
+  ## later have, the key map and the flexi-grid. Bitmap modes are refused: as
+  ## text they would be garbage.
   if p.displayMode > dmEcmText: fail("V7 has no bitmap modes")
-  result = p.fit
+  result = p.fit(leftOut)
+  var high = result.colours[0] > 15
+  for ch in result.chars: high = high or ch.material > 15 or ch.colours[0] > 15
+  for t in result.tiles: high = high or t.colours[0] > 15
+  if high: leftOut.add "colour and material bits above the low 4 (V7 has 4)"
+  if result.keyMap != 0: leftOut.add "key map " & $result.keyMap & " (V7 has none)"
+  if result.flexiGrid.settings.testBit(7): leftOut.add "the flexi-grid (V7 has none)"
   result.colours[0] = result.colours[0] and 0x0f
   for ch in result.chars.mitems:
     ch.material = ch.material and 0x0f
     ch.colours[0] = ch.colours[0] and 0x0f
   for t in result.tiles.mitems: t.colours[0] = t.colours[0] and 0x0f
 
-proc fitV9(p: Project): Project =
+proc fitV9(p: Project, leftOut: var seq[string]): Project =
   ## Also drops key maps above 15, which don't fit in their 4 bits.
-  result = p.fit
-  if result.keyMap > 15: result.keyMap = 0
+  result = p.fit(leftOut)
+  if result.keyMap > 15:
+    leftOut.add "key map " & $result.keyMap & " (V9 holds 0-15)"
+    result.keyMap = 0
 
 proc writeChars(w: var Writer, p: Project) =
   w.blockMarker
@@ -342,18 +360,23 @@ proc formatV9(p: Project): seq[byte] =
   w.writeMap(p)
   w.data
 
-proc toCtm*(p: Project, version = 9): seq[byte] =
+proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
   ## Formats `p` as a .ctm file of version 7 or 9. What the version can't
-  ## hold is left out (see `fit`, `fitV7` and `fitV9`), and so are the colour
-  ## bytes a display mode doesn't store (e.g. colour RAM in hires bitmap) and,
-  ## in V7, the key map, the flexi-grid and screen colours. Raises CtmError on
-  ## other versions, on projects that don't hold together, such as one
-  ## without chars, and on bitmap modes in V7.
+  ## hold is left out (see `fit`, `fitV7` and `fitV9`), with a line in
+  ## `leftOut` for each, and so are the colour bytes a display mode doesn't
+  ## use (e.g. colour RAM in hires bitmap, screen colours in text modes),
+  ## without a line. Raises CtmError on other versions, on projects that don't
+  ## hold together, such as one without chars, and on bitmap modes in V7.
   p.check
   case version
-  of 7: formatV7(p.fitV7)
-  of 9: formatV9(p.fitV9)
+  of 7: formatV7(p.fitV7(leftOut))
+  of 9: formatV9(p.fitV9(leftOut))
   else: fail("writing CTM version " & $version & " is not supported yet")
+
+proc toCtm*(p: Project, version = 9): seq[byte] =
+  ## `toCtm` without the list of what is left out.
+  var leftOut: seq[string]
+  p.toCtm(version, leftOut)
 
 proc writeCtm*(path: string, p: Project, version = 9) =
   let data = p.toCtm(version)

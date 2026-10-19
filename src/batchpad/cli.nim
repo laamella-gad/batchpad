@@ -156,7 +156,7 @@ proc infoText(j: JsonNode): string =
   for key, value in j:
     result.add key & ": " & (if value.kind == JString: value.getStr else: $value) & "\n"
 
-proc convert(input: Input, path, to: string): Output =
+proc convert(input: Input, path, to: string, leftOut: var seq[string]): Output =
   var to = to
   if to == "":
     to = case path.splitFile.ext.toLowerAscii
@@ -171,8 +171,8 @@ proc convert(input: Input, path, to: string): Output =
     fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to " & to)
   let v = try: parseInt(version) except ValueError: fail("unknown output format: " & to)
   let data = case kind
-             of kCtm: input.ctm.toCtm(v)
-             of kSpd: input.spd.toSpd(v)
+             of kCtm: input.ctm.toCtm(v, leftOut)
+             of kSpd: input.spd.toSpd(v, leftOut)
   Output(path: path, data: data.toStr)
 
 proc usage(msg: string) {.noreturn.} = raise newException(UsageError, msg)
@@ -317,8 +317,10 @@ let parser = newParser("batchpad"):
     flag("--always-write", help = "Writes the output even when unchanged")
     arg("parts", nargs = -1)
 
-proc run*(args: seq[string], output: Stream = newFileStream(stdout)): int =
-  ## Runs batchpad with `args` and returns its exit code. Errors go to stderr.
+proc run*(args: seq[string], output: Stream = newFileStream(stdout),
+           errors: Stream = newFileStream(stderr)): int =
+  ## Runs batchpad with `args` and returns its exit code. Errors and warnings
+  ## go to `errors`.
   var inputPath = ""
 
   proc load(path, format: string, sets: seq[string] = @[]): Input =
@@ -338,7 +340,12 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout)): int =
     of "convert":
       let o = opts.argparse_convert_opts.get
       alwaysWrite = o.alwaysWrite
-      outputs.add load(o.input, o.inputFormat, o.set).convert(o.output, o.to)
+      var leftOut: seq[string]
+      outputs.add load(o.input, o.inputFormat, o.set).convert(o.output, o.to, leftOut)
+      if o.strict and leftOut.len > 0:
+        fail("--strict: " & o.output & " can't hold " & leftOut.join("; "))
+      if not o.quiet:
+        for l in leftOut: errors.writeLine "batchpad: " & o.output & ": warning: left out " & l
     of "bin":
       let o = opts.argparse_bin_opts.get
       alwaysWrite = o.alwaysWrite
@@ -353,17 +360,21 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout)): int =
     of "stats": notYet("#47")
     of "import": notYet("#42")
     else:
-      stderr.write(parser.help)
+      errors.write(parser.help)
+      errors.flush
       return 2
     outputs.writeOutputs(alwaysWrite, output)
     output.flush
+    errors.flush
   except ShortCircuit as e:
     output.write(if e.flag == "version": "batchpad " & version & "\n" else: e.help)
     output.flush
   except UsageError as e:
-    stderr.writeLine "batchpad: " & e.msg
+    errors.writeLine "batchpad: " & e.msg
+    errors.flush
     return 2
   except CliError, CtmError, SpdError, BinError:
     let e = getCurrentException()
-    stderr.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
+    errors.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
+    errors.flush
     return 1

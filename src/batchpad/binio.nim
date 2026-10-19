@@ -38,3 +38,7 @@ proc u16*(w: var Writer, v: SomeInteger) =
 proc zstring*(w: var Writer, s: string) =
   for c in s: w.u8 ord(c)
   w.u8 0
+
+func count*(n: int, things: string): string =
+  ## `count(3, "tiles")` is "3 tiles", `count(1, "tiles")` is "1 tile".
+  $n & " " & (if n == 1: things[0 .. ^2] else: things)
