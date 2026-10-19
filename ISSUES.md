@@ -22,43 +22,31 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - One model every SpritePad reader fills and every writer reads: sprites with 64th-byte attributes, colours, tiles with attributes/tags/names, sprite and tile animations, overlay distances.
   - Keep unused bits of the 64th byte for round trips; writers leave out what the target format can't hold, with no error.
   - Started: `SpriteProject` in `src/batchpad/spd.nim` (#38), filled by the V5 reader. Keeps the 64th byte and the tile and animation attribute bytes as stored.
-- #6 [feature, low] CharPad CTM V1 reader
+- #6 [feature, low] CharPad CTM V1 reader and writer
   - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
-- #7 [feature, low] CharPad CTM V1 writer
-- #8 [feature, low] CharPad CTM V2 reader
+- #8 [feature, low] CharPad CTM V2 reader and writer
   - CharPad 1.7. 9-byte chars (material), byte map.
   - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
-- #9 [feature, low] CharPad CTM V2 writer
-- #10 [feature, low] CharPad CTM V3 reader
+- #10 [feature, low] CharPad CTM V3 reader and writer
   - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
-- #11 [feature, low] CharPad CTM V3 writer
-- #12 [feature, normal] CharPad CTM V4 reader
+- #12 [feature, normal] CharPad CTM V4 reader and writer
   - CharPad 1.8 Rev 3. 110 samples.
-- #13 [feature, low] CharPad CTM V4 writer
-- #14 [feature, normal] CharPad CTM V5 reader
+- #14 [feature, normal] CharPad CTM V5 reader and writer
   - CharPad 2.0-2.5. 292 samples; flags byte, word map.
-- #15 [feature, low] CharPad CTM V5 writer
-- #16 [feature, normal] CharPad CTM V6 reader
+- #16 [feature, normal] CharPad CTM V6 reader and writer
   - CharPad 2.6. First block format; flags bit 0 = multicolour, bit 1 = tiles.
-- #17 [feature, low] CharPad CTM V6 writer
-- #20 [feature, normal] CharPad CTM V8 reader
+- #20 [feature, normal] CharPad CTM V8 reader and writer
   - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some. Layout confirmed by Pro 3.88's decompiled V8 loader and saver.
-- #21 [feature, low] CharPad CTM V8 writer
-- #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader
+- #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
-- #25 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
-- #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader
+- #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader and writer
   - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
-- #27 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
-- #28 [feature, low] SpritePad 1.8 headerless .spd reader
+- #28 [feature, low] SpritePad 1.8 headerless .spd reader and writer
   - 10 samples; writer already proven in Python reference.
-- #29 [feature, low] SpritePad 1.8 headerless .spd writer
-- #34 [feature, low] SPD V3 reader
+- #34 [feature, low] SPD V3 reader and writer
   - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
-- #35 [feature, low] SPD V3 writer
-- #36 [feature, normal] SPD V4 reader
+- #36 [feature, normal] SPD V4 reader and writer
   - SpritePad 2.8. No samples; overlay distances. Layout confirmed by SpritePad Pro 3.80's decompiled V4 loader and saver (no menu item saves V4).
-- #37 [feature, low] SPD V4 writer
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
@@ -107,6 +95,30 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #7 [feature, low] CharPad CTM V1 writer
+  - Merged into #6 (2026-10-19): one issue per format for reading and writing.
+- #9 [feature, low] CharPad CTM V2 writer
+  - Merged into #8 (2026-10-19): one issue per format for reading and writing.
+- #11 [feature, low] CharPad CTM V3 writer
+  - Merged into #10 (2026-10-19): one issue per format for reading and writing.
+- #13 [feature, low] CharPad CTM V4 writer
+  - Merged into #12 (2026-10-19): one issue per format for reading and writing.
+- #15 [feature, low] CharPad CTM V5 writer
+  - Merged into #14 (2026-10-19): one issue per format for reading and writing.
+- #17 [feature, low] CharPad CTM V6 writer
+  - Merged into #16 (2026-10-19): one issue per format for reading and writing.
+- #21 [feature, low] CharPad CTM V8 writer
+  - Merged into #20 (2026-10-19): one issue per format for reading and writing.
+- #25 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) writer
+  - Merged into #24 (2026-10-19): one issue per format for reading and writing.
+- #27 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` writer
+  - Merged into #26 (2026-10-19): one issue per format for reading and writing.
+- #29 [feature, low] SpritePad 1.8 headerless .spd writer
+  - Merged into #28 (2026-10-19): one issue per format for reading and writing.
+- #35 [feature, low] SPD V3 writer
+  - Merged into #34 (2026-10-19): one issue per format for reading and writing.
+- #37 [feature, low] SPD V4 writer
+  - Merged into #36 (2026-10-19): one issue per format for reading and writing.
 - #45 [feature, normal] Export colour map
   - 1 byte per map char cell, the colour matrix low nibble (for $d800). Binary and asm (`colourmap_data`).
   - Done 2026-10-19: `colour-map` part in `bin` and `asm` (`colourmap_data`), `rawbin.colourMap`. Values as CharPad Pro 3.88's decompiled `CPV_ColourMap.GetMapCharCellColour`: tiles expanded, colour per project, tile or char, 0 for a char number out of range (and, where Pro would crash, for a tile number out of range). Always 8 bits per cell; `--area` refused, as Pro has no colour map of an area. Bytes not compared with a CharPad export by hand.
