@@ -260,33 +260,17 @@ proc bytes(w: var Writer, data: openArray[byte]) =
     for b in data[i .. min(i + 15, data.high)]: vals.add "$" & toHex(b).toLowerAscii
     w.line byteDirective(w.o.dialect) & vals.join(",")
 
-func printable(c: char): bool = c in {' ' .. '~'} - {'"', '\\'}
-
 proc name(w: var Writer, s: string) =
-  ## A zero-terminated name. 64tass and ACME keep the bytes of a string as they
-  ## are; KickAssembler and ca65 may translate them, so they get bytes.
-  if w.o.dialect in {d64tass, dAcme}:
-    var parts: seq[string]
-    var i = 0
-    while i < s.len:
-      if s[i].printable:
-        var j = i
-        while j < s.len and s[j].printable: inc j
-        parts.add "\"" & s[i ..< j] & "\""
-        i = j
-      else:
-        parts.add "$" & toHex(ord(s[i]), 2).toLowerAscii
-        inc i
-    parts.add "0"
-    w.line (if w.o.dialect == dAcme: "!text " else: ".text ") & parts.join(", ")
-  else:
-    var shown = s
-    for c in shown.mitems:
-      if not c.printable and c != '"': c = '?'
-    w.comment "\"" & shown & "\""
-    var data = cast[seq[byte]](s)
-    data.add 0
-    w.bytes data
+  ## A zero-terminated name, as the bytes stored, with the name in a comment
+  ## above. A string would be translated by some assemblers or their options
+  ## (64tass -a, KickAssembler, ca65 -t c64).
+  var shown = s
+  for c in shown.mitems:
+    if c notin {' ' .. '~'}: c = '?'
+  w.comment "\"" & shown & "\""
+  var data = cast[seq[byte]](s)
+  data.add 0
+  w.bytes data
 
 func orgFor(o: AsmOptions, part: string): Option[int] =
   ## `map` also names `map-lo`, the start of a split map.

@@ -110,9 +110,11 @@ suite "CharPad assembler source":
     check not s.defines("lv_addr_map_data_hi")
     check not s.defines("charset_data")
     check s.defines("lv_charset_data")
-    check ".text \"floor\", 0" in s.lines
-    check ".text \"say \", $22, \"hi\", $22, 0" in s.lines
-    check ".text 0" in s.lines
+    check "; \"floor\"" in s.lines
+    check ".byte $66,$6c,$6f,$6f,$72,$00" in s.lines
+    check "; \"say \"hi\"\"" in s.lines
+    check ".byte $73,$61,$79,$20,$22,$68,$69,$22,$00" in s.lines
+    check ".byte $00" in s.lines
     check not s.defines("lv_charset_attrib_L1_data")
 
   test "org on the high half of a split part":
@@ -150,7 +152,7 @@ suite "dialects":
     let s = charProject().toAsm(a)
     check "charset_data" in s.lines
     check "!byte $00,$01,$02,$03,$04,$05,$06,$07,$10,$11,$12,$13,$14,$15,$16,$17" in s.lines
-    check "!text \"floor\", 0" in s.lines
+    check "!byte $66,$6c,$6f,$6f,$72,$00" in s.lines
     check "* = addr_charset_data" in s.lines
 
   test "KickAssembler":
@@ -224,21 +226,58 @@ suite "SpritePad assembler source":
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["tile-anims"]))
 
 suite "assembling":
-  test "64tass assembles it, when installed":
+  ## Each assembler is used when it is on the PATH (KickAssembler: when
+  ## KICKASS_JAR names its jar and java is on the PATH), and left out otherwise.
+  let dir = getTempDir() / "batchpad_tasm"
+  let parts = AsmOptions(prefix: "lv_", bin: BinOptions(cells: cf12),
+                         parts: @["chars", "char-attribs", "tiles", "tile-attribs",
+                                  "tile-tags", "tile-names", "map"])
+
+  proc assemble(d: Dialect, main, command: string): string =
+    ## The bytes the assembler makes of both projects, after `main`.
+    var o = parts
+    o.dialect = d
+    writeFile(dir / "level.s", charProject().toAsm(o))
+    writeFile(dir / "sprites.s", spriteProject().toAsm(AsmOptions(dialect: d, prefix: "sp_")))
+    writeFile(dir / "main.s", main)
+    let (output, code) = execCmdEx("cd " & quoteShell(dir) & " && " & command)
+    check code == 0
+    if code != 0: echo output
+    else: result = readFile(dir / "out.bin")
+
+  setup: createDir(dir)
+  teardown: removeDir(dir)
+
+  test "64tass, ACME, KickAssembler and ca65 give the same bytes":
+    var made: seq[(string, string)]
+    if findExe("64tass") != "":
+      made.add ("64tass", assemble(d64tass, "* = $1000\n.include \"level.s\"\n.include \"sprites.s\"\n",
+                                   "64tass -q -b -o out.bin main.s"))
+    if findExe("acme") != "":
+      made.add ("acme", assemble(dAcme, "* = $1000\n!source \"level.s\"\n!source \"sprites.s\"\n",
+                                 "acme -f plain -o out.bin main.s"))
+    if findExe("ca65") != "" and findExe("ld65") != "":
+      made.add ("ca65", assemble(dCa65, ".include \"level.s\"\n.include \"sprites.s\"\n",
+                                 "ca65 -o main.o main.s && ld65 -t none -o out.bin main.o"))
+    let kickAss = getEnv("KICKASS_JAR")
+    if kickAss != "" and findExe("java") != "":
+      made.add ("kickass", assemble(dKickAss, "* = $1000\n#import \"level.s\"\n#import \"sprites.s\"\n",
+                                    "java -jar " & quoteShell(kickAss) & " main.s -binfile -o out.bin"))
+    if made.len == 0: skip()
+    for (name, bytes) in made:
+      checkpoint name
+      # chars, attributes, tiles, tile attributes, tags, names, map; sprites,
+      # attributes, tiles, tile attributes, tags, two lots of animations
+      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 192 + 3 + 4 + 2 + 2 + 4 + 4
+      check bytes == made[0][1]
+
+  test "64tass with --org":
     if findExe("64tass") == "":
       skip()
     else:
-      let dir = getTempDir() / "batchpad_tasm"
-      createDir(dir)
-      let o = AsmOptions(prefix: "lv_", bin: BinOptions(cells: cf12),
-                         parts: @["chars", "char-attribs", "tiles", "tile-attribs",
-                                  "tile-tags", "tile-names", "map"],
-                         org: @[("chars", 0x2000), ("tiles", 0x3000)])
-      writeFile(dir / "level.s", charProject().toAsm(o))
-      writeFile(dir / "sprites.s", spriteProject().toAsm(AsmOptions(prefix: "sp_")))
-      writeFile(dir / "main.s", "* = $1000\n.include \"level.s\"\n.include \"sprites.s\"\n")
-      let (output, code) = execCmdEx("64tass -q -a -o " & quoteShell(dir / "main.prg") &
-                                     " " & quoteShell(dir / "main.s"))
+      var o = parts
+      o.org = @[("chars", 0x2000), ("tiles", 0x3000)]
+      writeFile(dir / "main.s", "* = $1000\n" & charProject().toAsm(o))
+      let (output, code) = execCmdEx("cd " & quoteShell(dir) & " && 64tass -q -o out.prg main.s")
       check code == 0
       if code != 0: echo output
-      removeDir(dir)

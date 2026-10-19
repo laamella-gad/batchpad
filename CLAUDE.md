@@ -32,6 +32,7 @@ nim c -r src/batchpad.nim   # compile + run directly
 nim check src/batchpad.nim  # type-check without building
 nimble test                  # runs tests/t*.nim
 nim c -r -p:src tests/tctm.nim   # run a single test file (also tests/tspd.nim, tests/tcli.nim, tests/trawbin.nim, tests/tasm.nim)
+# tests/tasm.nim assembles with 64tass, acme, ca65 when on the PATH, and KickAssembler when KICKASS_JAR names its jar
 ```
 
 ## Layout

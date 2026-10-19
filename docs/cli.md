@@ -196,7 +196,7 @@ batchpad asm level.ctm -o build/level.asm --dialect kickass --parts chars,map --
 | `--parts LIST` | What to include | what CharPad's "Export All (one file)" writes |
 | `--prefix TEXT` | Put before every label and constant, so two projects can go in one program | none |
 | `--org part=ADDR` | Writes an `addr_` constant and a `* =` (ca65: `.org`) line before that part; can repeat. For split cells `map` names the low half, `map-hi` the high one. | none: the data follows on where the file is included |
-| `--segment NAME` | ca65 `.segment`, KickAssembler `.segment`; an error for the others | none |
+| `--segment NAME` | ca65 `.segment`, KickAssembler `.segment`; an error for the others. The program defines the segment: ld65's config, or KickAssembler's `.segmentdef` (KickAssembler refuses one it doesn't know). | none |
 | `--cells`, `--area`, `--sprite-attribs` | As for `bin`. Animation frames are bytes with `--cells 8`, words otherwise. | |
 | `--event-labels normal\|alt` | `chtl_<name>_event` or `<name>` (#46) | `normal` |
 | `--eol lf\|crlf` | Line endings | `lf` |
@@ -212,13 +212,18 @@ included. Split cells get a block each, `map_data_lo` and `map_data_hi` (or
 
 | Dialect | Constants | Labels | Data | Comments |
 | --- | --- | --- | --- | --- |
-| `64tass` | `x = 1` | `name` | `.byte`, names as `.text "..", 0` | `;` |
-| `acme` | `x = 1` | `name` | `!byte`, names as `!text "..", 0` | `;` |
-| `kickass` | `.const x = 1` | `name:` | `.byte`, names as bytes | `//` |
-| `ca65` | `x = 1` | `name:` | `.byte`, names as bytes | `;` |
+| `64tass` | `x = 1` | `name` | `.byte` | `;` |
+| `acme` | `x = 1` | `name` | `!byte` | `;` |
+| `kickass` | `.const x = 1` | `name:` | `.byte` | `//` |
+| `ca65` | `x = 1` | `name:` | `.byte` | `;` |
 
-KickAssembler and ca65 may translate the characters of a string, so names are
-written there as their bytes, with the name in a comment above.
+Tile names are written as the bytes stored (ASCII), zero-terminated, with the
+name in a comment above, not as strings as CharPad does: an assembler may
+translate a string's characters (64tass with `-a`, KickAssembler, ca65 with
+`-t c64`), so the bytes would depend on how it is called. Decided 2026-10-19.
+
+Checked 2026-10-19 with 64tass 1.6, ACME 0.97, KickAssembler 5.25 and ca65:
+every test file in every cell width gives the same bytes in all four.
 
 ### c
 
