@@ -2,7 +2,7 @@
 
 How batchpad is meant to be called. `src/batchpad/cli.nim` has every
 command and option below, parsed with argparse; `info`, `convert`, `bin` and
-`asm` work (without `colour-map` and `tile-events` yet), the others
+`asm` work (without `tile-events` yet), the others
 say which issue they wait for. Raw binary layouts are in
 `src/batchpad/rawbin.nim`, assembler source in `src/batchpad/asmout.nim`. This is the design the exports
 (#41-#54, #56, #57) are written against. Decided
@@ -78,7 +78,7 @@ CharPad:
 | `tile-events` | event jump table (asm and C only, #46) | |
 | `map` | the map, or the area given by `--area` | Map, MapArea |
 | `submaps` | flexi-grid sub-maps (#44) | SubMaps, SubMap |
-| `colour-map` | colour matrix colour per char cell (#45) | ColourMap |
+| `colour-map` | colour matrix colour per char cell of the whole map (#45) | ColourMap |
 
 SpritePad:
 
@@ -112,6 +112,13 @@ the grid is measured in chars in a project with tiles (as CharPad refuses), and
 with `--area`. The one-file form in 12 bit packs the nibbles of all sub-maps
 together, so with an odd cell count per sub-map it differs from the per-file
 form.
+
+`colour-map` follows CharPad Pro 3.88's ColourMap: one byte per char cell of
+the whole map (tiles expanded, so map size times tile size), row by row,
+holding the low nibble of the project's, the tile's or the char's colour
+matrix colour as the colouring method says, ready to copy to $d800. A char or
+tile number the set doesn't have gives 0. It is always 8 bits a cell whatever
+`--cells` says, and `--area` is an error.
 
 ## Options shared by the export commands
 
@@ -225,6 +232,9 @@ included. Split cells get a block each, `map_data_lo` and `map_data_hi` (or
 constants `submap_wid`, `submap_hei` (cells per sub-map), `submap_count_x` and
 `submap_count_y`. `--org submaps=ADDR` puts the `* =` line before the first one
 only; the others follow on.
+
+`colour-map` writes `colourmap_data`, as CharPad's text export of the colour
+map. It is not in the default parts, as CharPad's Export All leaves it out.
 
 | Dialect | Constants | Labels | Data | Comments |
 | --- | --- | --- | --- | --- |

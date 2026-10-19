@@ -38,7 +38,7 @@ type
 const
   ctmAsmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                   "tiles", "tile-attribs", "tile-attribs-l2", "tile-tags",
-                  "tile-names", "map", "submaps"]
+                  "tile-names", "map", "submaps", "colour-map"]
   spdAsmParts* = ["sprites", "sprite-attribs", "tiles", "tile-attribs",
                   "tile-tags", "tile-names", "sprite-anims", "tile-anims"]
 
@@ -166,7 +166,11 @@ proc blocks(p: ctm.Project, part: string, o: BinOptions): seq[Block] =
         for b in bs.mitems:
           if not first: b.part = ""
         result.add bs
-  of "colour-map": fail("the colour map is not written yet (#45)")
+  of "colour-map":
+    if o.area.isSome: fail("--area is for map, not colour-map")
+    let (w, h) = (p.charsWide, p.charsHigh)
+    one("colourmap_data", @["ColourMap Data...",
+        $w & "x" & $h & " (" & $(w * h) & ") cells, 8 bits per cell, " & sizeText(w * h)])
   of "tile-events": fail("tile events are not written yet (#46)")
   else: fail("a CharPad project has no part " & part)
 

@@ -29,7 +29,7 @@ const
   ctmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                "tiles", "tiles-lo", "tiles-hi", "tile-attribs", "tile-attribs-l2",
                "tile-tags", "map", "map-lo", "map-hi",
-               "submaps", "submaps-lo", "submaps-hi"]
+               "submaps", "submaps-lo", "submaps-hi", "colour-map"]
   spdParts* = ["sprites", "sprite-attribs", "tiles", "tiles-lo", "tiles-hi",
                "tile-attribs", "tile-tags", "sprite-anims", "tile-anims"]
 
@@ -96,8 +96,8 @@ proc subMapCells(p: ctm.Project, s: SubMaps, y, x: int): seq[uint16] =
     let at = row * p.mapWidth + x * s.width
     result.add p.map[at ..< at + s.width]
 
-proc needWholeMap(o: BinOptions) =
-  if o.area.isSome: fail("--area is for map, not submaps")
+proc needWholeMap(o: BinOptions, part = "submaps") =
+  if o.area.isSome: fail("--area is for map, not " & part)
 
 proc binSubMap*(p: ctm.Project, y, x: int, part: string, o = BinOptions()): seq[byte] =
   ## One sub-map, `part` being `submaps`, `submaps-lo` or `submaps-hi`.
@@ -117,6 +117,40 @@ func l2(c: Colours, p: ctm.Project, colouring: ColouringMethod): byte =
 
 proc needTiles(p: ctm.Project) =
   if not p.tileSystem: fail("the project has no tiles")
+
+func charsWide*(p: ctm.Project): int =
+  ## The map's width in chars: tiles expanded.
+  p.mapWidth * (if p.tileSystem: p.tileWidth else: 1)
+
+func charsHigh*(p: ctm.Project): int =
+  p.mapHeight * (if p.tileSystem: p.tileHeight else: 1)
+
+proc colourMap(p: ctm.Project): seq[byte] =
+  ## The colour matrix colour of every char cell of the map, row by row, as
+  ## CharPad Pro's ColourMap: 0 for a char (or tile) number that isn't in
+  ## the set.
+  if p.colouring == cmPerTile and not p.tileSystem:
+    fail("the colouring is per tile, but the project has no tiles")
+  for y in 0 ..< p.charsHigh:
+    for x in 0 ..< p.charsWide:
+      var tile = 0
+      var ch: int
+      if p.tileSystem:
+        tile = int(p.map[(y div p.tileHeight) * p.mapWidth + x div p.tileWidth])
+        if tile >= p.tiles.len:
+          result.add 0
+          continue
+        ch = int(p.tiles[tile].cells[(y mod p.tileHeight) * p.tileWidth + x mod p.tileWidth])
+      else:
+        ch = int(p.map[y * p.mapWidth + x])
+      if ch >= p.chars.len:
+        result.add 0
+        continue
+      let c = case p.colouring
+              of cmPerProject: p.colours
+              of cmPerTile: p.tiles[tile].colours
+              of cmPerChar: p.chars[ch].colours
+      result.add c[0] and 0x0f
 
 proc needBitmap(p: ctm.Project, part: string) =
   if not p.isBitmap: fail(part & " is only there in bitmap modes")
@@ -157,6 +191,9 @@ proc binPart*(p: ctm.Project, part: string, o = BinOptions()): seq[byte] =
     for y in 0 ..< s.down:
       for x in 0 ..< s.across: all.add p.subMapCells(s, y, x)
     result = cells(all, "submaps", part, o)
+  of "colour-map":
+    o.needWholeMap(part)
+    result = p.colourMap
   else:
     fail("a CharPad project has no part " & part)
 

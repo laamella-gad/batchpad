@@ -65,8 +65,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
-- #45 [feature, normal] Export colour map
-  - 1 byte per map char cell, the colour matrix low nibble (for $d800). Binary and asm (`colourmap_data`).
 - #46 [feature, normal] Export tile event jump table
   - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
   - CharPad puts names into labels as they are; ours should reject or clean names that aren't valid labels.
@@ -109,6 +107,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #45 [feature, normal] Export colour map
+  - 1 byte per map char cell, the colour matrix low nibble (for $d800). Binary and asm (`colourmap_data`).
+  - Done 2026-10-19: `colour-map` part in `bin` and `asm` (`colourmap_data`), `rawbin.colourMap`. Values as CharPad Pro 3.88's decompiled `CPV_ColourMap.GetMapCharCellColour`: tiles expanded, colour per project, tile or char, 0 for a char number out of range (and, where Pro would crash, for a tile number out of range). Always 8 bits per cell; `--area` refused, as Pro has no colour map of an area. Bytes not compared with a CharPad export by hand.
 - #44 [feature, normal] Export flexi-grid sub-maps
   - V9 map cut along the flexi-grid: one file/block per sub-map or consolidated, binary and asm (`submap_yN_xN_data`).
   - Done 2026-10-19: `submaps` part in `bin` (one file, or one per sub-map with `{y}`/`{x}` in the name) and `asm` (`submap_y{i}_x{j}_data` blocks, `submap_wid`/`_hei`/`_count_x`/`_count_y` constants), in every cell width; `rawbin.subMaps`/`binSubMap`. Cut as CharPad Pro 3.88's decompiled `CPV_FileIO_TextSubMaps` and its checks: whole grid cells only, the grid's "on" bit ignored, refused when measured in chars with tiles. `info` gives `subMapsAcross`/`subMapsDown`. `--set flexi-grid` now takes 1-256 only. Bytes not yet compared with a CharPad export by hand.

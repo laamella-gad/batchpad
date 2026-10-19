@@ -142,6 +142,21 @@ suite "command line":
     let (code, info) = batchpad("info", src)
     check code == 0 and "subMapsAcross: 2\nsubMapsDown: 1\n" in info
 
+  test "bin colour map":
+    check batchpad("bin", files / "ctm9" / "hirestext_perchar_notiles.ctm",
+                   "--set", "colouring=project", "--set", "colour=6",
+                   "colour-map=" & tmp / "blue.bin")[0] == 0
+    check readFile(tmp / "blue.bin") == "\x06".repeat(12)
+    check batchpad("bin", files / "ctm9" / "hirestext_perchar_notiles.ctm",
+                   "colour-map=" & tmp / "plain.bin")[0] == 0
+    check readFile(tmp / "plain.bin") == "\x02\x05\x07\x0d\x0e\x01\x0e\x0d\x07\x05\x02\x01"
+    check batchpad("bin", files / "ctm9" / "mctext_pertile.ctm",
+                   "colour-map=" & tmp / "tiles.bin")[0] == 0
+    let tiles = readFile(tmp / "tiles.bin")
+    check tiles.len == 12 * 6
+    check tiles[0 .. 11] == "\x0a\x0a\x0d\x0d\x0f\x0f\x0a\x0a\x0d\x0d\x0f\x0f"
+    check batchpad("bin", files / "spd5" / "tiles_anims.spd", "colour-map=" & tmp / "x.bin")[0] == 1
+
   test "asm":
     let (code, text) = batchpad("asm", files / "ctm9" / "mctext_pertile.ctm",
                                 "--prefix", "lv_", "--parts", "chars,tile-names,map",

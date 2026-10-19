@@ -156,6 +156,19 @@ suite "CharPad assembler source":
       discard p.toAsm(AsmOptions(parts: @["submaps"],
                                  bin: BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1)))))
 
+  test "colour map":
+    let s = charProject().toAsm(AsmOptions(parts: @["colour-map"], bin: BinOptions(cells: cf16),
+                                           org: @[("colour-map", 0xd800)]))
+    check "; ColourMap Data..." in s.lines
+    check "; 6x2 (12) cells, 8 bits per cell, total size is 12 ($c) bytes." in s.lines
+    check "colourmap_data" in s.lines
+    check ".byte $09,$09,$0a,$00,$00,$0b,$00,$0b,$0a,$00,$09,$09" in s.lines
+    check "addr_colourmap_data = $d800" in s.lines
+    check s.everyOrgDefined
+    expect AsmError:
+      discard charProject().toAsm(AsmOptions(parts: @["colour-map"],
+                                             bin: BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1)))))
+
   test "mistakes":
     let p = charProject()
     expect AsmError: discard p.toAsm(AsmOptions(parts: @["sprites"]))
@@ -257,7 +270,7 @@ suite "assembling":
   let dir = getTempDir() / "batchpad_tasm"
   let parts = AsmOptions(prefix: "lv_", bin: BinOptions(cells: cf12),
                          parts: @["chars", "char-attribs", "tiles", "tile-attribs",
-                                  "tile-tags", "tile-names", "map", "submaps"])
+                                  "tile-tags", "tile-names", "map", "submaps", "colour-map"])
 
   proc assemble(d: Dialect, main, command: string): string =
     ## The bytes the assembler makes of both projects, after `main`.
@@ -294,9 +307,10 @@ suite "assembling":
     if made.len == 0: skip()
     for (name, bytes) in made:
       checkpoint name
-      # chars, attributes, tiles, tile attributes, tags, names, map, sub-maps;
-      # sprites, attributes, tiles, tile attributes, tags, two lots of animations
-      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 9 + 192 + 3 + 4 + 2 + 2 + 4 + 4
+      # chars, attributes, tiles, tile attributes, tags, names, map, sub-maps,
+      # colour map; sprites, attributes, tiles, tile attributes, tags, two lots
+      # of animations
+      check bytes.len == 24 + 3 + 9 + 3 + 3 + 16 + 9 + 9 + 12 + 192 + 3 + 4 + 2 + 2 + 4 + 4
       check bytes == made[0][1]
 
   test "64tass with --org":

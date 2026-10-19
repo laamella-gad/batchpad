@@ -216,7 +216,6 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
       a = parseAddress(path[at + 1 .. ^1])
       path = path[0 ..< at]
     case part
-    of "colour-map": notYet("#45")
     of "tile-names", "tile-events": usage(part & " is only written by asm and c")
     elif part notin ctmParts and part notin spdParts: usage("unknown part: " & part)
     template add(file: string, bytes: seq[byte]) =

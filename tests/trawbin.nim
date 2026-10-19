@@ -108,6 +108,29 @@ suite "CharPad parts":
     expect BinError:
       discard p.binPart("submaps", BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1))))
 
+  test "colour map":
+    # Tiles expanded into a 6 x 2 char map; 0x123 and 0x345 aren't chars.
+    var p = charProject()
+    check (p.charsWide, p.charsHigh) == (6, 2)
+    check p.binPart("colour-map") == @[byte 8, 9, 10, 0, 0, 10, 0, 10, 10, 0, 8, 9]
+    p.colouring = cmPerTile
+    check p.binPart("colour-map") == @[byte 9, 9, 10, 0, 0, 11, 0, 11, 10, 0, 9, 9]
+    p.colouring = cmPerProject
+    p.colours = [0x16'u8, 0, 0]    # only the low nibble
+    check p.binPart("colour-map") == @[byte 6, 6, 6, 0, 0, 6, 0, 6, 6, 0, 6, 6]
+    # --cells doesn't change it; --area isn't for it.
+    check p.binPart("colour-map", BinOptions(cells: cf16)).len == 12
+    expect BinError:
+      discard p.binPart("colour-map", BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1))))
+    p.map[0] = 7    # no such tile
+    check p.binPart("colour-map")[0 .. 1] == @[byte 0, 0]
+    p.tileSystem = false
+    p.colouring = cmPerChar
+    p.map = @[0'u16, 1, 2, 2, 1, 0]
+    check p.binPart("colour-map") == @[byte 8, 9, 10, 10, 9, 8]
+    p.colouring = cmPerTile
+    expect BinError: discard p.binPart("colour-map")
+
   test "no tiles":
     var p = charProject()
     p.tileSystem = false
