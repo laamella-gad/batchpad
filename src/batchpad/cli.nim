@@ -71,7 +71,8 @@ proc applySet(p: var ctm.Project, name, value: string) =
   of "key-map": p.keyMap = colourValue(name, value)
   of "tiles":
     if value != "off": fail("tiles can only be set to off")
-    if p.tileSystem: notYet("expanding tiles into a char map")
+    try: p.expandTiles
+    except CtmError as e: fail(e.msg)
   of "flexi-grid":
     if value == "off":
       p.flexiGrid.settings = p.flexiGrid.settings and 0x7f

@@ -67,6 +67,20 @@ suite "command line":
     check batchpad("convert", src, tmp / "b.spd", "--set", "frob=1")[0] == 1
     check not fileExists(tmp / "b.spd")
 
+  test "convert with --set tiles=off":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("convert", src, tmp / "flat.ctm", "--set", "tiles=off")[0] == 0
+    let p = readCtm(tmp / "flat.ctm")
+    let q = readCtm(src)
+    check not p.tileSystem and p.tiles.len == 0
+    check p.colouring == cmPerChar
+    check (p.mapWidth, p.mapHeight) == (q.mapWidth * q.tileWidth, q.mapHeight * q.tileHeight)
+    # The colour of every char cell is the same as before.
+    check batchpad("bin", tmp / "flat.ctm", "colour-map=" & tmp / "flat.bin")[0] == 0
+    check batchpad("bin", src, "colour-map=" & tmp / "tiled.bin")[0] == 0
+    check readFile(tmp / "flat.bin") == readFile(tmp / "tiled.bin")
+    check batchpad("convert", src, tmp / "x.ctm", "--set", "tiles=on")[0] == 1
+
   test "convert warns about what is left out":
     let src = files / "spd5" / "tiles_anims.spd"
     let (code, text) = warnings("convert", src, tmp / "w.spd", "--to", "spd1")

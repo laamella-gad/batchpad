@@ -148,9 +148,16 @@ CharPad:
 | `bg0` to `bg3` | chip colours $d021-$d024, 0-15 |
 | `colour` | project colour matrix colour, 0-15 |
 | `vmx-lo`, `vmx-hi` | project video matrix nibbles (bitmap modes) |
-| `tiles` | `off` expands the tiles into a char map |
+| `tiles` | `off` expands the tiles into a char map (see below) |
 | `key-map` | 0-15 |
 | `flexi-grid` | `W,H` (1-256 each) in the units the project uses, or `off` |
+
+`tiles=off`: the map becomes a char map of map size times tile size, and the
+tile tags and names are dropped. With per tile colouring the colours move to
+the chars and the colouring becomes per char: a char used in tiles of different
+colours gets a copy (same shape and material) per colour. A flexi-grid in map
+cells is multiplied by the tile size. A map cell or tile cell out of range is
+an error. The colour map (`bin colour-map`) is the same before and after.
 
 SpritePad:
 

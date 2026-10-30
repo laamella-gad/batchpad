@@ -317,3 +317,53 @@ suite "CTM V7":
     q = p
     q.chars.setLen 0
     expect CtmError: discard q.toCtm(version = 7)
+
+suite "expanding tiles":
+  proc project(colouring: ColouringMethod): Project =
+    result = Project(version: 9, displayMode: dmMulticolourText, colouring: colouring,
+                     tileSystem: true, tileWidth: 2, tileHeight: 2, colours: [5'u8, 0, 0],
+                     mapWidth: 2, mapHeight: 1, map: @[0'u16, 1])
+    for i in 0 .. 2: result.chars.add Char(material: uint8(i), colours: [uint8(i + 1), 0, 0])
+    result.tiles = @[Tile(cells: @[0'u16, 1, 2, 0], colours: [9'u8, 0, 0], tag: 3, name: "a"),
+                     Tile(cells: @[1'u16, 1, 0, 2], colours: [10'u8, 0, 0], name: "b")]
+
+  test "chars of one colour stay, the map is by chars":
+    var p = project(cmPerProject)
+    p.expandTiles
+    check not p.tileSystem
+    check p.tiles.len == 0 and p.tileWidth == 0
+    check p.chars.len == 3 and p.colouring == cmPerProject
+    check (p.mapWidth, p.mapHeight) == (4, 2)
+    check p.map == @[0'u16, 1, 1, 1, 2, 0, 0, 2]
+
+  test "per tile colours move to chars, with copies":
+    var p = project(cmPerTile)
+    p.expandTiles
+    check p.colouring == cmPerChar
+    # Tile 0 (9) takes chars 0-2; tile 1 (10) gets copies: 3 of 1, 4 of 0, 5 of 2.
+    check p.chars.len == 6
+    check p.map == @[0'u16, 1, 3, 3, 2, 0, 4, 5]
+    check p.chars[0].colours[0] == 9 and p.chars[3].colours[0] == 10
+    check p.chars[4].colours[0] == 10 and p.chars[5].colours[0] == 10
+    check p.chars[3].material == 1 and p.chars[4].material == 0 and p.chars[5].material == 2
+
+  test "flexi-grid in tiles is in map cells now":
+    var p = project(cmPerProject)
+    p.flexiGrid = FlexiGrid(width: 3, height: 1, settings: 0x80)
+    p.expandTiles
+    check (p.flexiGrid.width, p.flexiGrid.height) == (6'u16, 2'u16)
+    var q = project(cmPerProject)
+    q.flexiGrid = FlexiGrid(width: 3, height: 1, settings: 0xa0)
+    q.expandTiles
+    check (q.flexiGrid.width, q.flexiGrid.height) == (3'u16, 1'u16)
+
+  test "no tiles: nothing changes, bad numbers are errors":
+    var p = project(cmPerProject)
+    p.map[1] = 2
+    expect CtmError: p.expandTiles
+    p = project(cmPerProject)
+    p.tiles[0].cells[0] = 3
+    expect CtmError: p.expandTiles
+    var q = Project(version: 9, chars: @[Char()], map: @[0'u16], mapWidth: 1, mapHeight: 1)
+    q.expandTiles
+    check q.map == @[0'u16] and q.mapWidth == 1

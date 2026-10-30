@@ -381,3 +381,70 @@ proc toCtm*(p: Project, version = 9): seq[byte] =
 proc writeCtm*(path: string, p: Project, version = 9) =
   let data = p.toCtm(version)
   writeFile(path, data)
+
+proc expandTiles*(p: var Project) =
+  ## Turns the tile map into a char map and switches the tile system off.
+  ## With per tile colouring the colours move to the chars: a char used in
+  ## tiles of different colours gets a copy per colour, and the colouring
+  ## becomes per char. Tile tags and names are lost. Raises CtmError when a
+  ## tile or char number is out of range.
+  if not p.tileSystem: return
+  let used = case p.displayMode.colourCount
+             of 1: {0}
+             of 2: {1, 2}
+             else: {0, 1, 2}
+  proc key(c: Colours): Colours =
+    for i in used: result[i] = c[i]
+  let tileUnit = p.tileWidth * p.tileHeight
+  let perTile = p.colouring == cmPerTile
+  var chars = p.chars
+  var coloured = newSeq[bool](chars.len)
+  var copies: seq[(int, Colours, int)]   ## char, colours, number of the copy
+  var map = newSeq[uint16](p.map.len * tileUnit)
+  let wide = p.mapWidth * p.tileWidth
+  for my in 0 ..< p.mapHeight:
+    for mx in 0 ..< p.mapWidth:
+      let n = int(p.map[my * p.mapWidth + mx])
+      if n >= p.tiles.len:
+        raise newException(CtmError, "map cell " & $mx & "," & $my & " uses tile " & $n &
+                           " but there are " & $p.tiles.len)
+      for ty in 0 ..< p.tileHeight:
+        for tx in 0 ..< p.tileWidth:
+          var ch = int(p.tiles[n].cells[ty * p.tileWidth + tx])
+          if ch >= p.chars.len:
+            raise newException(CtmError, "tile " & $n & " uses char " & $ch &
+                               " but there are " & $p.chars.len)
+          if perTile:
+            let c = p.tiles[n].colours.key
+            if not coloured[ch]:
+              coloured[ch] = true
+              chars[ch].colours = c
+            elif chars[ch].colours.key != c:
+              var found = -1
+              for (orig, colours, number) in copies:
+                if orig == ch and colours == c: found = number
+              if found < 0:
+                found = chars.len
+                if found > 0xffff:
+                  raise newException(CtmError, "expanding the tiles needs more than 65536 chars")
+                chars.add p.chars[ch]
+                chars[found].colours = c
+                copies.add (ch, c, found)
+              ch = found
+          map[(my * p.tileHeight + ty) * wide + mx * p.tileWidth + tx] = uint16(ch)
+  if perTile: p.colouring = cmPerChar
+
+  if not p.flexiGrid.settings.testBit(5):
+    let (w, h) = (int(p.flexiGrid.width) * p.tileWidth, int(p.flexiGrid.height) * p.tileHeight)
+    if w > 0xffff or h > 0xffff:
+      raise newException(CtmError, "the flexi-grid is too big in chars")
+    p.flexiGrid.width = uint16(w)
+    p.flexiGrid.height = uint16(h)
+  p.chars = chars
+  p.map = map
+  p.mapWidth = wide
+  p.mapHeight = p.mapHeight * p.tileHeight
+  p.tileSystem = false
+  p.tiles = @[]
+  p.tileWidth = 0
+  p.tileHeight = 0
