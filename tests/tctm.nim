@@ -160,7 +160,7 @@ suite "CTM V9":
     q = p
     q.map.add 0
     expect CtmError: discard q.toCtm
-    expect CtmError: discard p.toCtm(version = 6)
+    expect CtmError: discard p.toCtm(version = 3)
 
   test "writer leaves out what doesn't fit":
     let p = readCtm(dir / "mctext_pertile.ctm")
@@ -278,6 +278,213 @@ suite "CTM V8":
     bad.add 0
     expect CtmError: discard parseCtm(bad)
     expect CtmError: discard parseCtm(data[0 ..< 40])
+
+const filesDir = currentSourcePath().parentDir / "files"
+
+proc fromV7(name: string, version: int): Project =
+  ## The V7 file of `name` as the project a version without tile tags and names,
+  ## and without $d024, holds.
+  result = readCtm(filesDir / "ctm7" / name)
+  result.version = version
+  result.chipColours[3] = 0
+  for t in result.tiles.mitems:
+    t.tag = 0
+    t.name = ""
+
+suite "CTM V5":
+  const dir = filesDir / "ctm5"
+  const names = ["mctext_pertile.ctm", "hirestext_perchar_notiles.ctm"]
+
+  test "same project as V7, apart from the version, tags and names":
+    for name in names:
+      checkpoint name
+      check readCtm(dir / name) == fromV7(name, 5)
+
+  test "multicolour text, per tile":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerTile
+    check p.chipColours == [6'u8, 11, 12, 0]
+    check p.colours == [14'u8, 0, 0]
+    check p.tiles.len == 4 and p.tiles[3].cells == @[5'u16, 2, 2, 5]
+    for i, c in [9'u8, 10, 13, 15]:
+      check p.tiles[i].colours == [c, 0, 0]
+
+  test "hires text, per char, no tiles":
+    let p = readCtm(dir / "hirestext_perchar_notiles.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerChar
+    p.checkNoTiles
+    for i, c in [1'u8, 2, 5, 7, 13, 14]:
+      check p.chars[i].colours == [c, 0, 0]
+
+  test "expanded char set: the tile data is left out":
+    let p = readCtm(dir / "mctext_expanded.ctm")
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerProject
+    check p.colours == [7'u8, 0, 0]
+    check p.chars.len == 8
+    check p.tileWidth == 2 and p.tileHeight == 2
+    check p.tiles.len == 2
+    check p.tiles[0].cells == @[0'u16, 1, 2, 3]
+    check p.tiles[1].cells == @[4'u16, 5, 6, 7]
+    check p.mapWidth == 3 and p.mapHeight == 2
+    check p.map == @[0'u16, 1, 1, 1, 0, 0]
+    # Written out in full, and read back the same.
+    check parseCtm(p.toCtm(5)) == p
+
+  test "writing gives back the same bytes":
+    for name in names:
+      checkpoint name
+      check readCtm(dir / name).toCtm(version = 5) == cast[seq[byte]](readFile(dir / name))
+
+  test "writer says what it leaves out":
+    var p = readCtm(filesDir / "ctm7" / "mctext_pertile.ctm")
+    p.chars[2].material = 0x12
+    p.chipColours[3] = 4
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(5, leftOut))
+    check leftOut == @["colour and material bits above the low 4 (V5 has 4)", "$d024 (V5 has none)",
+                       "3 tile tags (V5 has none)", "4 tile names (V5 has none)"]
+    check q.chars[2].material == 2
+
+  test "errors":
+    let data = cast[seq[byte]](readFile(dir / "mctext_pertile.ctm"))
+    var bad = data
+    bad[8] = 3                   # colouring
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    bad = cast[seq[byte]](readFile(dir / "mctext_expanded.ctm"))
+    bad[10] = 6                  # 7 chars are not 2 tiles of 4
+    expect CtmError: discard parseCtm(bad)
+    var p = readCtm(filesDir / "ctm7" / "ecm_perproject_notiles.ctm")
+    expect CtmError: discard p.toCtm(version = 5)
+    p.displayMode = dmMulticolourBitmap
+    expect CtmError: discard p.toCtm(version = 5)
+
+suite "CTM V4":
+  const dir = filesDir / "ctm4"
+
+  test "same project as V7 (tile colours), apart from the version, tags and names":
+    check readCtm(dir / "mctext_pertile.ctm") == fromV7("mctext_pertile.ctm", 4)
+
+  test "per tile cell colours become per char, with copies":
+    let p = readCtm(dir / "hires_pertilecell.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerChar
+    check p.chars.len == 7
+    check p.chars[6].data == charData[5]
+    check p.chars[6].material == 5
+    # Tile n has colour n + 1, except the first cell of tile 3: 5.
+    for (ch, c) in [(0, 1), (1, 2), (3, 3), (5, 5), (2, 4), (6, 4)]:
+      check p.chars[ch].colours[0] == uint8(c)
+    check p.tiles[3].cells == @[5'u16, 2, 2, 6]
+    check p.tiles[0].cells == @[0'u16, 0, 0, 0]
+    check p.map == tileMap
+
+  test "expanded char set":
+    let p = readCtm(dir / "mctext_expanded.ctm")
+    check p.chars.len == 8
+    check p.tiles.len == 2
+    check p.tiles[1].cells == @[4'u16, 5, 6, 7]
+    check p.map == @[0'u16, 1, 1, 1, 0, 0]
+    check p.chars[7].material == 7
+
+  test "writing gives back the same bytes":
+    let name = "mctext_pertile.ctm"
+    check readCtm(dir / name).toCtm(version = 4) == cast[seq[byte]](readFile(dir / name))
+
+  test "writing and reading give back the project":
+    for name in ["hires_pertilecell.ctm", "mctext_expanded.ctm"]:
+      checkpoint name
+      let p = readCtm(dir / name)
+      check parseCtm(p.toCtm(4)) == p
+
+  test "writer says what it leaves out":
+    var p = readCtm(filesDir / "ctm7" / "mctext_pertile.ctm")
+    var leftOut: seq[string]
+    discard p.toCtm(4, leftOut)
+    check leftOut == @["3 tile tags (V4 has none)", "4 tile names (V4 has none)"]
+
+  test "errors and refusals":
+    let data = cast[seq[byte]](readFile(dir / "mctext_pertile.ctm"))
+    var bad = data
+    bad[8] = 3                   # colouring
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad[13] = 0                  # tile width
+    expect CtmError: discard parseCtm(bad)
+    # A char map has no V4 form.
+    var p = readCtm(filesDir / "ctm7" / "hirestext_perchar_notiles.ctm")
+    expect CtmError: discard p.toCtm(version = 4)
+    p = readCtm(filesDir / "ctm7" / "mctext_pertile.ctm")
+    p.map[0] = 256
+    expect CtmError: discard p.toCtm(version = 4)
+    p = readCtm(filesDir / "ctm7" / "mctext_pertile.ctm")
+    for i in 0 ..< 253: p.tiles.add p.tiles[0]
+    expect CtmError: discard p.toCtm(version = 4)
+
+suite "CTM V6":
+  const dir = currentSourcePath().parentDir / "files" / "ctm6"
+  const dir7 = currentSourcePath().parentDir / "files" / "ctm7"
+  const names = ["mctext_pertile.ctm", "hirestext_perchar_notiles.ctm", "hirestext_perproject.ctm"]
+
+  test "same project as V7, apart from the version and $d024":
+    for name in names:
+      checkpoint name
+      var q = readCtm(dir7 / name)
+      q.version = 6
+      q.chipColours[3] = 0
+      check readCtm(dir / name) == q
+
+  test "multicolour text, per tile":
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerTile
+    check p.chipColours == [6'u8, 11, 12, 0]
+    p.checkChars
+    p.checkTiles
+
+  test "hires text, per char, no tiles":
+    let p = readCtm(dir / "hirestext_perchar_notiles.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerChar
+    p.checkNoTiles
+
+  test "writing gives back the same bytes":
+    for name in names:
+      checkpoint name
+      check readCtm(dir / name).toCtm(version = 6) == cast[seq[byte]](readFile(dir / name))
+
+  test "writer says what it leaves out":
+    var p = readCtm(dir7 / "mctext_pertile.ctm")
+    p.chipColours[3] = 5
+    p.keyMap = 9
+    p.chars[2].material = 0x12
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(6, leftOut))
+    check leftOut == @["colour and material bits above the low 4 (V6 has 4)",
+                       "key map 9 (V6 has none)", "$d024 (V6 has none)"]
+    check q.chars[2].material == 2
+    check q.chipColours == [6'u8, 11, 12, 0]
+
+  test "errors":
+    let data = cast[seq[byte]](readFile(dir / "mctext_pertile.ctm"))
+    var bad = data
+    bad[8] = 3                   # colouring
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    var p = readCtm(dir7 / "ecm_perproject_notiles.ctm")
+    expect CtmError: discard p.toCtm(version = 6)
+    p.displayMode = dmHiresBitmap
+    expect CtmError: discard p.toCtm(version = 6)
 
 suite "CTM V7":
   const dir = currentSourcePath().parentDir / "files" / "ctm7"

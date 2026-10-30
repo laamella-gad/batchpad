@@ -28,8 +28,9 @@ That gives the rules below.
 - What doesn't fit the output is left out without an error (the writer
   policy), but each thing left out is reported on stderr as a warning;
   `--quiet` hides warnings, `--strict` makes them errors. Refusals stay
-  errors: a bitmap project to CTM V7, a cell value that doesn't fit the cell
-  width.
+  errors: a bitmap project to CTM V4 to V7, an ECM project to CTM V4 to V6,
+  a char map or over 256 tiles to CTM V4, a cell value that doesn't fit the
+  cell width.
 
 ## Shape
 
@@ -184,13 +185,13 @@ to get the sub-map count or the char count into a build.
 ### convert
 
 ```
-batchpad convert old.ctm new.ctm [--to ctm7|ctm8|ctm9]
+batchpad convert old.ctm new.ctm [--to ctm4|ctm5|ctm6|ctm7|ctm8|ctm9]
 batchpad convert ships.spd ships.A [--to seuck-a]
 batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm7`, `ctm8`, `ctm9`, `spd1`, `spd2`,
+`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm4` to `ctm9`, `spd1`, `spd2`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 
@@ -386,7 +387,7 @@ batchpad import -o level.ctm chars=chars.bin tiles=tiles.bin map=map.bin \
 batchpad import -o ships.spd sprites=ships.bin --sprite-attribs seuck
 ```
 
-The output kind comes from `-o`'s extension (or `--to`: `ctm7`, `ctm8`, `ctm9`,
+The output kind comes from `-o`'s extension (or `--to`: `ctm4` to `ctm9`,
 `spd1`, `spd2`, `spd5`). Parts are the ones `bin` writes, as far as CharPad and
 SpritePad import them (`src/batchpad/rawimport.nim`):
 

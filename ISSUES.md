@@ -29,12 +29,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
 - #10 [feature, low] CharPad CTM V3 reader and writer
   - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
-- #12 [feature, normal] CharPad CTM V4 reader and writer
-  - CharPad 1.8 Rev 3. 110 samples.
-- #14 [feature, normal] CharPad CTM V5 reader and writer
-  - CharPad 2.0-2.5. 292 samples; flags byte, word map.
-- #16 [feature, normal] CharPad CTM V6 reader and writer
-  - CharPad 2.6. First block format; flags bit 0 = multicolour, bit 1 = tiles.
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader and writer
@@ -68,6 +62,12 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #12 [feature, normal] CharPad CTM V4 reader and writer
+  - Done 2026-10-30 in `src/batchpad/ctm.nim` (`parseV4`, `formatV4`, `fitV4`), tests in `tests/tctm.nim`, files in `tests/files/ctm4/`. V4 keeps colour (method 2, per tile cell) and material per tile cell: the reader gives a char a copy for each other colour/material it is used with, so the project is per char; the per-char attribute block is only used for chars no cell uses (as CharPad does). The writer refuses char maps and over 256 tiles, never sets CHAREX, leaves out tags and names (reported). All 112 V4 files of the CharPad 1.8/2.x downloads read and convert.
+- #14 [feature, normal] CharPad CTM V5 reader and writer
+  - Done 2026-10-30 in `src/batchpad/ctm.nim` (`parseV5`, `formatV5`), tests in `tests/tctm.nim`, files in `tests/files/ctm5/`. CHAREX files read (tile data synthesised); the writer always writes the tile data and writes 0 tile fields when the tile system is off, as CharPad 2.x does. 640 of the 708 V5 files in the CharPad 2.x downloads write back byte for byte; the rest differ only in the tile size fields of projects without tiles.
+- #16 [feature, normal] CharPad CTM V6 reader and writer
+  - Done 2026-10-30 in `src/batchpad/ctm.nim` (`parseV6`, `formatV6`; blocks shared with V7, `fitLow` shared with V7), tests in `tests/tctm.nim`, files in `tests/files/ctm6/` (cut from our V7 files). Multicolour flag instead of display mode, so no ECM or bitmap modes (writer refuses them), no $d024. Not checked in CharPad itself.
 - #20 [feature, normal] CharPad CTM V8 reader and writer
   - Done 2026-10-30 in `src/batchpad/ctm.nim` (`parseV8`, `formatV8`, `fitV8`; the blocks are shared with V9), tests in `tests/tctm.nim`, files in `tests/files/ctm8/` (cut from our V9 files; one with version byte 82, read as V8). Writes version 8 only. No sample from CharPad C64 3.0, so not checked in CharPad itself.
 - #47 [feature, low] Export usage statistics
