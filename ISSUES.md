@@ -33,8 +33,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader and writer
   - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
-- #28 [feature, low] SpritePad 1.8 headerless .spd reader and writer
-  - 10 samples; writer already proven in Python reference.
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
@@ -58,6 +56,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #28 [feature, low] SpritePad 1.8 headerless .spd reader and writer
+  - 10 samples; writer already proven in Python reference.
+  - Done 2026-10-30: `spd.nim` reads and writes it as version 0 (`parseV0`, `formatV0`); `convert --to spd0`. A file with no `SPD` magic and a length of 3 + 64 × n (1-1024 sprites) is taken as headerless, also in `cli.nim`'s input detection. Colours cut to the low nibble as in Pro; the writer leaves out tiles, animations, sprites past 256 and overlays at another distance than 1. Own test file `tests/files/spd0/`.
 - #34 [feature, low] SPD V3 reader and writer
   - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
   - Done 2026-10-30: `spd.nim` reads and writes V3 (`parseV3V4V5`, `formatV5(p, 3)`); V3 is V4 without overlay distances (both 1; overlays at another distance are left out, as are tags and names). `convert --to spd3`. Own test file `tests/files/spd3/`. Not checked in SpritePad, as V3 was never released.

@@ -64,6 +64,15 @@ suite "command line":
     let (code, data) = batchpad("convert", src, "-", "--to", "ctm9")
     check code == 0 and data.startsWith("CTM\x09")
 
+  test "headerless SPD":
+    let src = files / "spd0" / "sprites.spd"
+    let (code, text) = batchpad("info", src)
+    check code == 0 and "version: 0" in text
+    check batchpad("convert", files / "spd5" / "sprites.spd", tmp / "h.spd", "--to", "spd0")[0] == 0
+    check readSpd(tmp / "h.spd").version == 0
+    check batchpad("convert", src, tmp / "h5.spd")[0] == 0
+    check readSpd(tmp / "h5.spd").version == 5
+
   test "convert to spd3 and spd4":
     for v in [3, 4]:
       check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0

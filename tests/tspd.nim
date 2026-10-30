@@ -399,3 +399,41 @@ suite "SPD V3":
     let data = cast[seq[byte]](readFile(dir / "tiles_anims.spd"))
     expect SpdError: discard parseSpd(data[0 ..< 100])
     expect SpdError: discard parseSpd(data & @[byte 0])
+
+suite "SPD headerless (SpritePad 1.8)":
+  const dir5 = currentSourcePath().parentDir / "files" / "spd5"
+  const dir = currentSourcePath().parentDir / "files" / "spd0"
+  const dir1 = currentSourcePath().parentDir / "files" / "spd1"
+
+  test "colours and sprites":
+    let p = readSpd(dir / "sprites.spd")
+    var q = readSpd(dir1 / "sprites.spd")
+    check p.version == 0
+    q.version = 0
+    q.spriteAnims = @[]
+    check p == q
+    check p.sprites.len == 6 and p.sprites[2].overlay
+
+  test "writing gives back the same bytes":
+    check readSpd(dir / "sprites.spd").toSpd(0) == cast[seq[byte]](readFile(dir / "sprites.spd"))
+
+  test "colours are cut to their low nibble":
+    var data = cast[seq[byte]](readFile(dir / "sprites.spd"))
+    data[0] = 0xf3
+    check parseSpd(data).colours[0] == 3
+
+  test "V5 to headerless":
+    let p = readSpd(dir5 / "tiles_anims.spd")
+    var leftOut: seq[string]
+    let q = parseSpd(p.toSpd(0, leftOut))
+    check leftOut == @["the tiles (the headerless format has none)",
+                       "the animations (the headerless format has none)",
+                       "the overlay of 4 sprites (overlay distance 4; up to V3 overlay means the next sprite)"]
+    check q.version == 0 and not q.tileSystem and q.spriteAnims.len == 0
+    check q.sprites.len == p.sprites.len
+
+  test "errors":
+    let data = cast[seq[byte]](readFile(dir / "sprites.spd"))
+    expect SpdError: discard parseSpd(data[0 ..< 100])
+    expect SpdError: discard parseSpd(data[0 ..< 3 + 64 * 0 + 63])
+    expect SpdError: discard parseSpd(data[0 ..< 3])

@@ -191,7 +191,7 @@ batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm4` to `ctm9`, `spd1`, `spd2`, `spd3`, `spd4`,
+`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm4` to `ctm9`, `spd0` (SpritePad 1.8, no header), `spd1`, `spd2`, `spd3`, `spd4`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 
@@ -388,7 +388,7 @@ batchpad import -o ships.spd sprites=ships.bin --sprite-attribs seuck
 ```
 
 The output kind comes from `-o`'s extension (or `--to`: `ctm4` to `ctm9`,
-`spd1`, `spd2`, `spd3`, `spd4`, `spd5`). Parts are the ones `bin` writes, as far as CharPad and
+`spd0`, `spd1`, `spd2`, `spd3`, `spd4`, `spd5`). Parts are the ones `bin` writes, as far as CharPad and
 SpritePad import them (`src/batchpad/rawimport.nim`):
 
 - CharPad: `chars` (required), `char-attribs`, `char-attribs-l2`, `tiles`,

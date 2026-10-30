@@ -57,6 +57,16 @@ proc readAnims(r: var Reader, anims: var seq[Animation], wordFrames = true) =
   for a in anims.mitems: a.timer = r.u8
   for a in anims.mitems: a.attributes = r.u8
 
+proc parseV0(r: var Reader): SpriteProject =
+  ## The headerless format of SpritePad 1.8, version 0 here: three colours and
+  ## sprites, nothing else. Like SpritePad Pro, the colours are cut to their low
+  ## nibble. Overlay means "the next sprite", so both distances are 1.
+  result.version = 0
+  for c in result.colours.mitems: c = r.u8 and 0x0f
+  result.spriteOverlay = 1
+  result.tileOverlay = 1
+  r.readSprites(result, (r.data.len - 3) div 64)
+
 proc parseV1(r: var Reader): SpriteProject =
   ## V1 has no tiles and always at least one sprite animation. Overlay means
   ## "the next sprite", so both overlay distances are 1.
@@ -146,6 +156,11 @@ proc parseV3V4V5(r: var Reader, version: int): SpriteProject =
 proc parseSpd*(data: openArray[byte]): SpriteProject =
   ## Parses a whole .spd file. Raises SpdError on anything it can't read.
   var r = Reader(data: @data)
+  let headerless = data.len >= 67 and (data.len - 3) mod 64 == 0 and
+                   not (data[0] == byte('S') and data[1] == byte('P') and data[2] == byte('D'))
+  if headerless:
+    if data.len > 3 + 64 * 1024: r.fail("more than 1024 sprites")
+    return parseV0(r)
   if data.len < 4 or data[0] != byte('S') or data[1] != byte('P') or data[2] != byte('D'):
     r.fail("not a SpritePad project (no SPD signature)")
   r.pos = 3
@@ -324,6 +339,26 @@ proc writeAnims(w: var Writer, anims: seq[Animation], wordFrames = true) =
   for a in anims: w.u8 a.timer
   for a in anims: w.u8 a.attributes
 
+proc fitV0(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
+  ## Drops what the headerless format can't hold: tiles, animations, sprites
+  ## past 256 (SpritePad Pro refuses more) and overlays when the overlay
+  ## distance isn't 1.
+  result = p
+  result.sprites.limit(256, "sprites", leftOut)
+  if p.tileSystem: leftOut.add "the tiles (the headerless format has none)"
+  if p.spriteAnims.len + p.tileAnims.len > 0: leftOut.add "the animations (the headerless format has none)"
+  result.tileSystem = false
+  result.tiles = @[]
+  result.spriteAnims = @[]
+  result.tileAnims = @[]
+  result.dropOverlays(leftOut)
+
+proc formatV0(p: SpriteProject): seq[byte] =
+  var w: Writer
+  for c in p.colours: w.u8 c
+  w.writeSprites(p)
+  w.data
+
 proc formatV1(p: SpriteProject): seq[byte] =
   var w: Writer
   for c in "SPD": w.u8 ord(c)
@@ -389,12 +424,13 @@ proc formatV5(p: SpriteProject, version = 5): seq[byte] =
   w.data
 
 proc toSpd*(p: SpriteProject, version: int, leftOut: var seq[string]): seq[byte] =
-  ## Formats `p` as a .spd file of version 1, 2, 3, 4 or 5. What the version can't
-  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`, which also does V3 and V4), with a line in
+  ## Formats `p` as a .spd file of version 0 (headerless), 1, 2, 3, 4 or 5. What the version can't
+  ## hold is left out (see `fitV0`, `fitV1`, `fitV2` and `fitV5`, which also does V3 and V4), with a line in
   ## `leftOut` for each. Raises SpdError on other versions and on projects
   ## that don't hold together, such as one without sprites.
   p.check
   case version
+  of 0: formatV0(p.fitV0(leftOut))
   of 1: formatV1(p.fitV1(leftOut))
   of 2: formatV2(p.fitV2(leftOut))
   of 3: formatV5(p.fitV5(leftOut, 3), 3)

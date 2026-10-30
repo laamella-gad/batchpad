@@ -44,6 +44,7 @@ proc readInput(path, format: string): Input =
     of "":
       if data.startsWith("CTM"): kCtm
       elif data.startsWith("SPD"): kSpd
+      elif data.len >= 67 and (data.len - 3) mod 64 == 0: kSpd  # headerless, SpritePad 1.8
       else: fail("not a CharPad or SpritePad project")
     else: fail("unknown input format: " & format)
   case kind
@@ -332,7 +333,7 @@ let parser = newParser("batchpad"):
     arg("input")
   command("convert"):
     help("Writes the project in another project format")
-    option("--to", help = "ctm4 to ctm9, spd1 to spd5; default from the output's extension")
+    option("--to", help = "ctm4 to ctm9, spd0 to spd5; default from the output's extension")
     common()
     arg("input")
     arg("output")
@@ -409,7 +410,7 @@ let parser = newParser("batchpad"):
   command("import"):
     help("Builds a project from raw binary parts: part=file ...")
     option("-o", "--output", required = true, help = "Project file to write")
-    option("--to", help = "ctm4 to ctm9, spd1 to spd5; default from the output's extension")
+    option("--to", help = "ctm4 to ctm9, spd0 to spd5; default from the output's extension")
     option("--tile-size", help = "WxH")
     option("--map-size", help = "WxH")
     option("--cells", choices = @["8", "12", "16", "word"], default = some("8"))
