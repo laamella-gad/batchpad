@@ -64,9 +64,10 @@ suite "command line":
     let (code, data) = batchpad("convert", src, "-", "--to", "ctm9")
     check code == 0 and data.startsWith("CTM\x09")
 
-  test "convert to spd4":
-    check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v4.spd", "--to", "spd4")[0] == 0
-    check readSpd(tmp / "v4.spd").version == 4
+  test "convert to spd3 and spd4":
+    for v in [3, 4]:
+      check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0
+      check readSpd(tmp / "v.spd").version == v
 
   test "convert with --set":
     let src = files / "spd5" / "sprites.spd"

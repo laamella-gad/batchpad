@@ -100,8 +100,9 @@ proc parseV2(r: var Reader): SpriteProject =
     result.spriteAnims.setLen anims
     r.readAnims(result.spriteAnims)
 
-proc parseV4V5(r: var Reader, version: int): SpriteProject =
-  ## V4 is V5 without tile tags and names. Counts whose flag is off are
+proc parseV3V4V5(r: var Reader, version: int): SpriteProject =
+  ## V4 is V5 without tile tags and names; V3 is V4 without overlay distances
+  ## (overlay means "the next", so both are 1). Counts whose flag is off are
   ## ignored, as SpritePad does.
   result.version = version
   let flags = r.u8
@@ -114,8 +115,12 @@ proc parseV4V5(r: var Reader, version: int): SpriteProject =
   let width = r.u8.int
   let height = r.u8.int
   for c in result.colours.mitems: c = r.u8
-  result.spriteOverlay = cast[int16](r.u16)
-  result.tileOverlay = cast[int16](r.u16)
+  if version >= 4:
+    result.spriteOverlay = cast[int16](r.u16)
+    result.tileOverlay = cast[int16](r.u16)
+  else:
+    result.spriteOverlay = 1
+    result.tileOverlay = 1
 
   r.readSprites(result, sprites)
 
@@ -148,7 +153,7 @@ proc parseSpd*(data: openArray[byte]): SpriteProject =
   case version
   of 1: result = parseV1(r)
   of 2: result = parseV2(r)
-  of 4, 5: result = parseV4V5(r, version)
+  of 3, 4, 5: result = parseV3V4V5(r, version)
   else: r.fail("SPD version " & $version & " is not supported yet")
   if r.pos != r.data.len:
     r.fail($(r.data.len - r.pos) & " bytes after the last part")
@@ -191,6 +196,7 @@ proc enableAnims(p: var SpriteProject, fromVersion: int) =
   ## formats have no such bit, so it is set on every animation.
   if fromVersion notin 1..3:
     for a in p.spriteAnims.mitems: a.attributes.setBit(7)
+    for a in p.tileAnims.mitems: a.attributes.setBit(7)
 
 proc dropOverlays(p: var SpriteProject, leftOut: var seq[string]) =
   ## Up to V3 overlay means the next sprite, so overlays at another distance
@@ -203,6 +209,17 @@ proc dropOverlays(p: var SpriteProject, leftOut: var seq[string]) =
     if n > 0:
       leftOut.add "the overlay of " & count(n, "sprites") & " (overlay distance " & $p.spriteOverlay &
                   "; up to V3 overlay means the next sprite)"
+
+proc dropTileOverlays(p: var SpriteProject, leftOut: var seq[string]) =
+  ## As `dropOverlays`, for the tiles.
+  if p.tileOverlay != 1:
+    var n = 0
+    for t in p.tiles.mitems:
+      if t.overlay: inc n
+      t.attributes.clearBit(4)
+    if n > 0:
+      leftOut.add "the overlay of " & count(n, "tiles") & " (overlay distance " & $p.tileOverlay &
+                  "; up to V3 overlay means the next tile)"
 
 proc limit[T](s: var seq[T], n: int, what: string, leftOut: var seq[string]) =
   if s.len > n:
@@ -270,24 +287,29 @@ proc fitV2(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
 proc fitV5(p: SpriteProject, leftOut: var seq[string], version = 5): SpriteProject =
   ## Drops what V5 can't hold: sprites and tiles past 65535, tile cells past
   ## 255 either way, animations past 256 and name chars past 32 or a 0 byte.
-  ## Adds a line to `leftOut` for each. For V4, also the tags and names,
-  ## which it has none of.
+  ## Adds a line to `leftOut` for each. For V3 and V4, also the tags and names,
+  ## which they have none of; for V3 also overlays at another distance than 1,
+  ## and see `enableAnims` for the enabled bit.
   result = p
   result.sprites.limit(65535, "sprites", leftOut)
   if not result.tileSystem: result.tiles = @[]
   result.tiles.limit(65535, "tiles", leftOut)
   result.cropTiles(255, 255, leftOut)
-  if version == 4:
+  if version <= 4:
     var tags, names = 0
     for t in result.tiles:
       if t.tag != 0: inc tags
       if t.name != "": inc names
-    if tags > 0: leftOut.add "the tags of " & count(tags, "tiles") & " (V4 has none)"
-    if names > 0: leftOut.add "the names of " & count(names, "tiles") & " (V4 has none)"
+    if tags > 0: leftOut.add "the tags of " & count(tags, "tiles") & " (V" & $version & " has none)"
+    if names > 0: leftOut.add "the names of " & count(names, "tiles") & " (V" & $version & " has none)"
   else:
     result.dropNames(leftOut)
   result.spriteAnims.limit(256, "sprite animations", leftOut)
   result.tileAnims.limit(256, "tile animations", leftOut)
+  if version == 3:
+    result.enableAnims(p.version)
+    result.dropOverlays(leftOut)
+    result.dropTileOverlays(leftOut)
 
 proc writeSprites(w: var Writer, p: SpriteProject) =
   for s in p.sprites:
@@ -334,7 +356,7 @@ proc formatV2(p: SpriteProject): seq[byte] =
   w.data
 
 proc formatV5(p: SpriteProject, version = 5): seq[byte] =
-  ## V4 has no tile tags and names.
+  ## V4 has no tile tags and names, V3 also no overlay distances.
   var w: Writer
   for c in "SPD": w.u8 ord(c)
   w.u8 version
@@ -348,8 +370,9 @@ proc formatV5(p: SpriteProject, version = 5): seq[byte] =
   w.u8(if p.tileSystem: p.tileWidth else: 0)
   w.u8(if p.tileSystem: p.tileHeight else: 0)
   for c in p.colours: w.u8 c
-  w.u16 cast[uint16](p.spriteOverlay)
-  w.u16 cast[uint16](p.tileOverlay)
+  if version >= 4:
+    w.u16 cast[uint16](p.spriteOverlay)
+    w.u16 cast[uint16](p.tileOverlay)
 
   w.writeSprites(p)
 
@@ -366,14 +389,15 @@ proc formatV5(p: SpriteProject, version = 5): seq[byte] =
   w.data
 
 proc toSpd*(p: SpriteProject, version: int, leftOut: var seq[string]): seq[byte] =
-  ## Formats `p` as a .spd file of version 1, 2, 4 or 5. What the version can't
-  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`, which also does V4), with a line in
+  ## Formats `p` as a .spd file of version 1, 2, 3, 4 or 5. What the version can't
+  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`, which also does V3 and V4), with a line in
   ## `leftOut` for each. Raises SpdError on other versions and on projects
   ## that don't hold together, such as one without sprites.
   p.check
   case version
   of 1: formatV1(p.fitV1(leftOut))
   of 2: formatV2(p.fitV2(leftOut))
+  of 3: formatV5(p.fitV5(leftOut, 3), 3)
   of 4: formatV5(p.fitV5(leftOut, 4), 4)
   of 5: formatV5(p.fitV5(leftOut))
   else: fail("writing SPD version " & $version & " is not supported yet")

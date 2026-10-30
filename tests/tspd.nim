@@ -1,4 +1,4 @@
-import std/[os, strutils, unittest]
+import std/[bitops, os, strutils, unittest]
 import batchpad/spd
 
 proc v5(flags, sprites, tiles, spriteAnims, tileAnims, width, height: int,
@@ -292,7 +292,7 @@ suite "SPD V5":
     q = p
     q.tiles[1].cells.add 0
     expect SpdError: discard q.toSpd
-    expect SpdError: discard p.toSpd(version = 3)
+    expect SpdError: discard p.toSpd(version = 6)
 
   test "writer leaves out what doesn't fit":
     let p = readSpd(dir / "tiles_anims.spd")
@@ -359,6 +359,41 @@ suite "SPD V4":
     check q.tiles[1].cells == p.tiles[1].cells
     check q.spriteAnims == p.spriteAnims and q.tileAnims == p.tileAnims
     check parseSpd(q.toSpd(5)).version == 5
+
+  test "errors":
+    let data = cast[seq[byte]](readFile(dir / "tiles_anims.spd"))
+    expect SpdError: discard parseSpd(data[0 ..< 100])
+    expect SpdError: discard parseSpd(data & @[byte 0])
+
+suite "SPD V3":
+  const dir = currentSourcePath().parentDir / "files" / "spd3"
+  const dir5 = currentSourcePath().parentDir / "files" / "spd5"
+
+  test "reads as V4 with overlay distances of 1":
+    let p = readSpd(dir / "tiles_anims.spd")
+    var q = readSpd(dir5 / "tiles_anims.spd")
+    check p.version == 3
+    check p.spriteOverlay == 1 and p.tileOverlay == 1
+    q.version = 3
+    q.spriteOverlay = 1
+    for t in q.tiles.mitems:
+      t.tag = 0
+      t.name = ""
+    check p == q
+
+  test "writing gives back the same bytes":
+    check readSpd(dir / "tiles_anims.spd").toSpd(3) == cast[seq[byte]](readFile(dir / "tiles_anims.spd"))
+
+  test "V5 to V3 leaves out what it can't hold":
+    let p = readSpd(dir5 / "tiles_anims.spd")
+    var leftOut: seq[string]
+    let q = parseSpd(p.toSpd(3, leftOut))
+    check leftOut == @["the tags of 3 tiles (V3 has none)", "the names of 3 tiles (V3 has none)",
+                       "the overlay of 4 sprites (overlay distance 4; up to V3 overlay means the next sprite)"]
+    check q.version == 3 and q.spriteOverlay == 1
+    check q.tiles.len == 3 and q.tiles[1].name == "" and q.tiles[1].cells == p.tiles[1].cells
+    for a in q.spriteAnims & q.tileAnims: check a.attributes.testBit(7)
+    for s in q.sprites: check not s.overlay
 
   test "errors":
     let data = cast[seq[byte]](readFile(dir / "tiles_anims.spd"))

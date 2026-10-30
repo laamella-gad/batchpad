@@ -35,8 +35,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
 - #28 [feature, low] SpritePad 1.8 headerless .spd reader and writer
   - 10 samples; writer already proven in Python reference.
-- #34 [feature, low] SPD V3 reader and writer
-  - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
@@ -60,6 +58,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #34 [feature, low] SPD V3 reader and writer
+  - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
+  - Done 2026-10-30: `spd.nim` reads and writes V3 (`parseV3V4V5`, `formatV5(p, 3)`); V3 is V4 without overlay distances (both 1; overlays at another distance are left out, as are tags and names). `convert --to spd3`. Own test file `tests/files/spd3/`. Not checked in SpritePad, as V3 was never released.
 - #36 [feature, normal] SPD V4 reader and writer
   - SpritePad 2.8. No samples; overlay distances. Layout confirmed by SpritePad Pro 3.80's decompiled V4 loader and saver (no menu item saves V4).
   - Done 2026-10-30: `spd.nim` reads and writes V4 (`parseV4V5`, `formatV5(p, 4)`); V4 is V5 without tile tags and names (reported when dropped). `convert --to spd4`. Own test file `tests/files/spd4/`. Not checked in SpritePad, as no release saves V4.
