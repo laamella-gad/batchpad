@@ -139,6 +139,35 @@ proc parseV7(r: var Reader): Project =
 
   r.readMap(result)
 
+proc readV8Blocks(r: var Reader, p: var Project) =
+  ## The blocks of V8 and V9, which are the same.
+  r.readChars(p)
+  r.blockMarker("char materials")
+  for ch in p.chars.mitems: ch.material = r.u8
+  if p.colouring == cmPerChar:
+    r.blockMarker("char colours")
+    for ch in p.chars.mitems: ch.colours = r.readColours(p.displayMode)
+
+  if p.tileSystem:
+    r.readTiles(p)
+    if p.colouring == cmPerTile:
+      r.blockMarker("tile colours")
+      for t in p.tiles.mitems: t.colours = r.readColours(p.displayMode)
+    r.readTagsAndNames(p)
+
+  r.readMap(p)
+
+proc parseV8(r: var Reader, version: int): Project =
+  ## V8 is V9 without the flexi-grid and the key map. `version` is 8, or 82
+  ## from a prototype; either way the project is called V8.
+  result.version = 8
+  result.displayMode = r.readDisplayMode(DisplayMode.high)
+  result.colouring = r.readColouring
+  result.tileSystem = r.u8.testBit(0)
+  for c in result.chipColours.mitems: c = r.u8
+  for c in result.colours.mitems: c = r.u8
+  r.readV8Blocks(result)
+
 proc parseV9(r: var Reader): Project =
   result.version = 9
   result.displayMode = r.readDisplayMode(DisplayMode.high)
@@ -151,22 +180,7 @@ proc parseV9(r: var Reader): Project =
   result.flexiGrid.settings = r.u8
   for c in result.chipColours.mitems: c = r.u8
   for c in result.colours.mitems: c = r.u8
-
-  r.readChars(result)
-  r.blockMarker("char materials")
-  for ch in result.chars.mitems: ch.material = r.u8
-  if result.colouring == cmPerChar:
-    r.blockMarker("char colours")
-    for ch in result.chars.mitems: ch.colours = r.readColours(result.displayMode)
-
-  if result.tileSystem:
-    r.readTiles(result)
-    if result.colouring == cmPerTile:
-      r.blockMarker("tile colours")
-      for t in result.tiles.mitems: t.colours = r.readColours(result.displayMode)
-    r.readTagsAndNames(result)
-
-  r.readMap(result)
+  r.readV8Blocks(result)
 
 proc parseCtm*(data: openArray[byte]): Project =
   ## Parses a whole .ctm file. Raises CtmError on anything it can't read.
@@ -177,6 +191,7 @@ proc parseCtm*(data: openArray[byte]): Project =
   let version = r.u8.int
   case version
   of 7: result = parseV7(r)
+  of 8, 82: result = parseV8(r, version)
   of 9: result = parseV9(r)
   else: r.fail("CTM version " & $version & " is not supported yet")
   if r.pos != r.data.len:
@@ -217,7 +232,7 @@ proc check(p: Project) =
     fail("map has " & $p.map.len & " cells, not " & $p.mapWidth & " x " & $p.mapHeight)
 
 proc fit(p: Project, leftOut: var seq[string]): Project =
-  ## Drops what V7 and V9 can't hold: chars and tiles past 65536, tile cells
+  ## Drops what V7, V8 and V9 can't hold: chars and tiles past 65536, tile cells
   ## past 255 either way, map cells past 65535 either way and name chars past
   ## 32 or a 0 byte. Adds a line to `leftOut` for each.
   result = p
@@ -271,6 +286,14 @@ proc fitV7(p: Project, leftOut: var seq[string]): Project =
     ch.material = ch.material and 0x0f
     ch.colours[0] = ch.colours[0] and 0x0f
   for t in result.tiles.mitems: t.colours[0] = t.colours[0] and 0x0f
+
+proc fitV8(p: Project, leftOut: var seq[string]): Project =
+  ## Also drops the key map and the flexi-grid, which V8 has none of.
+  result = p.fit(leftOut)
+  if result.keyMap != 0: leftOut.add "key map " & $result.keyMap & " (V8 has none)"
+  if result.flexiGrid.settings.testBit(7): leftOut.add "the flexi-grid (V8 has none)"
+  result.keyMap = 0
+  result.flexiGrid = FlexiGrid()
 
 proc fitV9(p: Project, leftOut: var seq[string]): Project =
   ## Also drops key maps above 15, which don't fit in their 4 bits.
@@ -330,19 +353,8 @@ proc formatV7(p: Project): seq[byte] =
   w.writeMap(p)
   w.data
 
-proc formatV9(p: Project): seq[byte] =
-  var w: Writer
-  for c in "CTM": w.u8 ord(c)
-  w.u8 9
-  w.u8 ord(p.displayMode)
-  w.u8 ord(p.colouring)
-  w.u8((p.keyMap shl 4) or uint8(p.tileSystem))
-  w.u16 p.flexiGrid.width
-  w.u16 p.flexiGrid.height
-  w.u8 p.flexiGrid.settings
-  for c in p.chipColours: w.u8 c
-  for c in p.colours: w.u8 c
-
+proc writeV8Blocks(w: var Writer, p: Project) =
+  ## The blocks of V8 and V9, which are the same.
   w.writeChars(p)
   w.blockMarker
   for ch in p.chars: w.u8 ch.material
@@ -358,11 +370,37 @@ proc formatV9(p: Project): seq[byte] =
     w.writeTagsAndNames(p)
 
   w.writeMap(p)
+
+proc formatV8(p: Project): seq[byte] =
+  var w: Writer
+  for c in "CTM": w.u8 ord(c)
+  w.u8 8
+  w.u8 ord(p.displayMode)
+  w.u8 ord(p.colouring)
+  w.u8 uint8(p.tileSystem)
+  for c in p.chipColours: w.u8 c
+  for c in p.colours: w.u8 c
+  w.writeV8Blocks(p)
+  w.data
+
+proc formatV9(p: Project): seq[byte] =
+  var w: Writer
+  for c in "CTM": w.u8 ord(c)
+  w.u8 9
+  w.u8 ord(p.displayMode)
+  w.u8 ord(p.colouring)
+  w.u8((p.keyMap shl 4) or uint8(p.tileSystem))
+  w.u16 p.flexiGrid.width
+  w.u16 p.flexiGrid.height
+  w.u8 p.flexiGrid.settings
+  for c in p.chipColours: w.u8 c
+  for c in p.colours: w.u8 c
+  w.writeV8Blocks(p)
   w.data
 
 proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
-  ## Formats `p` as a .ctm file of version 7 or 9. What the version can't
-  ## hold is left out (see `fit`, `fitV7` and `fitV9`), with a line in
+  ## Formats `p` as a .ctm file of version 7, 8 or 9. What the version can't
+  ## hold is left out (see `fit`, `fitV7`, `fitV8` and `fitV9`), with a line in
   ## `leftOut` for each, and so are the colour bytes a display mode doesn't
   ## use (e.g. colour RAM in hires bitmap, screen colours in text modes),
   ## without a line. Raises CtmError on other versions, on projects that don't
@@ -370,6 +408,7 @@ proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
   p.check
   case version
   of 7: formatV7(p.fitV7(leftOut))
+  of 8: formatV8(p.fitV8(leftOut))
   of 9: formatV9(p.fitV9(leftOut))
   else: fail("writing CTM version " & $version & " is not supported yet")
 

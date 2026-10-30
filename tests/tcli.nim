@@ -49,6 +49,10 @@ suite "command line":
     let src = files / "ctm9" / "mctext_pertile.ctm"
     check batchpad("convert", src, tmp / "a.ctm", "--to", "ctm7")[0] == 0
     check readCtm(tmp / "a.ctm").version == 7
+    check batchpad("convert", src, tmp / "a8.ctm", "--to", "ctm8")[0] == 0
+    check readCtm(tmp / "a8.ctm").version == 8
+    check batchpad("convert", files / "ctm8" / "mcbitmap_pertile.ctm", tmp / "a9.ctm")[0] == 0
+    check readCtm(tmp / "a9.ctm").version == 9
     check batchpad("convert", src, tmp / "b.ctm")[0] == 0
     check readCtm(tmp / "b.ctm").version == 9
     check batchpad("convert", src, tmp / "c.bin")[0] == 1

@@ -184,13 +184,13 @@ to get the sub-map count or the char count into a build.
 ### convert
 
 ```
-batchpad convert old.ctm new.ctm [--to ctm7|ctm9]
+batchpad convert old.ctm new.ctm [--to ctm7|ctm8|ctm9]
 batchpad convert ships.spd ships.A [--to seuck-a]
 batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm7`, `ctm9`, `spd1`, `spd2`,
+`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm7`, `ctm8`, `ctm9`, `spd1`, `spd2`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 
@@ -386,7 +386,7 @@ batchpad import -o level.ctm chars=chars.bin tiles=tiles.bin map=map.bin \
 batchpad import -o ships.spd sprites=ships.bin --sprite-attribs seuck
 ```
 
-The output kind comes from `-o`'s extension (or `--to`: `ctm7`, `ctm9`,
+The output kind comes from `-o`'s extension (or `--to`: `ctm7`, `ctm8`, `ctm9`,
 `spd1`, `spd2`, `spd5`). Parts are the ones `bin` writes, as far as CharPad and
 SpritePad import them (`src/batchpad/rawimport.nim`):
 

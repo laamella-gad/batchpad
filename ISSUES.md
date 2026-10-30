@@ -35,8 +35,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad 2.0-2.5. 292 samples; flags byte, word map.
 - #16 [feature, normal] CharPad CTM V6 reader and writer
   - CharPad 2.6. First block format; flags bit 0 = multicolour, bit 1 = tiles.
-- #20 [feature, normal] CharPad CTM V8 reader and writer
-  - CharPad C64 3.0; version byte 8 or 82. No samples; bitmap modes, 1-3 colour bytes. CharPad Pro 3.88 "Export Project (CTM version 8)" can make some. Layout confirmed by Pro 3.88's decompiled V8 loader and saver.
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader and writer
@@ -70,6 +68,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #20 [feature, normal] CharPad CTM V8 reader and writer
+  - Done 2026-10-30 in `src/batchpad/ctm.nim` (`parseV8`, `formatV8`, `fitV8`; the blocks are shared with V9), tests in `tests/tctm.nim`, files in `tests/files/ctm8/` (cut from our V9 files; one with version byte 82, read as V8). Writes version 8 only. No sample from CharPad C64 3.0, so not checked in CharPad itself.
 - #47 [feature, low] Export usage statistics
   - Done 2026-10-30, `stats` command (`src/batchpad/stats.nim`, `tests/tstats.nim`): per char the cells of tiles and of the expanded map that use it, per tile the map cells, names, what is missing. Plain text, CharPad only. SpritePad projects are refused; sprite usage in tiles and animations could follow if wanted.
 - #49 [feature, low] Export SpritePad animations as animated GIFs

@@ -160,7 +160,7 @@ suite "CTM V9":
     q = p
     q.map.add 0
     expect CtmError: discard q.toCtm
-    expect CtmError: discard p.toCtm(version = 8)
+    expect CtmError: discard p.toCtm(version = 6)
 
   test "writer leaves out what doesn't fit":
     let p = readCtm(dir / "mctext_pertile.ctm")
@@ -201,6 +201,83 @@ suite "CTM V9":
     discard q.toCtm(9, leftOut)
     check leftOut == @["the end of 1 tile name (past 32 chars or a 0 byte)",
                        "key map 16 (V9 holds 0-15)"]
+
+suite "CTM V8":
+  const dir = currentSourcePath().parentDir / "files" / "ctm8"
+  const dir9 = currentSourcePath().parentDir / "files" / "ctm9"
+
+  test "multicolour bitmap, per tile":
+    let p = readCtm(dir / "mcbitmap_pertile.ctm")
+    check p.version == 8
+    check p.displayMode == dmMulticolourBitmap
+    check p.colouring == cmPerTile
+    check p.colours == [1'u8, 2, 3]
+    check p.keyMap == 0
+    check p.flexiGrid == FlexiGrid()
+    p.checkChars
+    p.checkTiles
+    check p.tiles[3].colours == [10'u8, 11, 12]
+
+  test "version byte 82 is V8 too":
+    let p = readCtm(dir / "hirestext_perchar_notiles.ctm")
+    check readFile(dir / "hirestext_perchar_notiles.ctm")[3] == char(82)
+    check p.version == 8
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerChar
+    p.checkChars
+    p.checkNoTiles
+    for i, c in [1'u8, 2, 5, 7, 13, 14]:
+      check p.chars[i].colours == [c, 0, 0]
+
+  test "values above 255":
+    let p = readCtm(dir / "mctext_perchar_big.ctm")
+    check p.chars.len == 300 and p.tiles.len == 261
+    check p.map[37] == 259
+
+  test "same project as V9, apart from the version and what V8 lacks":
+    for name in ["mcbitmap_pertile.ctm", "hirestext_perchar_notiles.ctm", "mctext_perchar_big.ctm"]:
+      checkpoint name
+      var q = readCtm(dir9 / name)
+      q.version = 8
+      q.keyMap = 0
+      q.flexiGrid = FlexiGrid()
+      check readCtm(dir / name) == q
+
+  test "writing gives back the same bytes, except version 82":
+    var files = 0
+    for kind, path in walkDir(dir):
+      if path.endsWith(".ctm"):
+        checkpoint path
+        var data = cast[seq[byte]](readFile(path))
+        data[3] = 8
+        check readCtm(path).toCtm(version = 8) == data
+        inc files
+    check files == 3
+
+  test "V9 to V8":
+    var p = readCtm(dir9 / "hiresbitmap_perchar.ctm")
+    p.keyMap = 9
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(8, leftOut))
+    check leftOut == @["key map 9 (V8 has none)", "the flexi-grid (V8 has none)"]
+    p.version = 8
+    p.keyMap = 0
+    p.flexiGrid = FlexiGrid()
+    check q == p
+    check parseCtm(q.toCtm(version = 9)).version == 9
+
+  test "errors":
+    let data = cast[seq[byte]](readFile(dir / "mcbitmap_pertile.ctm"))
+    var bad = data
+    bad[4] = 5                   # display mode
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad[5] = 3                   # colouring
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    expect CtmError: discard parseCtm(data[0 ..< 40])
 
 suite "CTM V7":
   const dir = currentSourcePath().parentDir / "files" / "ctm7"
