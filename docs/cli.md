@@ -326,6 +326,31 @@ batchpad gif ships.spd -o door.gif --tile-anim 1
 ```
 
 png parts: `chars`, `tiles`, `map` (CharPad); `sprites`, `tiles` (SpritePad).
+The picture is an 8 bit indexed PNG (16 colours) in the C64's own pixels:
+8 wide per char, 24 x 21 per sprite, a multicolour pixel two wide. `--scale N`
+(1-64) repeats every pixel N times each way. `--columns N` sets the items per
+row of a sheet (default 16 chars, 8 tiles or sprites; the rest of the last row
+is background). The map is the whole map with tiles expanded. `--palette FILE`
+reads a `.pal` file (16 lines of `#RRGGBB`, each with an optional name after
+it; blank lines and `;` or `//` lines are skipped); the default is Pepto.
+There is no compression yet: files are as big as their pixels.
+
+Colours, as the C64 shows them:
+
+| Mode | Pixel |
+| --- | --- |
+| hires text | bit 1 colour of the cell, 0 `$d021` |
+| multicolour text | colour 0-7: as hires. 8-15: `00` `$d021`, `01` `$d022`, `10` `$d023`, `11` the colour minus 8 |
+| ECM text | as hires, with the background `$d021`-`$d024` by the char number / 64; the shape is char & 63 (see #59) |
+| hires bitmap | bit 1 the high nibble of the cell's screen colour (`vmx-hi`), 0 the low one (`vmx-lo`) |
+| multicolour bitmap | `00` `$d021`, `01` high nibble, `10` low nibble, `11` the cell's colour |
+| sprite | hires: bit 1 the sprite's colour, 0 the project background. Multicolour: `00` background, `01` multicolour 1, `10` the sprite's colour, `11` multicolour 2 |
+
+The colour of a cell comes from the project's, the tile's or the char's
+colours as the colouring method says. In the chars sheet a per tile
+colouring has no tile to ask, so the project's colours are used. A map or
+tile cell without a tile or char is background. Sprite overlay, expand and
+the sprite animations aren't drawn (animations are #49).
 
 ### stats
 

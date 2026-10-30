@@ -220,6 +220,25 @@ suite "command line":
     check batchpad("c", files / "spd5" / "tiles_anims.spd", "--prefix", "1")[0] == 1
     check batchpad("c", files / "spd5" / "tiles_anims.spd", "--org", "map=$1000")[0] == 1
 
+  test "png":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("png", src, "map", "-o", tmp / "map.png", "--scale", "2")[0] == 0
+    let png = readFile(tmp / "map.png")
+    check png.startsWith("\x89PNG\r\n\x1a\n")
+    # 12 x 6 chars of 8 pixels, doubled: 192 x 96.
+    check png[16 .. 23] == "\0\0\0\xc0\0\0\0\x60"
+    let (code, text) = batchpad("png", files / "spd5" / "sprites.spd", "sprites", "--columns", "3")
+    check code == 0 and text.startsWith("\x89PNG")
+    var pal = ""
+    for i in 0 .. 15: pal.add "#" & toHex(i, 2) & "0000\n"
+    writeFile(tmp / "red.pal", pal)
+    check batchpad("png", src, "chars", "--palette", tmp / "red.pal", "-o", tmp / "red.png")[0] == 0
+    check readFile(tmp / "red.png").contains("\x00\x00\x00\x01\x00\x00")
+    check batchpad("png", src, "chars", "--palette", tmp / "nope.pal")[0] == 1
+    check batchpad("png", src, "sprites")[0] == 1
+    check batchpad("png", src, "chars", "--scale", "0")[0] == 2
+    check batchpad("png", src, "chars", "--columns", "x")[0] == 2
+
   test "import":
     let src = files / "ctm9" / "mctext_pertile.ctm"
     check batchpad("bin", src, "chars=" & tmp / "ic.bin", "tiles=" & tmp / "it.bin",

@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, cout, ctm, rawbin, rawimport, spd
+import asmout, cout, ctm, image, preview, rawbin, rawimport, spd
 
 type
   CliError* = object of CatchableError
@@ -485,7 +485,19 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       if o.header != "":
         if o.header == o.output: usage("--header names the same file as -o")
         outputs.add Output(path: o.header, data: c.header)
-    of "png": notYet("#48")
+    of "png":
+      let o = opts.argparse_png_opts.get
+      alwaysWrite = o.alwaysWrite
+      let scale = try: parseInt(o.scale) except ValueError: 0
+      if scale notin 1..64: usage("--scale must be 1-64, not " & o.scale)
+      let columns = if o.columns == "": 0 else: (try: parseInt(o.columns) except ValueError: 0)
+      if o.columns != "" and columns < 1: usage("--columns must be a positive number, not " & o.columns)
+      let palette = if o.palette == "": pepto else: readPalette(o.palette)
+      let input = load(o.input, o.inputFormat, o.set)
+      let picture = case input.kind
+                    of kCtm: input.ctm.previewCtm(o.part, columns)
+                    of kSpd: input.spd.previewSpd(o.part, columns)
+      outputs.add Output(path: o.output, data: picture.toPng(palette, scale))
     of "gif": notYet("#49")
     of "stats": notYet("#47")
     of "import":
@@ -508,7 +520,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     errors.writeLine "batchpad: " & e.msg
     errors.flush
     return 2
-  except CliError, CtmError, SpdError, BinError, AsmError:
+  except CliError, CtmError, SpdError, BinError, AsmError, ImageError, PreviewError:
     let e = getCurrentException()
     errors.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
     errors.flush
