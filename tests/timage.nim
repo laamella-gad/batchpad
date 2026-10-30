@@ -80,6 +80,96 @@ suite "PNG":
     let d = decode(img.toPng(pepto))
     check d.rows.len == 300 and d.rows[299] == "\5".repeat(300)
 
+proc lzwDecode(data: string): seq[int] =
+  ## GIF's LZW, minimum code size 4, from the sub-blocks' bytes.
+  var table: seq[seq[int]]
+  proc reset() =
+    table = @[]
+    for i in 0 .. 17: table.add @[i]
+  reset()
+  var size = 5
+  var bits = 0
+  var nbits = 0
+  var prev: seq[int]
+  for ch in data:
+    bits = bits or (ord(ch) shl nbits)
+    nbits += 8
+    while nbits >= size:
+      let code = bits and ((1 shl size) - 1)
+      bits = bits shr size
+      nbits -= size
+      if code == 16:
+        reset()
+        size = 5
+        prev = @[]
+      elif code == 17:
+        return
+      else:
+        var entry: seq[int]
+        if code < table.len: entry = table[code]
+        else: entry = prev & prev[0]   # the code about to be defined
+        result.add entry
+        if prev.len > 0: table.add prev & entry[0]
+        prev = entry
+        if table.len == (1 shl size) and size < 12: inc size
+
+proc decodeGif(gif: string): tuple[width, height: int, delays: seq[int], frames: seq[seq[int]]] =
+  check gif.startsWith("GIF89a")
+  result.width = ord(gif[6]) + 256 * ord(gif[7])
+  result.height = ord(gif[8]) + 256 * ord(gif[9])
+  check gif[10] == '\xf3'
+  var at = 13 + 48
+  proc blocks(): string =
+    while gif[at] != '\0':
+      let n = ord(gif[at])
+      result.add gif[at + 1 ..< at + 1 + n]
+      at += n + 1
+    inc at
+  while gif[at] != ';':
+    case gif[at]
+    of '\x21':
+      let label = gif[at + 1]
+      at += 2
+      let data = blocks()
+      if label == '\xf9': result.delays.add ord(data[1]) + 256 * ord(data[2])
+    of '\x2c':
+      check gif[at + 9 .. at + 10] == "\0\x04"
+      at += 11
+      result.frames.add lzwDecode(blocks())
+    else:
+      check false
+      break
+
+suite "GIF":
+  test "frames, delay and loop":
+    var a = newImage(3, 2)
+    a.pixels = @[0'u8, 1, 2, 3, 4, 5]
+    var b = newImage(3, 2, 15)
+    let d = decodeGif(toGif(@[a, b], pepto, 7, 2))
+    check (d.width, d.height) == (6, 4)
+    check d.delays == @[7, 7]
+    check d.frames[1] == newSeqWith(24, 15)
+    check d.frames[0][0 .. 5] == @[0, 0, 1, 1, 2, 2]
+    check d.frames[0][18 .. 23] == @[3, 3, 4, 4, 5, 5]
+    check "NETSCAPE2.0" in toGif(@[a], pepto, 7)
+
+  test "long frames: the code size grows and the table is reset":
+    var img = newImage(150, 150)
+    var x = 12345'u32
+    for p in img.pixels.mitems:
+      x = x * 1664525 + 1013904223
+      p = uint8((x shr 24) and 15)
+    let d = decodeGif(toGif(@[img], pepto, 2))
+    check d.frames[0].len == 150 * 150
+    check d.frames[0] == img.pixels.mapIt(int(it))
+    var flat = newImage(200, 200, 3)
+    check decodeGif(toGif(@[flat], pepto, 2)).frames[0] == newSeqWith(40000, 3)
+
+  test "mistakes":
+    expect ImageError: discard toGif(@[], pepto, 2)
+    expect ImageError: discard toGif(@[newImage(2, 2), newImage(3, 2)], pepto, 2)
+    expect ImageError: discard toGif(@[newImage(2, 2)], pepto, 2, 0)
+
 suite "CharPad previews":
   test "hires text: the char's colour on $d021":
     var p = charProject(dmHiresText, cmPerChar)
@@ -170,6 +260,30 @@ suite "SpritePad previews":
     check (img.width, img.height) == (48, 21)
     check img.row(0, 0, 8) == @[1, 1, 2, 2, 7, 7, 3, 3]
     check img.row(0, 24, 4) == @[5, 1, 5, 1]
+
+  test "animation order":
+    check Animation(first: 2, last: 4).order == @[2, 3, 4]
+    check Animation(first: 4, last: 2).order == @[4, 3, 2]
+    check Animation(first: 3, last: 3).order == @[3]
+    check Animation(first: 1, last: 4, attributes: 0x10).order == @[1, 2, 3, 4, 3, 2]
+    check Animation(first: 1, last: 2, attributes: 0x10).order == @[1, 2]
+
+  test "animation frames, with overlays":
+    var p = sprites()
+    p.spriteOverlay = 1
+    p.sprites[0].attributes = 0x15           # overlay: sprite 1 over it
+    p.spriteAnims = @[Animation(first: 0, last: 1, attributes: 0x10), Animation(first: 1, last: 1)]
+    p.tileAnims = @[Animation(first: 0, last: 0)]
+    let frames = p.animationFrames(false, 0)
+    check frames.len == 2       # ping-pong over two frames adds nothing
+    # Sprite 1 is drawn over sprite 0, its 00 pixels transparent.
+    check frames[0].row(0, 0, 8) == @[5, 1, 2, 2, 7, 7, 3, 3]
+    check frames[1].row(0, 0, 4) == @[1, 1, 2, 2]
+    check p.animationFrames(true, 0).len == 1
+    check p.animationFrames(true, 0)[0].width == 48
+    expect PreviewError: discard p.animationFrames(false, 2)
+    p.spriteAnims[1].last = 9
+    expect PreviewError: discard p.animationFrames(false, 1)
 
   test "mistakes":
     var p = sprites()

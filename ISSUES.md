@@ -53,8 +53,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
 - #47 [feature, low] Export usage statistics
   - How often each char is used in tiles and map, and each tile in the map. Plain text.
-- #49 [feature, low] Export SpritePad animations as animated GIFs
-  - Sprite and tile animations, using their timing; optional scaling.
 - #51 [feature, low] Read CharPad C16 `.ctt` projects
   - Decide after #40.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
@@ -74,6 +72,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #49 [feature, low] Export SpritePad animations as animated GIFs
+  - Done 2026-10-30, `gif` command (`animationFrames` in `preview.nim`, `toGif` in `image.nim`, tests in `tests/timage.nim`): sprite and tile animations, ping-pong, overlays, `--scale`, `--palette`, `--tick`. GIFs decoded back in the tests (own LZW decoder) and by PIL. Open: what a timer tick is in time; 20 ms (one PAL frame) is a guess, `--tick` changes it.
 - #48 [feature, normal] Export PNG previews
   - Done 2026-10-30, `png` command (`src/batchpad/preview.nim`, `src/batchpad/image.nim`, `tests/timage.nim`): chars, tiles and map (CharPad), sprites and tiles (SpritePad), in all five display modes and with the three colouring methods, as 8 bit indexed PNG with `--scale` and `--columns`. Colour rules in `docs/cli.md`. Not compared with CharPad's or SpritePad's own pictures; no compression (stored deflate blocks), so a 256 x 256 char map is about 4 MB at scale 1. ECM follows the Pro help (shape = char & 63, bank by char / 64): see #59.
 - #50 [feature, low] Read `.pal` palettes for previews

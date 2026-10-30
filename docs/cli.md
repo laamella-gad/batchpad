@@ -352,6 +352,18 @@ colouring has no tile to ask, so the project's colours are used. A map or
 tile cell without a tile or char is background. Sprite overlay, expand and
 the sprite animations aren't drawn (animations are #49).
 
+gif plays one animation of a SpritePad project: `--anim N` a sprite animation,
+`--tile-anim N` a tile animation (numbers from 0, as `info` counts them). The
+frames go from the animation's first to its last number (downwards when the
+last is lower), with ping-pong back to just after the first, and the GIF
+repeats forever. A frame is shown for the animation's timer reload times
+`--tick` milliseconds (default 20, one PAL frame; it is not known whether
+SpritePad counts something else), at least 2 hundredths of a second, as
+viewers show less as 10. Sprites and tiles with overlay have the sprite or
+tile at the overlay distance drawn over them, its background pixels left
+transparent. `--palette`, `--scale` and the colours are as for png; expand
+flags aren't drawn.
+
 ### stats
 
 ```

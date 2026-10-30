@@ -1,7 +1,7 @@
 ## Indexed images with a 16 colour palette, `.pal` palette files and PNG
 ## output, for the previews of `png` (docs/cli.md).
 
-import std/[strutils]
+import std/[strutils, tables]
 
 type
   ImageError* = object of ValueError
@@ -103,3 +103,73 @@ proc toPng*(img: Image, palette: Palette, scale = 1): string =
   result = "\x89PNG\r\n\x1a\n" &
            chunk("IHDR", be32(uint32(w)) & be32(uint32(h)) & "\x08\x03\x00\x00\x00") &
            chunk("PLTE", plte) & chunk("IDAT", zlibStored(raw)) & chunk("IEND", "")
+
+proc lzw(pixels: openArray[uint8]): string =
+  ## GIF's LZW for 4 bit pixels, as sub-blocks of at most 255 bytes.
+  const (clear, eoi) = (16, 17)
+  var bits = 0'u32
+  var nbits = 0
+  var bytes = ""
+  proc put(code, size: int) =
+    bits = bits or (uint32(code) shl nbits)
+    nbits += size
+    while nbits >= 8:
+      bytes.add char(bits and 0xff)
+      bits = bits shr 8
+      nbits -= 8
+  var table = initTable[int, int]()
+  var next = 18
+  var size = 5
+  put(clear, size)
+  var prefix = -1
+  for p in pixels:
+    if prefix < 0:
+      prefix = int(p)
+      continue
+    let key = prefix * 16 + int(p)
+    if key in table:
+      prefix = table[key]
+    else:
+      put(prefix, size)
+      if next < 4096:
+        table[key] = next
+        if next == (1 shl size): inc size
+        inc next
+      else:
+        put(clear, size)
+        table.clear
+        next = 18
+        size = 5
+      prefix = int(p)
+  if prefix >= 0: put(prefix, size)
+  put(eoi, size)
+  if nbits > 0: bytes.add char(bits and 0xff)
+  for i in countup(0, bytes.high, 255):
+    let n = min(255, bytes.len - i)
+    result.add char(n)
+    result.add bytes[i ..< i + n]
+  result.add '\0'
+
+proc le16(v: int): string = $char(v and 0xff) & $char((v shr 8) and 0xff)
+
+proc toGif*(frames: seq[Image], palette: Palette, delay: int, scale = 1): string =
+  ## An animated GIF that plays the `frames`, all of one size, `delay`
+  ## hundredths of a second each, and repeats.
+  if frames.len == 0: raise newException(ImageError, "no frames")
+  if scale < 1 or scale > 64: raise newException(ImageError, "scale must be 1-64, not " & $scale)
+  let (w, h) = (frames[0].width * scale, frames[0].height * scale)
+  result = "GIF89a" & le16(w) & le16(h) & "\xf3\0\0"   # a 16 colour global table
+  for c in palette:
+    for v in c: result.add char(v)
+  result.add "\x21\xff\x0bNETSCAPE2.0\x03\x01\0\0\0"
+  for f in frames:
+    if (f.width * scale, f.height * scale) != (w, h): raise newException(ImageError, "frames of different sizes")
+    result.add "\x21\xf9\x04\x00" & le16(delay) & "\0\0"
+    result.add "\x2c" & le16(0) & le16(0) & le16(w) & le16(h) & "\0\x04"
+    var pixels = newSeqOfCap[uint8](w * h)
+    for y in 0 ..< h:
+      for x in 0 ..< f.width:
+        let c = f.pixels[(y div scale) * f.width + x] and 0x0f
+        for _ in 0 ..< scale: pixels.add c
+    result.add lzw(pixels)
+  result.add ';'

@@ -2,7 +2,6 @@
 ## and map of a CharPad project, sprites and tiles of a SpritePad project.
 ## Layouts and colour rules are in docs/cli.md under png.
 
-import std/bitops
 import ctm, image, spd
 
 type
@@ -100,17 +99,19 @@ proc previewCtm*(p: ctm.Project, part: string, columns = 0): Image =
 
 # SpritePad
 
-proc drawSprite(img: var Image, x0, y0: int, p: SpriteProject, s: Sprite) =
-  ## 24 x 21 pixels; the background is the project's.
+proc drawSprite(img: var Image, x0, y0: int, p: SpriteProject, s: Sprite,
+                transparent = false) =
+  ## 24 x 21 pixels; the background is the project's. When `transparent`, the
+  ## background pixels (bits 00) are left as they are.
   let multi = s.multicolour
   for y in 0 .. 20:
     for x in 0 ..< (if multi: 12 else: 24):
       let byte = s.data[y * 3 + x div (if multi: 4 else: 8)]
+      let bits = if multi: (byte shr (6 - 2 * (x mod 4))) and 3 else: (byte shr (7 - x mod 8)) and 1
+      if transparent and bits == 0: continue
       let c =
-        if multi:
-          [p.colours[0], p.colours[1], s.colour, p.colours[2]][(byte shr (6 - 2 * (x mod 4))) and 3]
-        else:
-          if testBit(byte, 7 - x mod 8): s.colour else: p.colours[0]
+        if multi: [p.colours[0], p.colours[1], s.colour, p.colours[2]][bits]
+        else: (if bits == 1: s.colour else: p.colours[0])
       if multi:
         img.pixels[(y0 + y) * img.width + x0 + 2 * x] = c
         img.pixels[(y0 + y) * img.width + x0 + 2 * x + 1] = c
@@ -140,3 +141,54 @@ proc previewSpd*(p: SpriteProject, part: string, columns = 0): Image =
                             (n div cols) * th + (i div p.tileWidth) * 21, p, p.sprites[int(c)])
   else:
     fail("a SpritePad project has no picture of " & part & " (sprites, tiles)")
+
+# Animations
+
+func order*(a: Animation): seq[int] =
+  ## The frame numbers in the order they play, once through: first to last
+  ## (down if last is lower), and with ping-pong back to just after the first.
+  let step = if a.last >= a.first: 1 else: -1
+  var i = int(a.first)
+  while true:
+    result.add i
+    if i == int(a.last): break
+    i += step
+  if a.pingPong:
+    for j in countdown(result.len - 2, 1): result.add result[j]
+
+proc drawSpriteOver(img: var Image, x0, y0: int, p: SpriteProject, n: int, transparent: bool) =
+  ## Sprite `n`, and over it the sprite its overlay flag points at.
+  img.drawSprite(x0, y0, p, p.sprites[n], transparent)
+  let o = n + int(p.spriteOverlay)
+  if p.sprites[n].overlay and o in 0 ..< p.sprites.len:
+    img.drawSprite(x0, y0, p, p.sprites[o], transparent = true)
+
+proc drawTile(img: var Image, x0, y0: int, p: SpriteProject, n: int, transparent: bool) =
+  for i, c in p.tiles[n].cells:
+    if int(c) < p.sprites.len:
+      img.drawSpriteOver(x0 + (i mod p.tileWidth) * 24, y0 + (i div p.tileWidth) * 21, p, int(c),
+                         transparent)
+
+proc animationFrames*(p: SpriteProject, tiles: bool, number: int): seq[Image] =
+  ## The pictures of sprite animation (or tile animation) `number`, in play
+  ## order, with each sprite's or tile's overlay drawn over it. A number or a
+  ## frame that isn't there raises PreviewError.
+  let anims = if tiles: p.tileAnims else: p.spriteAnims
+  let what = if tiles: "tile animation" else: "sprite animation"
+  if number notin 0 ..< anims.len:
+    fail("there is no " & what & " " & $number & " (the project has " & $anims.len & ")")
+  if tiles and not p.tileSystem: fail("the project has no tiles")
+  let count = if tiles: p.tiles.len else: p.sprites.len
+  let (w, h) = if tiles: (p.tileWidth * 24, p.tileHeight * 21) else: (24, 21)
+  for n in anims[number].order:
+    if n >= count:
+      fail(what & " " & $number & " uses " & (if tiles: "tile " else: "sprite ") & $n &
+           " but there are " & $count)
+    var img = newImage(w, h, p.colours[0])
+    if tiles:
+      img.drawTile(0, 0, p, n, false)
+      let o = n + int(p.tileOverlay)
+      if p.tiles[n].overlay and o in 0 ..< p.tiles.len: img.drawTile(0, 0, p, o, true)
+    else:
+      img.drawSpriteOver(0, 0, p, n, false)
+    result.add img

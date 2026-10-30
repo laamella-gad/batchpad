@@ -394,6 +394,7 @@ let parser = newParser("batchpad"):
     option("-o", "--output", default = some("-"), help = "Output file")
     option("--anim", help = "Sprite animation number")
     option("--tile-anim", help = "Tile animation number")
+    option("--tick", default = some("20"), help = "Milliseconds of one timer tick")
     option("--palette", help = ".pal file")
     option("--scale", default = some("1"))
     common()
@@ -498,7 +499,26 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
                     of kCtm: input.ctm.previewCtm(o.part, columns)
                     of kSpd: input.spd.previewSpd(o.part, columns)
       outputs.add Output(path: o.output, data: picture.toPng(palette, scale))
-    of "gif": notYet("#49")
+    of "gif":
+      let o = opts.argparse_gif_opts.get
+      alwaysWrite = o.alwaysWrite
+      if (o.anim == "") == (o.tileAnim == ""): usage("give one of --anim and --tile-anim")
+      let scale = try: parseInt(o.scale) except ValueError: 0
+      if scale notin 1..64: usage("--scale must be 1-64, not " & o.scale)
+      let tick = try: parseInt(o.tick) except ValueError: 0
+      if tick notin 1..1000: usage("--tick must be 1-1000 milliseconds, not " & o.tick)
+      let tiles = o.tileAnim != ""
+      let numberText = if tiles: o.tileAnim else: o.anim
+      let number = try: parseInt(numberText) except ValueError: -1
+      if number < 0: usage("the animation number must be 0 or more, not " & numberText)
+      let palette = if o.palette == "": pepto else: readPalette(o.palette)
+      let input = load(o.input, o.inputFormat, o.set)
+      if input.kind != kSpd: fail("only SpritePad projects have animations")
+      let frames = input.spd.animationFrames(tiles, number)
+      let timer = int((if tiles: input.spd.tileAnims else: input.spd.spriteAnims)[number].timer)
+      # GIF counts hundredths of a second; viewers play less than 2 as 10.
+      let delay = max(2, (timer * tick + 5) div 10)
+      outputs.add Output(path: o.output, data: frames.toGif(palette, delay, scale))
     of "stats": notYet("#47")
     of "import":
       let o = opts.argparse_import_opts.get

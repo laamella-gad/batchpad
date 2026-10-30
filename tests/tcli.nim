@@ -239,6 +239,19 @@ suite "command line":
     check batchpad("png", src, "chars", "--scale", "0")[0] == 2
     check batchpad("png", src, "chars", "--columns", "x")[0] == 2
 
+  test "gif":
+    let src = files / "spd5" / "tiles_anims.spd"
+    check batchpad("gif", src, "--anim", "0", "-o", tmp / "a.gif", "--scale", "2")[0] == 0
+    check readFile(tmp / "a.gif").startsWith("GIF89a")
+    let (tcode, tiles) = batchpad("gif", src, "--tile-anim", "0", "--tick", "40")
+    check tcode == 0 and tiles.startsWith("GIF89a")
+    check batchpad("gif", src)[0] == 2
+    check batchpad("gif", src, "--anim", "0", "--tile-anim", "0")[0] == 2
+    check batchpad("gif", src, "--anim", "x")[0] == 2
+    check batchpad("gif", src, "--anim", "0", "--tick", "0")[0] == 2
+    check batchpad("gif", src, "--anim", "99")[0] == 1
+    check batchpad("gif", files / "ctm9" / "mctext_pertile.ctm", "--anim", "0")[0] == 1
+
   test "import":
     let src = files / "ctm9" / "mctext_pertile.ctm"
     check batchpad("bin", src, "chars=" & tmp / "ic.bin", "tiles=" & tmp / "it.bin",
