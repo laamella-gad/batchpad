@@ -1,7 +1,10 @@
 ## SpritePad project files (.spd). Layouts are described in docs/spritepad.md.
 
-import std/bitops
+import std/[bitops, os]
 import binio
+
+const
+  sprVersion* = -1  ## `version` of a project read from an SpritePad 1.x `.spr`
 
 type
   SpdError* = object of ValueError
@@ -173,6 +176,26 @@ proc parseSpd*(data: openArray[byte]): SpriteProject =
   if r.pos != r.data.len:
     r.fail($(r.data.len - r.pos) & " bytes after the last part")
 
+proc parseSpr*(spr: openArray[byte], inf: openArray[byte] = []): SpriteProject =
+  ## Parses the `.spr` of SpritePad 1.3 to 1.7 (sprites only: 64 bytes each,
+  ## 1 to 256 of them) and its `.spr.inf`. As SpritePad 1.5, it takes the colours from
+  ## an `inf` of exactly 3 bytes (cut to their low nibble) and otherwise has them all 0.
+  var r = Reader(data: @spr)
+  if spr.len == 0 or spr.len mod 64 != 0 or spr.len > 64 * 256:
+    r.fail("a .spr holds 1 to 256 sprites of 64 bytes, not " & $spr.len & " bytes")
+  result.version = sprVersion
+  if inf.len == 3:
+    for i, c in result.colours.mpairs: c = inf[i] and 0x0f
+  result.spriteOverlay = 1
+  result.tileOverlay = 1
+  r.readSprites(result, spr.len div 64)
+
+proc readSpr*(path: string): SpriteProject =
+  ## Reads `path` and, when it exists, `path & ".inf"`.
+  let s = readFile(path)
+  let inf = if fileExists(path & ".inf"): readFile(path & ".inf") else: ""
+  parseSpr(s.toOpenArrayByte(0, s.high), inf.toOpenArrayByte(0, inf.high))
+
 proc readSpd*(path: string): SpriteProject =
   let s = readFile(path)
   parseSpd(s.toOpenArrayByte(0, s.high))
@@ -339,14 +362,14 @@ proc writeAnims(w: var Writer, anims: seq[Animation], wordFrames = true) =
   for a in anims: w.u8 a.timer
   for a in anims: w.u8 a.attributes
 
-proc fitV0(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
-  ## Drops what the headerless format can't hold: tiles, animations, sprites
+proc fitV0(p: SpriteProject, leftOut: var seq[string], what = "the headerless format"): SpriteProject =
+  ## Drops what the headerless format (or `.spr`, `what`) can't hold: tiles, animations, sprites
   ## past 256 (SpritePad Pro refuses more) and overlays when the overlay
   ## distance isn't 1.
   result = p
   result.sprites.limit(256, "sprites", leftOut)
-  if p.tileSystem: leftOut.add "the tiles (the headerless format has none)"
-  if p.spriteAnims.len + p.tileAnims.len > 0: leftOut.add "the animations (the headerless format has none)"
+  if p.tileSystem: leftOut.add "the tiles (" & what & " has none)"
+  if p.spriteAnims.len + p.tileAnims.len > 0: leftOut.add "the animations (" & what & " has none)"
   result.tileSystem = false
   result.tiles = @[]
   result.spriteAnims = @[]
@@ -422,6 +445,16 @@ proc formatV5(p: SpriteProject, version = 5): seq[byte] =
   w.writeAnims(p.spriteAnims)
   w.writeAnims(p.tileAnims)
   w.data
+
+proc toSpr*(p: SpriteProject, leftOut: var seq[string]): tuple[spr, inf: seq[byte]] =
+  ## Formats `p` as the `.spr` and `.spr.inf` of SpritePad 1.3 to 1.7. Leaves
+  ## out the same as `toSpd` does for the headerless format.
+  p.check
+  let q = p.fitV0(leftOut, "a .spr")
+  var w: Writer
+  w.writeSprites(q)
+  result.spr = w.data
+  result.inf = @(q.colours)
 
 proc toSpd*(p: SpriteProject, version: int, leftOut: var seq[string]): seq[byte] =
   ## Formats `p` as a .spd file of version 0 (headerless), 1, 2, 3, 4 or 5. What the version can't

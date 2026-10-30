@@ -40,16 +40,21 @@ proc readInput(path, format: string): Input =
   let kind =
     case format
     of "ctm": kCtm
-    of "spd": kSpd
+    of "spd", "spr": kSpd
     of "":
       if data.startsWith("CTM"): kCtm
-      elif data.startsWith("SPD"): kSpd
+      elif data.startsWith("SPD") or path.toLowerAscii.endsWith(".spr"): kSpd
       elif data.len >= 67 and (data.len - 3) mod 64 == 0: kSpd  # headerless, SpritePad 1.8
       else: fail("not a CharPad or SpritePad project")
     else: fail("unknown input format: " & format)
   case kind
   of kCtm: Input(kind: kCtm, ctm: parseCtm(data.toOpenArrayByte(0, data.high)))
-  of kSpd: Input(kind: kSpd, spd: parseSpd(data.toOpenArrayByte(0, data.high)))
+  of kSpd:
+    if format == "spr" or format == "" and path.toLowerAscii.endsWith(".spr"):
+      if path == "-": fail("a .spr needs a file name, to find its .inf")
+      Input(kind: kSpd, spd: readSpr(path))
+    else:
+      Input(kind: kSpd, spd: parseSpd(data.toOpenArrayByte(0, data.high)))
 
 proc colourValue(name, value: string): uint8 =
   let n = try: parseInt(value) except ValueError: -1
@@ -165,13 +170,19 @@ proc infoText(j: JsonNode): string =
   for key, value in j:
     result.add key & ": " & (if value.kind == JString: value.getStr else: $value) & "\n"
 
-proc convert(input: Input, path, to: string, leftOut: var seq[string]): Output =
+proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Output] =
   var to = to
   if to == "":
     to = case path.splitFile.ext.toLowerAscii
          of ".ctm": "ctm9"
          of ".spd": "spd5"
+         of ".spr": "spr"
          else: fail("can't tell the output format from " & path & "; use --to")
+  if to == "spr":
+    if input.kind != kSpd: fail("can't convert a CTM project to spr")
+    if path == "-": fail("a .spr needs a file name, to write its .inf next to it")
+    let (spr, inf) = input.spd.toSpr(leftOut)
+    return @[Output(path: path, data: spr.toStr), Output(path: path & ".inf", data: inf.toStr)]
   let (kind, version) =
     if to.startsWith("ctm"): (kCtm, to[3 .. ^1])
     elif to.startsWith("spd"): (kSpd, to[3 .. ^1])
@@ -182,7 +193,7 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): Output =
   let data = case kind
              of kCtm: input.ctm.toCtm(v, leftOut)
              of kSpd: input.spd.toSpd(v, leftOut)
-  Output(path: path, data: data.toStr)
+  @[Output(path: path, data: data.toStr)]
 
 proc usage(msg: string) {.noreturn.} = raise newException(UsageError, msg)
 
@@ -317,7 +328,7 @@ proc parseOrg(specs: seq[string]): seq[(string, int)] =
     result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
 
 template common() =
-  option("--input-format", choices = @["ctm", "spd"], help = "Format of the input, if not detected")
+  option("--input-format", choices = @["ctm", "spd", "spr"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
   flag("--quiet", help = "Hides warnings about what is left out")
   flag("--strict", help = "Makes those warnings errors")
@@ -328,12 +339,12 @@ let parser = newParser("batchpad"):
   flag("--version", shortcircuit = true, help = "Prints the version")
   command("info"):
     help("Prints what a project holds")
-    option("--input-format", choices = @["ctm", "spd"], help = "Format of the input, if not detected")
+    option("--input-format", choices = @["ctm", "spd", "spr"], help = "Format of the input, if not detected")
     flag("--json", help = "Prints JSON")
     arg("input")
   command("convert"):
     help("Writes the project in another project format")
-    option("--to", help = "ctm4 to ctm9, spd0 to spd5; default from the output's extension")
+    option("--to", help = "ctm4 to ctm9, spd0 to spd5 or spr; default from the output's extension")
     common()
     arg("input")
     arg("output")

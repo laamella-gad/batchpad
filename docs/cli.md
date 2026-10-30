@@ -51,7 +51,7 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 | `import` | Builds a project from raw binary parts | #42, #54 |
 
 The input type comes from its contents, not its extension: CTM, SPD,
-headerless SPD, `.spr` (with `.spr.inf` next to it when there is one), SEUCK
+headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), SEUCK
 `.A` or `.B`. `--input-format` forces it (needed for the sideways SEUCK `.B`,
 which looks the same as the normal one).
 
@@ -191,7 +191,7 @@ batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm4` to `ctm9`, `spd0` (SpritePad 1.8, no header), `spd1`, `spd2`, `spd3`, `spd4`,
+`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm4` to `ctm9`, `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spd1`, `spd2`, `spd3`, `spd4`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 

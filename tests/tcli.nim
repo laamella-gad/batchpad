@@ -73,6 +73,17 @@ suite "command line":
     check batchpad("convert", src, tmp / "h5.spd")[0] == 0
     check readSpd(tmp / "h5.spd").version == 5
 
+  test ".spr and .spr.inf":
+    let src = files / "spr" / "sprites.spr"
+    let (code, text) = batchpad("info", src)
+    check code == 0 and "version: -1" in text
+    check batchpad("convert", src, tmp / "o.spd")[0] == 0
+    check readSpd(tmp / "o.spd").sprites.len == 6
+    check batchpad("convert", files / "spd5" / "sprites.spd", tmp / "o.spr")[0] == 0
+    check readFile(tmp / "o.spr.inf").len == 3
+    check readSpr(tmp / "o.spr").version == sprVersion
+    check batchpad("convert", src, "-", "--to", "spr")[0] == 1
+
   test "convert to spd3 and spd4":
     for v in [3, 4]:
       check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0

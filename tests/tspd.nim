@@ -437,3 +437,42 @@ suite "SPD headerless (SpritePad 1.8)":
     expect SpdError: discard parseSpd(data[0 ..< 100])
     expect SpdError: discard parseSpd(data[0 ..< 3 + 64 * 0 + 63])
     expect SpdError: discard parseSpd(data[0 ..< 3])
+
+suite "SpritePad 1.x .spr":
+  const dir = currentSourcePath().parentDir / "files" / "spr"
+  const dir0 = currentSourcePath().parentDir / "files" / "spd0"
+
+  test "sprites and colours":
+    let p = readSpr(dir / "sprites.spr")
+    var q = readSpd(dir0 / "sprites.spd")
+    check p.version == sprVersion
+    q.version = sprVersion
+    check p == q
+
+  test "without an .inf the colours are 0":
+    let p = readSpr(dir / "bare.spr")
+    check p.sprites.len == 2 and p.colours == [0'u8, 0, 0]
+
+  test "an .inf of another length is ignored":
+    let data = cast[seq[byte]](readFile(dir / "sprites.spr"))
+    check parseSpr(data, [byte 1, 2, 3, 4]).colours == [0'u8, 0, 0]
+    check parseSpr(data, [byte 0xf1, 2, 3]).colours == [1'u8, 2, 3]
+
+  test "writing gives back the same bytes":
+    var leftOut: seq[string]
+    let (spr, inf) = readSpr(dir / "sprites.spr").toSpr(leftOut)
+    check leftOut.len == 0
+    check spr == cast[seq[byte]](readFile(dir / "sprites.spr"))
+    check inf == cast[seq[byte]](readFile(dir / "sprites.spr.inf"))
+
+  test "V5 to .spr":
+    var leftOut: seq[string]
+    let p = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "tiles_anims.spd")
+    let (spr, inf) = p.toSpr(leftOut)
+    check leftOut[0] == "the tiles (a .spr has none)"
+    check spr.len == 64 * p.sprites.len and inf.len == 3
+
+  test "errors":
+    expect SpdError: discard parseSpr([])
+    expect SpdError: discard parseSpr(newSeq[byte](100))
+    expect SpdError: discard parseSpr(newSeq[byte](64 * 257))
