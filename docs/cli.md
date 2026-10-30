@@ -1,8 +1,7 @@
 # Command line (#55)
 
 How batchpad is meant to be called. `src/batchpad/cli.nim` has every
-command and option below, parsed with argparse; `info`, `convert`, `bin` and
-`asm` work, the others
+command and option below, parsed with argparse; `info`, `convert`, `bin`, `asm` and `import` work, the others
 say which issue they wait for. Raw binary layouts are in
 `src/batchpad/rawbin.nim`, assembler source in `src/batchpad/asmout.nim`. This is the design the exports
 (#41-#54, #56, #57) are written against. Decided
@@ -307,11 +306,39 @@ batchpad import -o level.ctm chars=chars.bin tiles=tiles.bin map=map.bin \
 batchpad import -o ships.spd sprites=ships.bin --sprite-attribs seuck
 ```
 
-The output kind comes from `-o` (or `--to`). Parts give the data, options the
-sizes CharPad would take from the open project: `--tile-size`, `--map-size`,
-`--cells`. `--load-address skip|detect|none`: skip 2 bytes, skip them when the
-size says so (2 mod 8 for chars, 2 mod 64 for sprites), or never (default
-`detect`). The address found is reported on stderr.
+The output kind comes from `-o`'s extension (or `--to`: `ctm7`, `ctm9`,
+`spd1`, `spd2`, `spd5`). Parts are the ones `bin` writes, as far as CharPad and
+SpritePad import them (`src/batchpad/rawimport.nim`):
+
+- CharPad: `chars` (required), `char-attribs`, `char-attribs-l2`, `tiles`,
+  `tile-attribs`, `tile-attribs-l2`, `tile-tags`, `map`; `tiles` and `map` as
+  `-lo` and `-hi` for `--cells 12` and `16`. Not `char-materials`, `submaps` and
+  `colour-map`, which are for export only.
+- SpritePad: `sprites` (required), `sprite-attribs`, `tiles`, `tile-attribs`,
+  `tile-tags`. Not the animations.
+
+Options give what CharPad would take from the open project:
+
+| Option | Meaning |
+| --- | --- |
+| `--tile-size WxH` | Required with `tiles`; an error without them |
+| `--map-size WxH` | Required with `map`; the file must hold exactly that many cells |
+| `--cells` | As for `bin`; the files for the other widths are an error |
+| `--sprite-attribs` | How the 64th byte of each sprite is read: `spritepad` as it is, `seuck` (bit 4 is multicolour, bits 5-7 dropped), `blank` (every sprite multicolour, colour 12). `sprite-attribs=file` replaces it |
+| `--load-address skip\|detect\|none` | Skips 2 bytes in every file, skips them when the size says so (2 mod 8 for `chars`, 2 mod 64 for `sprites`; no other part is detected), or never. Default `detect`. The address found is reported on stderr |
+| `--set` | Sets project settings before the data is read, so `--set mode=hires-bitmap` allows `char-attribs-l2` |
+
+The project starts as multicolour text with one colour per project (colours
+`bg0..bg3` 0, 9, 8, 11 and matrix colour 3, 8, 7 for CharPad; 0, 9, 8 for
+SpritePad, overlay distances 1), our choice. Char and tile attributes switch
+the colouring to per char or per tile (chars win) unless `--set colouring`
+says otherwise. Colours come from the attribute bytes the way `bin` writes
+them: `char-attribs` is material (high nibble) and colour (low), the L2 files
+are the two bitmap colours. Attribute files must hold one byte per char, tile
+or sprite. A file whose size isn't a whole number of chars, sprites, tiles
+or cells, a missing `--tile-size` or `--map-size`, and a tile or map cell the
+output version can't hold are errors; nothing is written then. What the output
+version can't hold is left out and reported on stderr, as for `convert`.
 
 ## In a build
 

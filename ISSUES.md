@@ -51,8 +51,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
-- #42 [feature, normal] Read raw binary files
-  - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
 - #47 [feature, low] Export usage statistics
   - How often each char is used in tiles and map, and each tile in the map. Plain text.
 - #48 [feature, normal] Export PNG previews
@@ -71,7 +69,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Check what oscar64 offers for placing data at an address (needed for char sets and sprites in a VIC bank) and whether `#embed` of our raw binaries (#41) is the simpler route.
 - #54 [feature, normal] Load address option for exports and imports
   - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
-  - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found.
+  - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found. Done with #42: `import --load-address skip|detect|none`.
   - Could also feed the asm (#43) and C (#53) output, instead of CharPad's dummy `addr_* = $1000`.
   - Export side done with #41: `--load-address`, and `part=file@ADDR` per file.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
@@ -91,6 +89,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #42 [feature, normal] Read raw binary files
+  - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
+  - Done: `batchpad import` (`src/batchpad/rawimport.nim`, `docs/cli.md`), tested by `tests/trawimport.nim` and `tests/tcli.nim`. Not imported: sprite and tile animations, `char-materials` (CharPad has no import for it either). Tile names are not in the binary layouts.
 - #46 [feature, normal] Export tile event jump table
   - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
   - CharPad puts names into labels as they are; ours should reject or clean names that aren't valid labels.

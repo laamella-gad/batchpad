@@ -1,4 +1,4 @@
-import std/[os, streams, strutils, times, unittest]
+import std/[os, sequtils, streams, strutils, times, unittest]
 import batchpad/[cli, ctm, spd]
 
 const files = currentSourcePath().parentDir / "files"
@@ -183,5 +183,47 @@ suite "command line":
     check "rts" notin events
     check batchpad("asm", files / "ctm9" / "hirestext_perchar_notiles.ctm",
                    "--parts", "tile-events")[0] == 1
+
+  test "import":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("bin", src, "chars=" & tmp / "ic.bin", "tiles=" & tmp / "it.bin",
+                   "tile-attribs=" & tmp / "ia.bin", "map=" & tmp / "im.bin")[0] == 0
+    let before = readCtm(src)
+    let args = @["import", "-o", tmp / "imp.ctm", "chars=" & tmp / "ic.bin", "tiles=" & tmp / "it.bin",
+                 "tile-attribs=" & tmp / "ia.bin", "map=" & tmp / "im.bin",
+                 "--tile-size", $before.tileWidth & "x" & $before.tileHeight,
+                 "--map-size", $before.mapWidth & "x" & $before.mapHeight]
+    check batchpad(args)[0] == 0
+    let p = readCtm(tmp / "imp.ctm")
+    check p.chars.mapIt(it.data) == before.chars.mapIt(it.data)
+    check p.tiles.mapIt(it.cells) == before.tiles.mapIt(it.cells)
+    check p.map == before.map and p.colouring == cmPerTile
+    check batchpad(args & @["--to", "ctm7"])[0] == 0 and readCtm(tmp / "imp.ctm").version == 7
+    check batchpad(args & @["--set", "colouring=project"])[0] == 0
+    check readCtm(tmp / "imp.ctm").colouring == cmPerProject
+
+  test "import sprites, load address":
+    writeFile(tmp / "sp.bin", "\x00\x20" & repeat('\x05', 62) & "\x00" & "\x11")
+    # 66 bytes: 2 mod 64, so detect skips the address and reports it
+    let (code, err) = warnings("import", "-o", tmp / "imp.spd", "sprites=" & tmp / "sp.bin")
+    check code == 0 and "load address $2000" in err
+    check readSpd(tmp / "imp.spd").sprites.len == 1
+    check warnings("import", "-o", tmp / "imp2.spd", "--load-address", "none",
+                   "sprites=" & tmp / "sp.bin")[0] == 1
+    check not fileExists(tmp / "imp2.spd")
+    check batchpad("import", "-o", tmp / "imp3.spd", "--sprite-attribs", "seuck",
+                   "sprites=" & tmp / "sp.bin")[0] == 0
+    check readSpd(tmp / "imp3.spd").sprites[0].attributes == 0x81
+
+  test "import argument errors":
+    check batchpad("import", "-o", tmp / "x.ctm")[0] == 2
+    check batchpad("import", "-o", tmp / "x.bin", "chars=" & tmp / "ic.bin")[0] == 2
+    check batchpad("import", "-o", tmp / "x.ctm", "frob=" & tmp / "ic.bin")[0] == 2
+    check batchpad("import", "-o", tmp / "x.ctm", "sprites=" & tmp / "ic.bin")[0] == 2
+    check batchpad("import", "-o", tmp / "x.ctm", "chars=" & tmp / "ic.bin", "chars=" & tmp / "ic.bin")[0] == 2
+    check batchpad("import", "-o", tmp / "x.ctm", "chars=" & tmp / "ic.bin", "--map-size", "3")[0] == 2
+    check batchpad("import", "-o", tmp / "x.ctm", "chars=" & tmp / "missing.bin")[0] == 1
+    check batchpad("import", "-o", tmp / "x.ctm", "map=" & tmp / "im.bin")[0] == 1
+    check not fileExists(tmp / "x.ctm")
 
 removeDir(tmp)

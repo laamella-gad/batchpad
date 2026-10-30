@@ -1,8 +1,8 @@
 ## The command line, as designed in docs/cli.md.
 
-import std/[bitops, json, options, os, streams, strutils]
+import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, ctm, rawbin, spd
+import asmout, ctm, rawbin, rawimport, spd
 
 type
   CliError* = object of CatchableError
@@ -240,6 +240,69 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
                 of kCtm: input.ctm.binPart(part, o)
                 of kSpd: input.spd.binPart(part, o))
 
+proc parseSize(name, s: string): (int, int) =
+  let n = s.split({'x', 'X'})
+  try:
+    if n.len != 2: raise newException(ValueError, "")
+    result = (parseInt(n[0]), parseInt(n[1]))
+    if result[0] < 1 or result[1] < 1: raise newException(ValueError, "")
+  except ValueError:
+    usage(name & " must be WxH, not " & s)
+
+proc importOutput(o: auto, warnings: var seq[string]): Output =
+  ## `import`: reads the parts, builds the project and formats it.
+  var to = o.to
+  if to == "":
+    to = case o.output.splitFile.ext.toLowerAscii
+         of ".ctm": "ctm9"
+         of ".spd": "spd5"
+         else: usage("can't tell the output format from " & o.output & "; use --to")
+  let isCtm = to.startsWith("ctm")
+  if not isCtm and not to.startsWith("spd"): usage("unknown output format: " & to)
+  let version = try: parseInt(to[3 .. ^1]) except ValueError: usage("unknown output format: " & to)
+  if o.parts.len == 0: usage("nothing to import: give part=file")
+  var opts = ImportOptions(cells: parseEnum[CellFormat](o.cells),
+                           spriteAttribs: parseEnum[SpriteAttribStyle](o.spriteAttribs))
+  if o.tileSize != "": (opts.tileWidth, opts.tileHeight) = parseSize("--tile-size", o.tileSize)
+  if o.mapSize != "": (opts.mapWidth, opts.mapHeight) = parseSize("--map-size", o.mapSize)
+  var parts: Parts
+  for spec in o.parts:
+    let eq = spec.find('=')
+    if eq < 1 or eq == spec.high: usage("expected part=file, not " & spec)
+    let (part, path) = (spec[0 ..< eq], spec[eq + 1 .. ^1])
+    if part notin (if isCtm: @ctmImportParts else: @spdImportParts):
+      usage(part & " can't be imported into a " & (if isCtm: "CharPad" else: "SpritePad") & " project")
+    if part in parts: usage(part & " is given twice")
+    let text = try: (if path == "-": stdin.readAll else: readFile(path))
+               except IOError as e: fail(e.msg)
+    let unit = case part
+               of "chars": 8
+               of "sprites": 64
+               else: 0
+    let (data, address) = stripLoadAddress(text.toOpenArrayByte(0, text.high).toSeq, o.loadAddress, unit)
+    if address.isSome:
+      warnings.add path & ": load address $" & toHex(address.get, 4).toLowerAscii
+    parts[part] = data
+  var data: seq[byte]
+  var leftOut: seq[string]
+  if isCtm:
+    var p = newCtmProject()
+    for s in o.set:
+      let eq = s.find('=')
+      if eq < 1: fail("--set needs name=value, not " & s)
+      p.applySet(s[0 ..< eq], s[eq + 1 .. ^1])
+      if s[0 ..< eq] == "colouring": opts.keepColouring = true
+    data = importCtm(parts, opts, p).toCtm(version, leftOut)
+  else:
+    var p = newSpdProject()
+    for s in o.set:
+      let eq = s.find('=')
+      if eq < 1: fail("--set needs name=value, not " & s)
+      p.applySet(s[0 ..< eq], s[eq + 1 .. ^1])
+    data = importSpd(parts, opts, p).toSpd(version, leftOut)
+  for l in leftOut: warnings.add o.output & ": left out " & l
+  Output(path: o.output, data: data.toStr)
+
 proc asmOutput(input: Input, o: AsmOptions): string =
   case input.kind
   of kCtm: input.ctm.toAsm(o)
@@ -402,7 +465,12 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     of "png": notYet("#48")
     of "gif": notYet("#49")
     of "stats": notYet("#47")
-    of "import": notYet("#42")
+    of "import":
+      let o = opts.argparse_import_opts.get
+      alwaysWrite = o.alwaysWrite
+      var notes: seq[string]
+      outputs.add importOutput(o, notes)
+      for n in notes: errors.writeLine "batchpad: " & n
     else:
       errors.write(parser.help)
       errors.flush
