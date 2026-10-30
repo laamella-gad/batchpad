@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, ctm, rawbin, rawimport, spd
+import asmout, cout, ctm, rawbin, rawimport, spd
 
 type
   CliError* = object of CatchableError
@@ -369,10 +369,14 @@ let parser = newParser("batchpad"):
     option("--header", help = "Also writes a header with the declarations")
     option("--parts", help = "Comma-separated parts to include")
     option("--prefix", help = "Put before every name")
-    option("--section", help = "oscar64 section for the data")
+    option("--org", multiple = true, help = "part=ADDR: places that part at the address")
     flag("--event-stubs", help = "Writes empty event functions")
+    option("--event-labels", choices = @["normal", "alt"], default = some("normal"))
     option("--eol", choices = @["lf", "crlf"], default = some("lf"))
     option("--cells", choices = @["8", "12", "16", "word"], default = some("8"))
+    option("--area", help = "Only this part of the map: X,Y,W,H")
+    option("--sprite-attribs", choices = @["spritepad", "seuck", "blank"],
+           default = some("spritepad"), help = "64th byte style of sprites")
     common()
     arg("input")
   command("png"):
@@ -461,7 +465,25 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       if o.area != "": ao.bin.area = some(parseArea(o.area))
       if o.parts != "": ao.parts = o.parts.split(',')
       outputs.add Output(path: o.output, data: load(o.input, o.inputFormat, o.set).asmOutput(ao))
-    of "c": notYet("#53")
+    of "c":
+      let o = opts.argparse_c_opts.get
+      alwaysWrite = o.alwaysWrite
+      var ao = AsmOptions(prefix: o.prefix, org: parseOrg(o.org), crlf: o.eol == "crlf",
+                          bin: BinOptions(cells: parseEnum[CellFormat](o.cells),
+                                          spriteAttribs: parseEnum[SpriteAttribStyle](o.spriteAttribs)),
+                          source: if o.input == "-": "stdin" else: o.input.extractFilename,
+                          altEventLabels: o.eventLabels == "alt", eventStubs: o.eventStubs)
+      if o.area != "": ao.bin.area = some(parseArea(o.area))
+      if o.parts != "": ao.parts = o.parts.split(',')
+      if o.header != "" and o.output == "-": usage("--header needs -o: the header is included by the source")
+      let input = load(o.input, o.inputFormat, o.set)
+      let c = case input.kind
+              of kCtm: input.ctm.toC(ao, o.header, o.output.extractFilename)
+              of kSpd: input.spd.toC(ao, o.header, o.output.extractFilename)
+      outputs.add Output(path: o.output, data: c.source)
+      if o.header != "":
+        if o.header == o.output: usage("--header names the same file as -o")
+        outputs.add Output(path: o.header, data: c.header)
     of "png": notYet("#48")
     of "gif": notYet("#49")
     of "stats": notYet("#47")

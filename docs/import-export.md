@@ -509,7 +509,7 @@ Decided 2026-10-18; issues #41-#51, #53 and #54.
 
 - Raw binary: write and read (#41, #42; done).
 - Assembler source: write, for several assemblers, 64tass first (#43).
-- C source for oscar64: the same data as arrays, tile events as function pointers (#53).
+- C source for oscar64: the same data as arrays, tile events as function pointers (#53; done).
 - CharPad Pro extras: flexi-grid sub-maps (#44), colour map (#45), tile event
   jump table (#46), usage statistics (#47).
 - PNG previews (#48), animated GIFs of SpritePad animations (#49), `.pal`

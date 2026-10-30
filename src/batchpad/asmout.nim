@@ -26,18 +26,28 @@ type
     altEventLabels*: bool          ## tile event labels `<name>`, not `chtl_<name>_event`
     eventStubs* = true             ## an `rts` per tile event label
 
-  Chunk = object
-    label: string                  ## a label inside the block, or ""
-    data: seq[byte]
+  Chunk* = object
+    label*: string                 ## a label inside the block, or ""
+    data*: seq[byte]
 
-  Block = object
-    part: string                   ## what `--org` names it by
-    label: string
-    comments: seq[string]
-    chunks: seq[Chunk]
-    names: seq[string]             ## zero-terminated strings instead of chunks
-    words: seq[string]             ## `.word` entries, labels
-    stubs: seq[(string, string)]   ## comment and label of an `rts` each
+  Block* = object
+    part*: string                  ## what `--org` names it by
+    label*: string
+    comments*: seq[string]
+    chunks*: seq[Chunk]
+    separate*: bool                ## the chunk labels are lists of their own (animations)
+    names*: seq[string]            ## zero-terminated strings instead of chunks
+    words*: seq[string]            ## `.word` entries, labels
+    stubs*: seq[(string, string)]  ## comment and label of an `rts` each
+
+  HeadKind* = enum
+    hkBlank, hkComment, hkConst
+
+  HeadLine* = object
+    ## A line of what comes before the data: colours, quantities, dimensions.
+    kind*: HeadKind
+    name*: string                  ## the comment, or the constant's name
+    value*: string                 ## `$xx` for hex, as in assembler source
 
 const
   ctmAsmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
@@ -48,12 +58,12 @@ const
 
 proc fail(msg: string) {.noreturn.} = raise newException(AsmError, msg)
 
-func size(b: Block): int =
+func size*(b: Block): int =
   for c in b.chunks: result += c.data.len
   for n in b.names: result += n.len + 1
   result += 2 * b.words.len + b.stubs.len
 
-func hex(n: int): string =
+func hex*(n: int): string =
   result = toHex(n).toLowerAscii.strip(trailing = false, chars = {'0'})
   if result == "": result = "0"
 
@@ -113,7 +123,7 @@ const reserved = toHashSet([
   "isb", "isc", "ins", "jam", "kil", "lae", "las", "lax", "lxa", "rla", "rra",
   "sax", "sbx", "sha", "shs", "shx", "shy", "slo", "sre", "tas", "xaa"])
 
-func isLabel(s: string): bool =
+func isLabel*(s: string): bool =
   s.len > 0 and s[0] in Letters and s.allCharsInSet(IdentChars) and s.toLowerAscii notin reserved
 
 proc eventBlocks(p: ctm.Project, ao: AsmOptions): seq[Block] =
@@ -250,7 +260,7 @@ proc animBlock(anims: seq[Animation], part, label, sub: string, comment: string,
   var p = SpriteProject(spriteAnims: anims)
   let data = p.binPart("sprite-anims", o)
   let f = n * frameBytes
-  result = Block(part: part, label: label, comments: @[comment,
+  result = Block(part: part, label: label, separate: true, comments: @[comment,
       count(n, "animations") & ", " & $(2 * frameBytes + 2) & " bytes per animation, " &
       sizeText(data.len)])
   result.chunks.add Chunk(label: sub & "_from", data: data[0 ..< f])
@@ -366,7 +376,7 @@ proc name(w: var Writer, s: string) =
   data.add 0
   w.bytes data
 
-func orgFor(o: AsmOptions, part: string): Option[int] =
+func orgFor*(o: AsmOptions, part: string): Option[int] =
   ## `map` also names `map-lo`, the start of a split map.
   for (p, a) in o.org:
     if p == part or (p & "-lo") == part: return some(a)
@@ -427,7 +437,7 @@ proc finish(w: Writer): string =
   result = w.text
   if w.o.crlf: result = result.replace("\n", "\r\n")
 
-proc collect[P](p: P, o: AsmOptions): seq[Block] =
+proc collect*[P](p: P, o: AsmOptions): seq[Block] =
   let parts = if o.parts.len > 0: o.parts else: p.defaultParts
   for i, part in parts:
     if part in parts[0 ..< i]: fail(part & " is named twice")
@@ -448,67 +458,110 @@ const modeText: array[DisplayMode, string] = ["Text (High Resolution)",
 const colouringText: array[ColouringMethod, string] = ["Per Project", "Per Tile",
   "Per Character"]
 
+type Head = seq[HeadLine]
+
+proc blank(h: var Head) = h.add HeadLine(kind: hkBlank)
+proc comment(h: var Head, s: string) = h.add HeadLine(kind: hkComment, name: s)
+proc constant(h: var Head, name, value: string) =
+  h.add HeadLine(kind: hkConst, name: name, value: value)
+
+proc head*(p: ctm.Project, o: AsmOptions): seq[HeadLine] =
+  ## What the CharPad template writes before the data blocks.
+  var h: Head
+  h.blank
+  h.blank
+  h.comment "Display mode : " & modeText[p.displayMode] & "."
+  h.comment "Matrix colouring method : " & colouringText[p.colouring] & "."
+  h.blank
+  h.blank
+  h.comment "Colour values..."
+  h.blank
+  h.comment "cmxlo = colour matrix low nybble."
+  h.comment "vmxlo = video matrix low nybble."
+  h.comment "vmxhi = video matrix high nybble."
+  h.comment "nb. any matrix colours listed here are usually only needed in a 'per project' matrix colouring system."
+  h.blank
+  let bg = p.chipColours
+  case p.displayMode
+  of dmHiresText:
+    h.constant("colr_vic_bg0", $bg[0])
+    h.constant("colr_cmxlo_proj", $p.colours[0])
+  of dmMulticolourText:
+    for i in 0..2: h.constant("colr_vic_bg" & $i, $bg[i])
+    h.constant("colr_cmxlo_proj", $p.colours[0])
+  of dmEcmText:
+    for i in 0..3: h.constant("colr_vic_bg" & $i, $bg[i])
+    h.constant("colr_cmxlo_proj", $p.colours[0])
+  of dmHiresBitmap:
+    h.constant("colr_vmxlo_proj", $p.colours[1])
+    h.constant("colr_vmxhi_proj", $p.colours[2])
+  of dmMulticolourBitmap:
+    h.constant("colr_vic_bg0", $bg[0])
+    h.constant("colr_cmxlo_proj", $p.colours[0])
+    h.constant("colr_vmxlo_proj", $p.colours[1])
+    h.constant("colr_vmxhi_proj", $p.colours[2])
+  h.blank
+  h.blank
+  h.comment "Quantities and dimensions..."
+  h.blank
+  h.constant("char_count", $p.chars.len)
+  if p.tileSystem:
+    h.constant("tile_count", $p.tiles.len)
+    h.constant("tile_wid", $p.tileWidth)
+    h.constant("tile_hei", $p.tileHeight)
+  let (mw, mh) = p.mapSize(o.bin)
+  h.constant("map_wid", $mw)
+  h.constant("map_hei", $mh)
+  if p.tileSystem:
+    h.constant("map_wid_chrs", $(mw * p.tileWidth))
+    h.constant("map_hei_chrs", $(mh * p.tileHeight))
+    h.constant("map_wid_pxls", $(mw * p.tileWidth * 8))
+    h.constant("map_hei_pxls", $(mh * p.tileHeight * 8))
+  if "submaps" in o.parts:
+    let s = p.subMaps
+    h.constant("submap_wid", $s.width)
+    h.constant("submap_hei", $s.height)
+    h.constant("submap_count_x", $s.across)
+    h.constant("submap_count_y", $s.down)
+  h
+
+proc head*(p: SpriteProject, o: AsmOptions): seq[HeadLine] =
+  ## What the SpritePad template writes before the data blocks.
+  var h: Head
+  h.blank
+  h.blank
+  h.comment "Colour values..."
+  h.blank
+  h.constant("colr_vic_bg0", $p.colours[0])
+  h.constant("colr_vic_sprite_mc1", $p.colours[1])
+  h.constant("colr_vic_sprite_mc2", $p.colours[2])
+  h.blank
+  h.blank
+  h.comment "Quantities and dimensions..."
+  h.blank
+  h.constant("sprite_count", $p.sprites.len)
+  if p.spriteAnims.len > 0: h.constant("spriteanim_count", $p.spriteAnims.len)
+  if p.tileSystem:
+    h.constant("spritetile_count", $p.tiles.len)
+    h.constant("spritetile_wid", $p.tileWidth)
+    h.constant("spritetile_hei", $p.tileHeight)
+    if p.tileAnims.len > 0: h.constant("spritetileanim_count", $p.tileAnims.len)
+  h
+
+proc render(w: var Writer, h: seq[HeadLine]) =
+  for l in h:
+    case l.kind
+    of hkBlank: w.line
+    of hkComment: w.comment l.name
+    of hkConst: w.constant(l.name, l.value)
+
 proc toAsm*(p: ctm.Project, o: AsmOptions): string =
   ## Assembler source of a CharPad project.
   o.check
   let blocks = p.collect(o)
   var w = Writer(o: o)
   w.start("CharPad")
-  w.line
-  w.line
-  w.comment "Display mode : " & modeText[p.displayMode] & "."
-  w.comment "Matrix colouring method : " & colouringText[p.colouring] & "."
-  w.line
-  w.line
-  w.comment "Colour values..."
-  w.line
-  w.comment "cmxlo = colour matrix low nybble."
-  w.comment "vmxlo = video matrix low nybble."
-  w.comment "vmxhi = video matrix high nybble."
-  w.comment "nb. any matrix colours listed here are usually only needed in a 'per project' matrix colouring system."
-  w.line
-  let bg = p.chipColours
-  case p.displayMode
-  of dmHiresText:
-    w.constant("colr_vic_bg0", $bg[0])
-    w.constant("colr_cmxlo_proj", $p.colours[0])
-  of dmMulticolourText:
-    for i in 0..2: w.constant("colr_vic_bg" & $i, $bg[i])
-    w.constant("colr_cmxlo_proj", $p.colours[0])
-  of dmEcmText:
-    for i in 0..3: w.constant("colr_vic_bg" & $i, $bg[i])
-    w.constant("colr_cmxlo_proj", $p.colours[0])
-  of dmHiresBitmap:
-    w.constant("colr_vmxlo_proj", $p.colours[1])
-    w.constant("colr_vmxhi_proj", $p.colours[2])
-  of dmMulticolourBitmap:
-    w.constant("colr_vic_bg0", $bg[0])
-    w.constant("colr_cmxlo_proj", $p.colours[0])
-    w.constant("colr_vmxlo_proj", $p.colours[1])
-    w.constant("colr_vmxhi_proj", $p.colours[2])
-  w.line
-  w.line
-  w.comment "Quantities and dimensions..."
-  w.line
-  w.constant("char_count", $p.chars.len)
-  if p.tileSystem:
-    w.constant("tile_count", $p.tiles.len)
-    w.constant("tile_wid", $p.tileWidth)
-    w.constant("tile_hei", $p.tileHeight)
-  let (mw, mh) = p.mapSize(o.bin)
-  w.constant("map_wid", $mw)
-  w.constant("map_hei", $mh)
-  if p.tileSystem:
-    w.constant("map_wid_chrs", $(mw * p.tileWidth))
-    w.constant("map_hei_chrs", $(mh * p.tileHeight))
-    w.constant("map_wid_pxls", $(mw * p.tileWidth * 8))
-    w.constant("map_hei_pxls", $(mh * p.tileHeight * 8))
-  if "submaps" in o.parts:
-    let s = p.subMaps
-    w.constant("submap_wid", $s.width)
-    w.constant("submap_hei", $s.height)
-    w.constant("submap_count_x", $s.across)
-    w.constant("submap_count_y", $s.down)
+  w.render p.head(o)
   w.header(blocks)
   w.body(blocks)
   w.finish
@@ -519,24 +572,7 @@ proc toAsm*(p: SpriteProject, o: AsmOptions): string =
   let blocks = p.collect(o)
   var w = Writer(o: o)
   w.start("SpritePad")
-  w.line
-  w.line
-  w.comment "Colour values..."
-  w.line
-  w.constant("colr_vic_bg0", $p.colours[0])
-  w.constant("colr_vic_sprite_mc1", $p.colours[1])
-  w.constant("colr_vic_sprite_mc2", $p.colours[2])
-  w.line
-  w.line
-  w.comment "Quantities and dimensions..."
-  w.line
-  w.constant("sprite_count", $p.sprites.len)
-  if p.spriteAnims.len > 0: w.constant("spriteanim_count", $p.spriteAnims.len)
-  if p.tileSystem:
-    w.constant("spritetile_count", $p.tiles.len)
-    w.constant("spritetile_wid", $p.tileWidth)
-    w.constant("spritetile_hei", $p.tileHeight)
-    if p.tileAnims.len > 0: w.constant("spritetileanim_count", $p.tileAnims.len)
+  w.render p.head(o)
   w.header(blocks)
   w.body(blocks)
   w.finish

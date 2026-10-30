@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#63**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#64**.
 
 ## Open
 
@@ -61,13 +61,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Text, 16 `#RRGGBB` per line, optional quoted name per line. Built-in default (e.g. Pepto) when none given. Used by #48 and #49.
 - #51 [feature, low] Read CharPad C16 `.ctt` projects
   - Decide after #40.
-- #53 [feature, normal] Write C source for oscar64
-  - Same content as the assembler output (#43): every labelled block becomes a `const` array (`charset_data`, `map_data`, `spriteset_data`, ...), the `colr_*`, `*_count`, `size_*` values become constants, names become a string table.
-  - Tile events (#46): the jump table becomes an array of function pointers, `void (* const chartileset_events[])(void)`, one per tile, pointing at a function named after the tile (`chtl_<name>_event`, or `chtl_null_event`). Our output declares them; the user's code defines them. Optionally also write empty default functions.
-  - Names must be valid C identifiers (as for #46).
-  - Addresses (from #54): asm has `--org part=ADDR`; decide what the C equivalent is (a `#pragma` placement, or a constant only), once the placement question below is answered.
-  - Optionally a header (`.h`) with `extern` declarations and the `.c` with the data, so several files can include it.
-  - Check what oscar64 offers for placing data at an address (needed for char sets and sprites in a VIC bank) and whether `#embed` of our raw binaries (#41) is the simpler route.
+- #63 [feature, low] Expand tiles into a char map: `convert --set tiles=off`
+  - Now fails with "not implemented yet (expanding tiles into a char map)" (`apply` in `cli.nim`, `tiles` setting).
+  - Replace the tile map by a char map of `map_wid * tile_wid` x `map_hei * tile_hei` cells, drop the tiles. Per-tile colouring has to become per-char (colours from the tile go to each of its chars; chars used with several colours would need copies), or be refused. Out-of-range tile numbers: decide.
+  - Not needed for C or assembler output: programs can look chars up through `tiles` and `map`, and `bin colour-map` already expands tiles.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
   - `$42 $00`, then 127 sprites of 64 bytes (8130 bytes); the 64th byte is `000M CCCC`. Layout in `docs/import-export.md`, conversions in `docs/spritepad.md` (SpritePad 1.8 and Pro agree).
   - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
@@ -85,9 +82,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #53 [feature, normal] Write C source for oscar64
+  - Done 2026-10-30, `c` command (`src/batchpad/cout.nim`, `tests/tcout.nim`): the blocks of `asm` as `__export const unsigned char` arrays, `colr_*`, `*_count`, `size_*` as `#define`s, tile events as an array of function pointers (empty functions with `--event-stubs`), tile names as bytes and a pointer table (oscar64 translates strings with `-psci`), `--header` with `extern`s and `#pragma compile` of the source, `--org part=ADDR` as `#pragma section`/`region`/`data`. Checked with oscar64 1.32. `#embed` of raw binaries works too but gives no constants; see `docs/cli.md`.
 - #54 [feature, normal] Load address option for exports and imports
   - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
-  - Done: export `bin --load-address` and `part=file@ADDR` (#41), import `--load-address skip|detect|none` (#42), asm `--org part=ADDR` (#43) instead of CharPad's dummy `addr_* = $1000`. The C output has no address option yet: see #53.
+  - Done: export `bin --load-address` and `part=file@ADDR` (#41), import `--load-address skip|detect|none` (#42), asm `--org part=ADDR` (#43) instead of CharPad's dummy `addr_* = $1000`. C output: `c --org part=ADDR` (#53).
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
   - Done: `batchpad import` (`src/batchpad/rawimport.nim`, `docs/cli.md`), tested by `tests/trawimport.nim` and `tests/tcli.nim`. Not imported: sprite and tile animations, `char-materials` (CharPad has no import for it either). Tile names are not in the binary layouts.
@@ -95,7 +94,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - `chartileset_eventjumptable`: a `.word` per tile pointing at a label from the tile name (configurable prefix/suffix), `null_event` for unnamed tiles, `rts` stubs.
   - CharPad puts names into labels as they are; ours should reject or clean names that aren't valid labels.
   - C output: see #53.
-  - Done 2026-10-19: `tile-events` part in `asm`, as CharPad Pro 3.88's decompiled `WriteTileEventData` (normal and alt labels, 4 pointers per `.word` line, a null stub, a stub per distinct name in first-use order). Unlike Pro: names that can't be labels are refused (letter first, then letters, digits and `_`; no register or mnemonic), any name defined twice is an error (case ignored, as 64tass does), the stub count in the comment counts each stub once, and `--no-event-stubs` leaves the stubs out. All four dialects assemble it to the same bytes. C output is still #53.
+  - Done 2026-10-19: `tile-events` part in `asm`, as CharPad Pro 3.88's decompiled `WriteTileEventData` (normal and alt labels, 4 pointers per `.word` line, a null stub, a stub per distinct name in first-use order). Unlike Pro: names that can't be labels are refused (letter first, then letters, digits and `_`; no register or mnemonic), any name defined twice is an error (case ignored, as 64tass does), the stub count in the comment counts each stub once, and `--no-event-stubs` leaves the stubs out. All four dialects assemble it to the same bytes. C output: #53 (done).
 - #7 [feature, low] CharPad CTM V1 writer
   - Merged into #6 (2026-10-19): one issue per format for reading and writing.
 - #9 [feature, low] CharPad CTM V2 writer

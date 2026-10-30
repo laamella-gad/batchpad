@@ -276,10 +276,37 @@ every test file in every cell width gives the same bytes in all four.
 batchpad c level.ctm -o build/level.c --header build/level.h --prefix level_
 ```
 
-`-o`, `--parts`, `--prefix` as for `asm`. `--header FILE` also writes the
-`extern` declarations. `--section NAME` for oscar64's `#pragma section`/
-`#pragma data` placement (to be checked, #53). `--event-stubs` writes empty
-event functions.
+`-o`, `--parts`, `--prefix`, `--org`, `--cells`, `--area`,
+`--sprite-attribs`, `--event-labels`, `--eol` as for `asm` (`--dialect` and
+`--segment` don't apply). Same parts, same names, same sizes.
+
+- Constants (`colr_*`, `*_count`, `size_*`, `addr_*`) are `#define`s, hex as `0x..`.
+- Data is `__export const unsigned char name[]`, so oscar64 keeps it when the
+  program doesn't use it. Animations are one array per list
+  (`sprite_anims_from[]`, ...); the sprite image labels `asm` writes inside the
+  sprite set are not written.
+- Tile names: the bytes, zero-terminated, in `name_data[]`, and
+  `const unsigned char * const name[n]` pointing into them. Not strings: oscar64
+  translates strings under `-psci`, escapes included.
+- Tile events: `void (* const chartileset_eventjumptable[n])(void)` and a
+  prototype per event function. The user's code defines the functions;
+  `--event-stubs` writes empty ones (off by default, unlike `asm`).
+- `--org part=ADDR` puts the part in an oscar64 section of its own, in a region
+  of exactly its size (`#pragma section`, `#pragma region`, `#pragma data`), and
+  defines `addr_<label>`. Unlike asm, what follows isn't dragged along: the
+  section ends after the part (both halves of a split part, and all sub-maps,
+  stay together). An address past `$ffff` is an error. Tile names take their
+  pointer table with them.
+- `--header FILE` (needs `-o`) writes the constants, prototypes and `extern`
+  declarations there, and the source includes it by file name (keep the two
+  in one directory). The header has `#pragma compile("<source>")`, so a program
+  that includes it gets the data without listing the source. Without
+  `--header` everything is in the source.
+- Names that aren't C names or are C keywords (`--prefix`, tile event labels)
+  are errors.
+
+Checked 2026-10-30 with oscar64 1.32: every part compiles, `--org` data is
+at its addresses in the PRG.
 
 ### png, gif
 
@@ -369,7 +396,7 @@ build/level.c build/level.h &: assets/level.ctm
 	batchpad c $< -o build/level.c --header build/level.h --prefix level_
 ```
 
-Or keep the data binary and `#embed` it (to check with oscar64, #53):
+Or keep the data binary and `#embed` it (works in oscar64 1.32, but gives no constants):
 
 ```c
 static const char charset[] = {
