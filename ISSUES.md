@@ -51,8 +51,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
   - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
-- #47 [feature, low] Export usage statistics
-  - How often each char is used in tiles and map, and each tile in the map. Plain text.
 - #51 [feature, low] Read CharPad C16 `.ctt` projects
   - Decide after #40.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
@@ -72,6 +70,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #47 [feature, low] Export usage statistics
+  - Done 2026-10-30, `stats` command (`src/batchpad/stats.nim`, `tests/tstats.nim`): per char the cells of tiles and of the expanded map that use it, per tile the map cells, names, what is missing. Plain text, CharPad only. SpritePad projects are refused; sprite usage in tiles and animations could follow if wanted.
 - #49 [feature, low] Export SpritePad animations as animated GIFs
   - Done 2026-10-30, `gif` command (`animationFrames` in `preview.nim`, `toGif` in `image.nim`, tests in `tests/timage.nim`): sprite and tile animations, ping-pong, overlays, `--scale`, `--palette`, `--tick`. GIFs decoded back in the tests (own LZW decoder) and by PIL. Open: what a timer tick is in time; 20 ms (one PAL frame) is a guess, `--tick` changes it.
 - #48 [feature, normal] Export PNG previews

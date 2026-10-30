@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, cout, ctm, image, preview, rawbin, rawimport, spd
+import asmout, cout, ctm, image, preview, rawbin, rawimport, spd, stats
 
 type
   CliError* = object of CatchableError
@@ -519,7 +519,13 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       # GIF counts hundredths of a second; viewers play less than 2 as 10.
       let delay = max(2, (timer * tick + 5) div 10)
       outputs.add Output(path: o.output, data: frames.toGif(palette, delay, scale))
-    of "stats": notYet("#47")
+    of "stats":
+      let o = opts.argparse_stats_opts.get
+      alwaysWrite = o.alwaysWrite
+      let input = load(o.input, o.inputFormat, o.set)
+      if input.kind != kCtm: fail("statistics are for CharPad projects")
+      outputs.add Output(path: o.output, data: input.ctm.statsText(
+        o.of, if o.input == "-": "stdin" else: o.input.extractFilename, o.eol == "crlf"))
     of "import":
       let o = opts.argparse_import_opts.get
       alwaysWrite = o.alwaysWrite
@@ -540,7 +546,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     errors.writeLine "batchpad: " & e.msg
     errors.flush
     return 2
-  except CliError, CtmError, SpdError, BinError, AsmError, ImageError, PreviewError:
+  except CliError, CtmError, SpdError, BinError, AsmError, ImageError, PreviewError, StatsError:
     let e = getCurrentException()
     errors.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
     errors.flush

@@ -252,6 +252,17 @@ suite "command line":
     check batchpad("gif", src, "--anim", "99")[0] == 1
     check batchpad("gif", files / "ctm9" / "mctext_pertile.ctm", "--anim", "0")[0] == 1
 
+  test "stats":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    let (code, text) = batchpad("stats", src)
+    check code == 0
+    check text.startsWith("Char usage of mctext_pertile.ctm\n6 chars, 1 not used\n")
+    let (tcode, tiles) = batchpad("stats", src, "--of", "tiles", "--eol", "crlf")
+    check tcode == 0 and "   3       4  bands\r\n" in tiles
+    check batchpad("stats", src, "--of", "sprites")[0] == 2
+    check batchpad("stats", files / "ctm9" / "hirestext_perchar_notiles.ctm", "--of", "tiles")[0] == 1
+    check batchpad("stats", files / "spd5" / "sprites.spd")[0] == 1
+
   test "import":
     let src = files / "ctm9" / "mctext_pertile.ctm"
     check batchpad("bin", src, "chars=" & tmp / "ic.bin", "tiles=" & tmp / "it.bin",

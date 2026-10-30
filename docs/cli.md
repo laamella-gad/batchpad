@@ -367,8 +367,16 @@ flags aren't drawn.
 ### stats
 
 ```
-batchpad stats level.ctm -o stats.txt [--of chars|tiles]
+batchpad stats level.ctm -o stats.txt [--of chars|tiles] [--eol lf|crlf]
 ```
+
+Plain text, for CharPad projects. `--of chars` (the default) lists every char
+with the number of cells of tiles that use it and of map char cells that use
+it (the map with its tiles expanded; just the map without tiles), and counts
+the chars that are in neither. `--of tiles` lists every tile with the number of
+map cells that use it, and its name. Numbers the project doesn't have (a tile
+cell with a char beyond the set, a map cell with a tile beyond the list) are
+counted in a line at the end. A project without tiles has no `--of tiles`.
 
 ### import
 
