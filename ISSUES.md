@@ -65,13 +65,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Same content as the assembler output (#43): every labelled block becomes a `const` array (`charset_data`, `map_data`, `spriteset_data`, ...), the `colr_*`, `*_count`, `size_*` values become constants, names become a string table.
   - Tile events (#46): the jump table becomes an array of function pointers, `void (* const chartileset_events[])(void)`, one per tile, pointing at a function named after the tile (`chtl_<name>_event`, or `chtl_null_event`). Our output declares them; the user's code defines them. Optionally also write empty default functions.
   - Names must be valid C identifiers (as for #46).
+  - Addresses (from #54): asm has `--org part=ADDR`; decide what the C equivalent is (a `#pragma` placement, or a constant only), once the placement question below is answered.
   - Optionally a header (`.h`) with `extern` declarations and the `.c` with the data, so several files can include it.
   - Check what oscar64 offers for placing data at an address (needed for char sets and sprites in a VIC bank) and whether `#embed` of our raw binaries (#41) is the simpler route.
-- #54 [feature, normal] Load address option for exports and imports
-  - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
-  - Imports: skip a load address when told to, or detect it from the size as CharPad/SpritePad do (#42); report the address found. Done with #42: `import --load-address skip|detect|none`.
-  - Could also feed the asm (#43) and C (#53) output, instead of CharPad's dummy `addr_* = $1000`.
-  - Export side done with #41: `--load-address`, and `part=file@ADDR` per file.
 - #56 [feature, low] Read and write SEUCK `.A` sprite files
   - `$42 $00`, then 127 sprites of 64 bytes (8130 bytes); the 64th byte is `000M CCCC`. Layout in `docs/import-export.md`, conversions in `docs/spritepad.md` (SpritePad 1.8 and Pro agree).
   - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
@@ -89,6 +85,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #54 [feature, normal] Load address option for exports and imports
+  - One option, shared by every binary export: write a 2-byte PRG load address (any value) or none. Default: none.
+  - Done: export `bin --load-address` and `part=file@ADDR` (#41), import `--load-address skip|detect|none` (#42), asm `--org part=ADDR` (#43) instead of CharPad's dummy `addr_* = $1000`. The C output has no address option yet: see #53.
 - #42 [feature, normal] Read raw binary files
   - Same layouts as #41; skip a PRG load address when the size is 2 mod 8 (chars) or 2 mod 64 (sprites), or as #54 says. Tile/map sizes come from options.
   - Done: `batchpad import` (`src/batchpad/rawimport.nim`, `docs/cli.md`), tested by `tests/trawimport.nim` and `tests/tcli.nim`. Not imported: sprite and tile animations, `char-materials` (CharPad has no import for it either). Tile names are not in the binary layouts.
