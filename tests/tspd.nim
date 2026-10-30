@@ -292,7 +292,7 @@ suite "SPD V5":
     q = p
     q.tiles[1].cells.add 0
     expect SpdError: discard q.toSpd
-    expect SpdError: discard p.toSpd(version = 4)
+    expect SpdError: discard p.toSpd(version = 3)
 
   test "writer leaves out what doesn't fit":
     let p = readSpd(dir / "tiles_anims.spd")
@@ -329,3 +329,38 @@ suite "SPD V5":
     discard q.toSpd(5, leftOut)
     check leftOut == @["the end of 1 tile name (past 32 chars or a 0 byte)",
                        "2 sprite animations past 256"]
+
+suite "SPD V4":
+  const dir = currentSourcePath().parentDir / "files" / "spd4"
+  const dir5 = currentSourcePath().parentDir / "files" / "spd5"
+
+  test "tiles and tile animations, without tags and names":
+    let p = readSpd(dir / "tiles_anims.spd")
+    var q = readSpd(dir5 / "tiles_anims.spd")
+    check p.version == 4
+    check p.spriteOverlay == 4 and p.tileOverlay == 1
+    q.version = 4
+    for t in q.tiles.mitems:
+      t.tag = 0
+      t.name = ""
+    check p == q
+    check p.tiles[1].overlay
+
+  test "writing gives back the same bytes":
+    check readSpd(dir / "tiles_anims.spd").toSpd(4) == cast[seq[byte]](readFile(dir / "tiles_anims.spd"))
+
+  test "V5 to V4 and back":
+    let p = readSpd(dir5 / "tiles_anims.spd")
+    var leftOut: seq[string]
+    let q = parseSpd(p.toSpd(4, leftOut))
+    check leftOut == @["the tags of 3 tiles (V4 has none)", "the names of 3 tiles (V4 has none)"]
+    check q.version == 4
+    check q.tiles.len == 3 and q.tiles[1].name == "" and q.tiles[1].tag == 0
+    check q.tiles[1].cells == p.tiles[1].cells
+    check q.spriteAnims == p.spriteAnims and q.tileAnims == p.tileAnims
+    check parseSpd(q.toSpd(5)).version == 5
+
+  test "errors":
+    let data = cast[seq[byte]](readFile(dir / "tiles_anims.spd"))
+    expect SpdError: discard parseSpd(data[0 ..< 100])
+    expect SpdError: discard parseSpd(data & @[byte 0])

@@ -37,8 +37,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - 10 samples; writer already proven in Python reference.
 - #34 [feature, low] SPD V3 reader and writer
   - SpritePad 2.8 private build, never released. No samples; layout confirmed by SpritePad Pro 3.80's decompiled V3 loader and saver.
-- #36 [feature, normal] SPD V4 reader and writer
-  - SpritePad 2.8. No samples; overlay distances. Layout confirmed by SpritePad Pro 3.80's decompiled V4 loader and saver (no menu item saves V4).
 - #40 [task, normal] Check what CharPad C16 Pro writes
   - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
   - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
@@ -62,6 +60,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #36 [feature, normal] SPD V4 reader and writer
+  - SpritePad 2.8. No samples; overlay distances. Layout confirmed by SpritePad Pro 3.80's decompiled V4 loader and saver (no menu item saves V4).
+  - Done 2026-10-30: `spd.nim` reads and writes V4 (`parseV4V5`, `formatV5(p, 4)`); V4 is V5 without tile tags and names (reported when dropped). `convert --to spd4`. Own test file `tests/files/spd4/`. Not checked in SpritePad, as no release saves V4.
 - #12 [feature, normal] CharPad CTM V4 reader and writer
   - Done 2026-10-30 in `src/batchpad/ctm.nim` (`parseV4`, `formatV4`, `fitV4`), tests in `tests/tctm.nim`, files in `tests/files/ctm4/`. V4 keeps colour (method 2, per tile cell) and material per tile cell: the reader gives a char a copy for each other colour/material it is used with, so the project is per char; the per-char attribute block is only used for chars no cell uses (as CharPad does). The writer refuses char maps and over 256 tiles, never sets CHAREX, leaves out tags and names (reported). All 112 V4 files of the CharPad 1.8/2.x downloads read and convert.
 - #14 [feature, normal] CharPad CTM V5 reader and writer

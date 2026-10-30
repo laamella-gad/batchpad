@@ -100,9 +100,10 @@ proc parseV2(r: var Reader): SpriteProject =
     result.spriteAnims.setLen anims
     r.readAnims(result.spriteAnims)
 
-proc parseV5(r: var Reader): SpriteProject =
-  ## Counts whose flag is off are ignored, as SpritePad does.
-  result.version = 5
+proc parseV4V5(r: var Reader, version: int): SpriteProject =
+  ## V4 is V5 without tile tags and names. Counts whose flag is off are
+  ## ignored, as SpritePad does.
+  result.version = version
   let flags = r.u8
   result.tileSystem = flags.testBit(0)
   let sprites = r.u16.int
@@ -126,8 +127,9 @@ proc parseV5(r: var Reader): SpriteProject =
       t.cells.setLen(width * height)
       for c in t.cells.mitems: c = r.u16
     for t in result.tiles.mitems: t.attributes = r.u8
-    for t in result.tiles.mitems: t.tag = r.u8
-    for t in result.tiles.mitems: t.name = r.zstring
+    if version == 5:
+      for t in result.tiles.mitems: t.tag = r.u8
+      for t in result.tiles.mitems: t.name = r.zstring
 
   if flags.testBit(1):
     result.spriteAnims.setLen spriteAnims
@@ -146,7 +148,7 @@ proc parseSpd*(data: openArray[byte]): SpriteProject =
   case version
   of 1: result = parseV1(r)
   of 2: result = parseV2(r)
-  of 5: result = parseV5(r)
+  of 4, 5: result = parseV4V5(r, version)
   else: r.fail("SPD version " & $version & " is not supported yet")
   if r.pos != r.data.len:
     r.fail($(r.data.len - r.pos) & " bytes after the last part")
@@ -265,16 +267,25 @@ proc fitV2(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
   result.enableAnims(p.version)
   result.dropOverlays(leftOut)
 
-proc fitV5(p: SpriteProject, leftOut: var seq[string]): SpriteProject =
+proc fitV5(p: SpriteProject, leftOut: var seq[string], version = 5): SpriteProject =
   ## Drops what V5 can't hold: sprites and tiles past 65535, tile cells past
   ## 255 either way, animations past 256 and name chars past 32 or a 0 byte.
-  ## Adds a line to `leftOut` for each.
+  ## Adds a line to `leftOut` for each. For V4, also the tags and names,
+  ## which it has none of.
   result = p
   result.sprites.limit(65535, "sprites", leftOut)
   if not result.tileSystem: result.tiles = @[]
   result.tiles.limit(65535, "tiles", leftOut)
   result.cropTiles(255, 255, leftOut)
-  result.dropNames(leftOut)
+  if version == 4:
+    var tags, names = 0
+    for t in result.tiles:
+      if t.tag != 0: inc tags
+      if t.name != "": inc names
+    if tags > 0: leftOut.add "the tags of " & count(tags, "tiles") & " (V4 has none)"
+    if names > 0: leftOut.add "the names of " & count(names, "tiles") & " (V4 has none)"
+  else:
+    result.dropNames(leftOut)
   result.spriteAnims.limit(256, "sprite animations", leftOut)
   result.tileAnims.limit(256, "tile animations", leftOut)
 
@@ -322,10 +333,11 @@ proc formatV2(p: SpriteProject): seq[byte] =
   w.writeAnims(p.spriteAnims)
   w.data
 
-proc formatV5(p: SpriteProject): seq[byte] =
+proc formatV5(p: SpriteProject, version = 5): seq[byte] =
+  ## V4 has no tile tags and names.
   var w: Writer
   for c in "SPD": w.u8 ord(c)
-  w.u8 5
+  w.u8 version
   w.u8(uint8(p.tileSystem) or uint8(p.spriteAnims.len > 0) shl 1 or
        uint8(p.tileAnims.len > 0) shl 2)
   w.u16 p.sprites.len
@@ -345,22 +357,24 @@ proc formatV5(p: SpriteProject): seq[byte] =
     for t in p.tiles:
       for c in t.cells: w.u16 c
     for t in p.tiles: w.u8 t.attributes
-    for t in p.tiles: w.u8 t.tag
-    for t in p.tiles: w.zstring t.name
+    if version == 5:
+      for t in p.tiles: w.u8 t.tag
+      for t in p.tiles: w.zstring t.name
 
   w.writeAnims(p.spriteAnims)
   w.writeAnims(p.tileAnims)
   w.data
 
 proc toSpd*(p: SpriteProject, version: int, leftOut: var seq[string]): seq[byte] =
-  ## Formats `p` as a .spd file of version 1, 2 or 5. What the version can't
-  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`), with a line in
+  ## Formats `p` as a .spd file of version 1, 2, 4 or 5. What the version can't
+  ## hold is left out (see `fitV1`, `fitV2` and `fitV5`, which also does V4), with a line in
   ## `leftOut` for each. Raises SpdError on other versions and on projects
   ## that don't hold together, such as one without sprites.
   p.check
   case version
   of 1: formatV1(p.fitV1(leftOut))
   of 2: formatV2(p.fitV2(leftOut))
+  of 4: formatV5(p.fitV5(leftOut, 4), 4)
   of 5: formatV5(p.fitV5(leftOut))
   else: fail("writing SPD version " & $version & " is not supported yet")
 
