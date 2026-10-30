@@ -68,13 +68,19 @@ proc cells(values: openArray[uint16], what, part: string, o: BinOptions): seq[by
         if i mod 2 == 0: result.add n shl 4
         else: result[^1] = result[^1] or n
 
-proc mapCells(p: ctm.Project, o: BinOptions): seq[uint16] =
-  if o.area.isNone: return p.map
+proc checkedArea(p: ctm.Project, o: BinOptions): Area =
+  ## `o.area`, or the whole map; an error when it isn't inside the map.
+  if o.area.isNone: return Area(x: 0, y: 0, width: p.mapWidth, height: p.mapHeight)
   let a = o.area.get
   if a.width < 1 or a.height < 1 or a.x < 0 or a.y < 0 or
      a.x + a.width > p.mapWidth or a.y + a.height > p.mapHeight:
     fail("--area " & $a.x & "," & $a.y & "," & $a.width & "," & $a.height &
          " is not inside the " & $p.mapWidth & " x " & $p.mapHeight & " map")
+  a
+
+proc mapCells(p: ctm.Project, o: BinOptions): seq[uint16] =
+  if o.area.isNone: return p.map
+  let a = p.checkedArea(o)
   for y in a.y ..< a.y + a.height:
     result.add p.map[y * p.mapWidth + a.x ..< y * p.mapWidth + a.x + a.width]
 
@@ -125,14 +131,17 @@ func charsWide*(p: ctm.Project): int =
 func charsHigh*(p: ctm.Project): int =
   p.mapHeight * (if p.tileSystem: p.tileHeight else: 1)
 
-proc colourMap(p: ctm.Project): seq[byte] =
+proc colourMap(p: ctm.Project, o: BinOptions): seq[byte] =
   ## The colour matrix colour of every char cell of the map, row by row, as
   ## CharPad Pro's ColourMap: 0 for a char (or tile) number that isn't in
-  ## the set.
+  ## the set. With `o.area` (in map cells, as for `map`) only the chars of
+  ## those cells; Pro has no such export.
   if p.colouring == cmPerTile and not p.tileSystem:
     fail("the colouring is per tile, but the project has no tiles")
-  for y in 0 ..< p.charsHigh:
-    for x in 0 ..< p.charsWide:
+  let a = p.checkedArea(o)
+  let (tw, th) = if p.tileSystem: (p.tileWidth, p.tileHeight) else: (1, 1)
+  for y in a.y * th ..< (a.y + a.height) * th:
+    for x in a.x * tw ..< (a.x + a.width) * tw:
       var tile = 0
       var ch: int
       if p.tileSystem:
@@ -192,8 +201,7 @@ proc binPart*(p: ctm.Project, part: string, o = BinOptions()): seq[byte] =
       for x in 0 ..< s.across: all.add p.subMapCells(s, y, x)
     result = cells(all, "submaps", part, o)
   of "colour-map":
-    o.needWholeMap(part)
-    result = p.colourMap
+    result = p.colourMap(o)
   else:
     fail("a CharPad project has no part " & part)
 

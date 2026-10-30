@@ -77,7 +77,7 @@ CharPad:
 | `tile-events` | event jump table and `rts` stubs (asm and C only) | |
 | `map` | the map, or the area given by `--area` | Map, MapArea |
 | `submaps` | flexi-grid sub-maps (#44) | SubMaps, SubMap |
-| `colour-map` | colour matrix colour per char cell of the whole map (#45) | ColourMap |
+| `colour-map` | colour matrix colour per char cell of the map, or of the area given by `--area` (#45) | ColourMap |
 
 SpritePad:
 
@@ -113,11 +113,12 @@ together, so with an odd cell count per sub-map it differs from the per-file
 form.
 
 `colour-map` follows CharPad Pro 3.88's ColourMap: one byte per char cell of
-the whole map (tiles expanded, so map size times tile size), row by row,
+the map (tiles expanded, so map size times tile size), row by row,
 holding the low nibble of the project's, the tile's or the char's colour
 matrix colour as the colouring method says, ready to copy to $d800. A char or
 tile number the set doesn't have gives 0. It is always 8 bits a cell whatever
-`--cells` says, and `--area` is an error.
+`--cells` says. `--area` (an addition: Pro has none) is in map cells as for
+`map`, so with tiles it gives the chars of those tiles.
 
 ## Options shared by the export commands
 

@@ -118,10 +118,17 @@ suite "CharPad parts":
     p.colouring = cmPerProject
     p.colours = [0x16'u8, 0, 0]    # only the low nibble
     check p.binPart("colour-map") == @[byte 6, 6, 6, 0, 0, 6, 0, 6, 6, 0, 6, 6]
-    # --cells doesn't change it; --area isn't for it.
+    # --cells doesn't change it; --area is in map cells, so tiles 1 and 2 of row 0
+    # are chars 2 to 5 of the first char row.
     check p.binPart("colour-map", BinOptions(cells: cf16)).len == 12
+    p.colouring = cmPerChar
+    check p.binPart("colour-map", BinOptions(area: some(Area(x: 1, y: 0, width: 2, height: 1)))) ==
+      @[byte 10, 0, 0, 10]
+    check p.binPart("colour-map", BinOptions(area: some(Area(x: 2, y: 1, width: 1, height: 1)))) ==
+      @[byte 8, 9]
     expect BinError:
-      discard p.binPart("colour-map", BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1))))
+      discard p.binPart("colour-map", BinOptions(area: some(Area(x: 2, y: 0, width: 2, height: 1))))
+    p.colouring = cmPerProject
     p.map[0] = 7    # no such tile
     check p.binPart("colour-map")[0 .. 1] == @[byte 0, 0]
     p.tileSystem = false

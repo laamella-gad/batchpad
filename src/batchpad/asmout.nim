@@ -229,8 +229,8 @@ proc blocks(p: ctm.Project, part: string, ao: AsmOptions): seq[Block] =
           if not first: b.part = ""
         result.add bs
   of "colour-map":
-    if o.area.isSome: fail("--area is for map, not colour-map")
-    let (w, h) = (p.charsWide, p.charsHigh)
+    let (mw, mh) = p.mapSize(o)
+    let (w, h) = if p.tileSystem: (mw * p.tileWidth, mh * p.tileHeight) else: (mw, mh)
     one("colourmap_data", @["ColourMap Data...",
         $w & "x" & $h & " (" & $(w * h) & ") cells, 8 bits per cell, " & sizeText(w * h)])
   of "tile-events": result = p.eventBlocks(ao)

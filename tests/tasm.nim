@@ -165,9 +165,11 @@ suite "CharPad assembler source":
     check ".byte $09,$09,$0a,$00,$00,$0b,$00,$0b,$0a,$00,$09,$09" in s.lines
     check "addr_colourmap_data = $d800" in s.lines
     check s.everyOrgDefined
-    expect AsmError:
-      discard charProject().toAsm(AsmOptions(parts: @["colour-map"],
-                                             bin: BinOptions(area: some(Area(x: 0, y: 0, width: 1, height: 1)))))
+    # An area is in map cells: tiles 1 and 2 of the first row are chars 2 to 5.
+    let a = charProject().toAsm(AsmOptions(parts: @["colour-map"],
+                                           bin: BinOptions(area: some(Area(x: 1, y: 0, width: 2, height: 1)))))
+    check "; 4x1 (4) cells, 8 bits per cell, total size is 4 ($4) bytes." in a.lines
+    check ".byte $0a,$00,$00,$0b" in a.lines
 
   test "tile events":
     var p = charProject()
