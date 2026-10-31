@@ -254,13 +254,17 @@ reader of ours should follow the spec, but these are the cases to test.
   Pro after loading ours can differ in those header bytes only (seen with
   `tests/files/ctm9/mctext_pertile.ctm`: 14, 0, 0 came back as 3, 8, 7).
 
-## How we read and write V4 and V5
+## How we read and write V3, V4 and V5
 
 - **V4 reader:** colour (method 2) and material are per tile cell in the file,
   but per char in our model. A char used with another colour or material gets
   a copy (added at the end of the set), and the tile cell points at the copy;
   method 2 becomes per char. The per-char attribute block only supplies chars
   no tile cell uses. CHAREX files get their tile data made up.
+- **V3:** read and written as V4 with its own header (the map size first, one
+  square tile size) and no attribute byte per char, so chars no tile cell
+  uses keep material 0. The writer cuts non-square tiles to a square
+  (reported). No sample exists; only the layout above backs it.
 - **V5 reader:** CHAREX likewise; with the tile system off, the tile fields and
   the CHAREX flag are ignored.
 - **Writers:** V4 and V5 never set CHAREX, and write no tags or names (reported

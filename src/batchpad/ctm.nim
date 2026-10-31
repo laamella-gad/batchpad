@@ -220,31 +220,49 @@ proc parseV5(r: var Reader): Project =
       for t in result.tiles.mitems: t.colours[0] = r.u8
   r.readMapOf(result, bytes = false)
 
-proc parseV4(r: var Reader): Project =
-  ## Always has tiles, 256 at most. Colour and material are kept per tile
+proc parseV3V4(r: var Reader, version: int): Project =
+  ## V3 is V4 with a different header (square tiles) and no attribute block
+  ## per char. Always has tiles, 256 at most. Colour and material are kept per tile
   ## cell, not per char: a char used with another colour or material gets a
   ## copy, so that a project colours per char, as the later versions do
   ## ("per tile cell" becomes "per char"). The attribute block per char is only
   ## used for chars no tile cell points at, as CharPad does.
-  result.version = 4
+  result.version = version
   for i in 0 .. 2: result.chipColours[i] = r.u8
   result.colours[0] = r.u8
   let colourMethod = r.u8
   if colourMethod > 2: r.fail("unknown colouring method " & $colourMethod)
   result.colouring = if colourMethod == 2: cmPerChar else: ColouringMethod(colourMethod)
   result.displayMode = if r.u8 == 1: dmMulticolourText else: dmHiresText
-  let charCount = r.u16.int + 1
-  let tileCount = r.u8.int + 1
-  result.tileWidth = r.u8.int
-  result.tileHeight = r.u8.int
-  result.mapWidth = r.u16.int
-  result.mapHeight = r.u16.int
-  let expanded = r.u8 == 1
-  for i in 0 .. 3: discard r.u8
+  var charCount, tileCount: int
+  var expanded: bool
+  if version == 3:
+    result.mapWidth = r.u16.int
+    result.mapHeight = r.u16.int
+    charCount = r.u16.int + 1
+    tileCount = r.u8.int + 1
+    result.tileWidth = r.u8.int
+    result.tileHeight = result.tileWidth
+    expanded = r.u8 == 1
+    discard r.u8
+  else:
+    charCount = r.u16.int + 1
+    tileCount = r.u8.int + 1
+    result.tileWidth = r.u8.int
+    result.tileHeight = r.u8.int
+    result.mapWidth = r.u16.int
+    result.mapHeight = r.u16.int
+    expanded = r.u8 == 1
+    for i in 0 .. 3: discard r.u8
   if result.tileWidth == 0 or result.tileHeight == 0:
     r.fail("tile size " & $result.tileWidth & " x " & $result.tileHeight)
   result.tileSystem = true
-  r.readCharsAndAttribs(result, charCount)
+  if version == 3:
+    result.chars.setLen charCount
+    for ch in result.chars.mitems:
+      for b in ch.data.mitems: b = r.u8
+  else:
+    r.readCharsAndAttribs(result, charCount)
   result.tiles.setLen tileCount
   if expanded: r.expandedCells(result)
   else:
@@ -322,7 +340,7 @@ proc parseCtm*(data: openArray[byte]): Project =
   r.pos = 3
   let version = r.u8.int
   case version
-  of 4: result = parseV4(r)
+  of 3, 4: result = parseV3V4(r, version)
   of 5: result = parseV5(r)
   of 6: result = parseV6(r)
   of 7: result = parseV7(r)
@@ -432,14 +450,27 @@ proc fitLow(p: Project, version: int, maxMode: DisplayMode, leftOut: var seq[str
     ch.colours[0] = ch.colours[0] and 0x0f
   for t in result.tiles.mitems: t.colours[0] = t.colours[0] and 0x0f
 
-proc fitV4(p: Project, leftOut: var seq[string]): Project =
-  ## Also what V4 lacks: a map of chars, more than 256 tiles. A tile cell
+proc fitV3V4(p: Project, version: int, leftOut: var seq[string]): Project =
+  ## Also what V3 and V4 lack: a map of chars, more than 256 tiles. A tile cell
   ## whose char is past the char set is refused: the cell's colour comes from it.
-  if not p.tileSystem: fail("V4 always has tiles, and this project is a char map")
-  result = p.fitLow(4, dmMulticolourText, leftOut)
-  if result.tiles.len > 256: fail("V4 holds 256 tiles; the project has " & $result.tiles.len)
+  ## V3 has square tiles only: bigger rectangles are cut to a square.
+  let v = "V" & $version
+  if not p.tileSystem: fail(v & " always has tiles, and this project is a char map")
+  result = p.fitLow(version, dmMulticolourText, leftOut)
+  if result.tiles.len > 256: fail(v & " holds 256 tiles; the project has " & $result.tiles.len)
   for i, c in result.map:
-    if c > 255: fail("V4 holds tiles 0 to 255; map cell " & $i & " uses tile " & $c)
+    if c > 255: fail(v & " holds tiles 0 to 255; map cell " & $i & " uses tile " & $c)
+  if version == 3 and result.tileWidth != result.tileHeight:
+    let side = min(result.tileWidth, result.tileHeight)
+    leftOut.add "tile cells past " & $side & " x " & $side & " (V3 has square tiles; the tiles are " &
+                $result.tileWidth & " x " & $result.tileHeight & ")"
+    for t in result.tiles.mitems:
+      var cells = newSeq[uint16](side * side)
+      for y in 0 ..< side:
+        for x in 0 ..< side: cells[y * side + x] = t.cells[y * result.tileWidth + x]
+      t.cells = cells
+    result.tileWidth = side
+    result.tileHeight = side
   for i, t in result.tiles:
     for c in t.cells:
       if c.int >= result.chars.len: fail("tile " & $i & " uses char " & $c & " but there are " & $result.chars.len)
@@ -559,23 +590,35 @@ proc formatV5(p: Project): seq[byte] =
   for c in p.map: w.u16 c
   w.data
 
-proc formatV4(p: Project): seq[byte] =
+proc formatV3V4(p: Project, version: int): seq[byte] =
+  ## V3 has a different header, and no attribute block per char.
   var w: Writer
   for c in "CTM": w.u8 ord(c)
-  w.u8 4
+  w.u8 version
   for i in 0 .. 2: w.u8 p.chipColours[i]
   w.u8 p.colours[0]
   w.u8 ord(p.colouring)
   w.u8 uint8(p.displayMode == dmMulticolourText)
-  w.u16 p.chars.len - 1
-  w.u8 p.tiles.len - 1
-  w.u8 p.tileWidth
-  w.u8 p.tileHeight
-  w.u16 p.mapWidth
-  w.u16 p.mapHeight
-  w.u8 0
-  for i in 0 .. 3: w.u8 0
-  w.writeCharsAndAttribs(p)
+  if version == 3:
+    w.u16 p.mapWidth
+    w.u16 p.mapHeight
+    w.u16 p.chars.len - 1
+    w.u8 p.tiles.len - 1
+    w.u8 p.tileWidth
+    w.u8 0
+    w.u8 0
+    for ch in p.chars:
+      for b in ch.data: w.u8 b
+  else:
+    w.u16 p.chars.len - 1
+    w.u8 p.tiles.len - 1
+    w.u8 p.tileWidth
+    w.u8 p.tileHeight
+    w.u16 p.mapWidth
+    w.u16 p.mapHeight
+    w.u8 0
+    for i in 0 .. 3: w.u8 0
+    w.writeCharsAndAttribs(p)
   for t in p.tiles:
     for c in t.cells: w.u16 c
   for t in p.tiles:
@@ -633,15 +676,15 @@ proc formatV9(p: Project): seq[byte] =
   w.data
 
 proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
-  ## Formats `p` as a .ctm file of version 4 to 9. What the version can't
-  ## hold is left out (see `fit`, `fitLow`, `fitV4`, `fitV8` and `fitV9`), with a line in
+  ## Formats `p` as a .ctm file of version 3 to 9. What the version can't
+  ## hold is left out (see `fit`, `fitLow`, `fitV3V4`, `fitV8` and `fitV9`), with a line in
   ## `leftOut` for each, and so are the colour bytes a display mode doesn't
   ## use (e.g. colour RAM in hires bitmap, screen colours in text modes),
   ## without a line. Raises CtmError on other versions, on projects that don't
-  ## hold together, such as one without chars, and on bitmap modes in V6 and V7 and ECM in V4 to V6, and on char maps and more than 256 tiles in V4.
+  ## hold together, such as one without chars, and on bitmap modes in V6 and V7 and ECM in V3 to V6, and on char maps and more than 256 tiles in V3 and V4.
   p.check
   case version
-  of 4: formatV4(p.fitV4(leftOut))
+  of 3, 4: formatV3V4(p.fitV3V4(version, leftOut), version)
   of 5: formatV5(p.fitLow(5, dmMulticolourText, leftOut))
   of 6: formatV6(p.fitLow(6, dmMulticolourText, leftOut))
   of 7: formatV7(p.fitLow(7, dmEcmText, leftOut))

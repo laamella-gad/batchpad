@@ -27,8 +27,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #8 [feature, low] CharPad CTM V2 reader and writer
   - CharPad 1.7. 9-byte chars (material), byte map.
   - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
-- #10 [feature, low] CharPad CTM V3 reader and writer
-  - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #40 [task, normal] Check what CharPad C16 Pro writes
@@ -54,6 +52,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #10 [feature, low] CharPad CTM V3 reader and writer
+  - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
+  - Done 2026-10-31: `ctm.nim` reads and writes V3 (`parseV3V4`, `formatV3V4`, `fitV3V4`): V4 with its own header and no attribute byte per char. The writer cuts non-square tiles to a square and refuses what V4 refuses. `convert --to ctm3`. Own test files `tests/files/ctm3/` (cut from the ctm4 files); not checked in CharPad, as nothing writes V3.
 - #26 [feature, low] SpritePad 1.3-1.7 `.spr` + `.spr.inf` reader and writer
   - Samples in 1.5 and 1.7. Load/save rules from the decompiled 1.5 exe: `docs/spritepad.md`.
   - Done 2026-10-30: `spd.nim` reads (`parseSpr`, `readSpr`) and writes (`toSpr`) them, project version `sprVersion` (-1). `convert --to spr` writes the `.spr` and `<name>.spr.inf`. Read by extension or `--input-format spr`. As 1.5: the `.inf` counts only when exactly 3 bytes, otherwise colours are 0. Own test files `tests/files/spr/`. Sprite Painter 1.2 (#24) still open: its `.inf` is different.

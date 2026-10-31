@@ -160,7 +160,7 @@ suite "CTM V9":
     q = p
     q.map.add 0
     expect CtmError: discard q.toCtm
-    expect CtmError: discard p.toCtm(version = 3)
+    expect CtmError: discard p.toCtm(version = 2)
 
   test "writer leaves out what doesn't fit":
     let p = readCtm(dir / "mctext_pertile.ctm")
@@ -363,6 +363,70 @@ suite "CTM V5":
     expect CtmError: discard p.toCtm(version = 5)
     p.displayMode = dmMulticolourBitmap
     expect CtmError: discard p.toCtm(version = 5)
+
+suite "CTM V3":
+  const dir = filesDir / "ctm3"
+  const dir4 = filesDir / "ctm4"
+
+  test "same project as V4, apart from the version":
+    for name in ["mctext_pertile.ctm", "hires_pertilecell.ctm", "mctext_expanded.ctm"]:
+      checkpoint name
+      var q = readCtm(dir4 / name)
+      q.version = 3
+      let p = readCtm(dir / name)
+      check p.version == 3
+      check p.tiles == q.tiles and p.map == q.map and p.colouring == q.colouring
+      check p.chars.len == q.chars.len
+      var used: set[uint8]
+      for t in p.tiles:
+        for c in t.cells: used.incl uint8(c)
+      for i, ch in p.chars:
+        check ch.data == q.chars[i].data
+        # V3 has no attribute byte per char, only per tile cell.
+        if uint8(i) in used: check ch.material == q.chars[i].material
+
+  test "writing gives back the same bytes":
+    let name = "mctext_pertile.ctm"
+    check readCtm(dir / name).toCtm(version = 3) == cast[seq[byte]](readFile(dir / name))
+
+  test "writing and reading give back the project":
+    for name in ["hires_pertilecell.ctm", "mctext_expanded.ctm"]:
+      checkpoint name
+      let p = readCtm(dir / name)
+      check parseCtm(p.toCtm(3)) == p
+
+  test "V4 to V3 and back":
+    for name in ["hires_pertilecell.ctm", "mctext_expanded.ctm"]:
+      checkpoint name
+      let p = readCtm(dir4 / name)
+      let q = parseCtm(p.toCtm(3))
+      check q.version == 3 and q.tiles == p.tiles and q.map == p.map
+      check parseCtm(q.toCtm(4)).tiles == p.tiles
+
+  test "square tiles only":
+    var p = readCtm(dir / "mctext_pertile.ctm")
+    p.tileHeight = 3
+    for t in p.tiles.mitems: t.cells = t.cells & @[t.cells[0], t.cells[1]]
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(3, leftOut))
+    check leftOut == @["tile cells past 2 x 2 (V3 has square tiles; the tiles are 2 x 3)"]
+    check q.tileWidth == 2 and q.tileHeight == 2
+    check q.tiles[1].cells == p.tiles[1].cells[0 ..< 4]
+
+  test "errors and refusals":
+    let data = cast[seq[byte]](readFile(dir / "mctext_pertile.ctm"))
+    var bad = data
+    bad[8] = 3                   # colouring
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad[17] = 0                  # tile size
+    expect CtmError: discard parseCtm(bad)
+    expect CtmError: discard parseCtm(data[0 ..< 50])
+    var p = readCtm(filesDir / "ctm7" / "hirestext_perchar_notiles.ctm")
+    expect CtmError: discard p.toCtm(version = 3)
 
 suite "CTM V4":
   const dir = filesDir / "ctm4"
