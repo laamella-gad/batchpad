@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#67**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#72**.
 
 ## Open
 
@@ -51,8 +51,23 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
   - Found by a web search on 2026-10-31; format not looked at yet.
 - #66 [feature, low] Read and write Tiled maps (TMX and JSON)
-  - Many people build C64 game maps in Tiled (mapeditor.org). Read a tile layer into the map (and tile size into the tile system), write one back. Needs a decision on which Tiled features count: several layers, tile properties as tags, external tilesets, encodings (CSV, base64, zlib).
+  - Many people build C64 game maps in Tiled (mapeditor.org). Read a tile layer into the map (and tile size into the tile system), write one back. Needs a decision on which Tiled features count: several layers, tile properties as tags, external tilesets, encodings (CSV, base64, zlib). Consider making the Tiled model leading if it is more flexible than CharPad.
   - Found by a web search on 2026-10-31; the TMX/JSON formats are documented at doc.mapeditor.org.
+- #67 [task, low] Look at Spred64 files and decide on a reader
+  - Spred64 (rrfreelance.itch.io/spred64-c64-sprite-editor) saves sprites as decimal byte data. Find out whether it has a project file of its own, what the text export looks like, and whether it keeps colours and modes.
+  - Found by a web search on 2026-10-31; format not looked at yet.
+- #68 [task, low] Look at Multipaint files and decide on a reader
+  - Multipaint (retro paint program) exports `.prg` bitmaps. We have no bitmap model; the question is whether raw bitmap import (CharPad bitmap modes: bitmap, screen and colour RAM) is enough, or whether it is out of scope.
+  - Found by a web search on 2026-10-31; formats not looked at yet.
+- #69 [task, low] Look at Tilemedo files and decide on a reader
+  - Tilemedo (see blog.retroleum.co.uk) builds game maps from a charset and tiles on the PC. Little is documented: find the project and export formats first.
+  - Found by a web search on 2026-10-31; formats not looked at yet.
+- #70 [task, low] Look at Pixcen files and decide on a reader
+  - Pixcen is a C64 bitmap editor that forums recommend. The searches found nothing on it: find the project and export formats first. Like #68, a bitmap model would be needed.
+  - Found by a web search on 2026-10-31; formats not looked at yet.
+- #71 [task, low] Look at HermIRES files and decide on a reader
+  - HermIRES is a hires bitmap editor that a 2024 community post recommends. Find the project and export formats first. Like #68, a bitmap model would be needed.
+  - Found by a web search on 2026-10-31; formats not looked at yet.
 
 ## In progress
 
