@@ -2,26 +2,10 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#72**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#73**.
 
 ## Open
 
-- #1 [feature, high] Parse CharPad project files (.ctm)
-  - Header, charset, tiles, map, colours.
-  - Umbrella: model #4, per-version readers/writers #6-#23. Specs for V1-V9: `docs/charpad.md`.
-- #2 [feature, high] Parse SpritePad project files (.spd)
-  - Sprite data, colours, animations.
-  - Umbrella: model #5, per-version readers/writers #24-#39. Specs for all formats: `docs/spritepad.md`.
-- #3 [task, normal] Decide output artifact formats and CLI options
-  - Which outputs (raw binary, assembler includes, ...) and which assemblers to target.
-  - CLI arguments: see #55.
-- #4 [feature, high] Shared in-memory model for all CharPad formats
-  - One model every CTM reader fills and every writer reads: chars, materials, colours (per project/tile/char, 1-3 per item for bitmap modes), tiles, tags, names, map, display mode, V9 extras.
-  - Readers convert older layouts into it (V1-V4 tile-cell colours, V2 9-byte chars, expanded char sets); writers leave out what the target version can't hold, with no error.
-- #5 [feature, high] Shared in-memory model for all SpritePad formats
-  - One model every SpritePad reader fills and every writer reads: sprites with 64th-byte attributes, colours, tiles with attributes/tags/names, sprite and tile animations, overlay distances.
-  - Keep unused bits of the 64th byte for round trips; writers leave out what the target format can't hold, with no error.
-  - Started: `SpriteProject` in `src/batchpad/spd.nim` (#38), filled by the V5 reader. Keeps the 64th byte and the tile and animation attribute bytes as stored.
 - #6 [feature, low] CharPad CTM V1 reader and writer
   - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
@@ -68,11 +52,38 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #71 [task, low] Look at HermIRES files and decide on a reader
   - HermIRES is a hires bitmap editor that a 2024 community post recommends. Find the project and export formats first. Like #68, a bitmap model would be needed.
   - Found by a web search on 2026-10-31; formats not looked at yet.
+- #72 [feature, normal] BMP export and import
+  - BMP as the lowest common denominator picture format of the PC platform. Asked for 2026-10-31; not started.
+  - Export: a `bmp` command next to `png` (same parts, `--palette`, `--scale`, `--columns`): uncompressed 8 bit BMP with a 16 colour palette, rows padded to 4 bytes, bottom row first. Share the code with `png` in `cli.nim`.
+  - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
+  - Colours: the shared colours (`bg0`-`bg2`, or `bg`, `mc1`, `mc2`) come from `--set` or else the most used colours of the picture. Each cell takes the cheapest fit (least colour distance) of its own colour and, in multicolour, hires or multicolour (sprites: per sprite). Text modes and sprites first; ECM and bitmap modes later.
+  - Needs: tests with BMPs we build ourselves (round trip through `bmp`), `docs/cli.md`, `docs/import-export.md`, CLAUDE.md.
 
 ## In progress
 
 ## Closed
 
+- #1 [feature, high] Parse CharPad project files (.ctm)
+  - Header, charset, tiles, map, colours.
+  - Umbrella: model #4, per-version readers/writers #6-#23. Specs for V1-V9: `docs/charpad.md`.
+  - Done 2026-10-31: readers and writers for CTM V2 to V9 in `ctm.nim` (V1 is #6).
+- #2 [feature, high] Parse SpritePad project files (.spd)
+  - Sprite data, colours, animations.
+  - Umbrella: model #5, per-version readers/writers #24-#39. Specs for all formats: `docs/spritepad.md`.
+  - Done 2026-10-31: readers and writers for SPD V0 to V5 and `.spr` in `spd.nim` (Sprite Painter 1.2 is #24).
+- #3 [task, normal] Decide output artifact formats and CLI options
+  - Which outputs (raw binary, assembler includes, ...) and which assemblers to target.
+  - CLI arguments: see #55.
+  - Done 2026-10-31: raw binary, assembler, C, PNG and GIF previews, stats and import exist; see `docs/cli.md`. Further formats have their own issues.
+- #4 [feature, high] Shared in-memory model for all CharPad formats
+  - One model every CTM reader fills and every writer reads: chars, materials, colours (per project/tile/char, 1-3 per item for bitmap modes), tiles, tags, names, map, display mode, V9 extras.
+  - Readers convert older layouts into it (V1-V4 tile-cell colours, V2 9-byte chars, expanded char sets); writers leave out what the target version can't hold, with no error.
+  - Done 2026-10-31: `Project` in `ctm.nim`, filled by all CTM readers.
+- #5 [feature, high] Shared in-memory model for all SpritePad formats
+  - One model every SpritePad reader fills and every writer reads: sprites with 64th-byte attributes, colours, tiles with attributes/tags/names, sprite and tile animations, overlay distances.
+  - Keep unused bits of the 64th byte for round trips; writers leave out what the target format can't hold, with no error.
+  - Started: `SpriteProject` in `src/batchpad/spd.nim` (#38), filled by the V5 reader. Keeps the 64th byte and the tile and animation attribute bytes as stored.
+  - Done 2026-10-31: `SpriteProject` in `spd.nim`, filled by all SPD readers.
 - #8 [feature, low] CharPad CTM V2 reader and writer
   - CharPad 1.7. 9-byte chars (material), byte map.
   - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
