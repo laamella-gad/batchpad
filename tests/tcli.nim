@@ -49,7 +49,7 @@ suite "command line":
     let src = files / "ctm9" / "mctext_pertile.ctm"
     check batchpad("convert", src, tmp / "a.ctm", "--to", "ctm7")[0] == 0
     check readCtm(tmp / "a.ctm").version == 7
-    for v in [3, 4, 5, 6, 8]:
+    for v in [2, 3, 4, 5, 6, 8]:
       check batchpad("convert", src, tmp / "v.ctm", "--to", "ctm" & $v)[0] == 0
       check readCtm(tmp / "v.ctm").version == v
     check batchpad("convert", src, tmp / "a8.ctm", "--to", "ctm8")[0] == 0

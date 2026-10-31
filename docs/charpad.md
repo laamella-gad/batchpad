@@ -254,13 +254,22 @@ reader of ours should follow the spec, but these are the cases to test.
   Pro after loading ours can differ in those header bytes only (seen with
   `tests/files/ctm9/mctext_pertile.ctm`: 14, 0, 0 came back as 3, 8, 7).
 
-## How we read and write V3, V4 and V5
+## How we read and write V2 to V5
 
 - **V4 reader:** colour (method 2) and material are per tile cell in the file,
   but per char in our model. A char used with another colour or material gets
   a copy (added at the end of the set), and the tile cell points at the copy;
   method 2 becomes per char. The per-char attribute block only supplies chars
   no tile cell uses. CHAREX files get their tile data made up.
+- **V2:** the 9th char byte is the material, whole (in all 25 samples it is
+  0 to 3, or 0 for every char). Colouring is per project or per tile; a method
+  of 2 counts as per project, above 2 is an error. Tile colour bytes are cut
+  to the low nibble (two SEUCK samples have bit 4 and more set in some). Tile
+  size 1 (a char map in CharPad's eyes) stays a tile system of 1 x 1 tiles.
+  The writer refuses char maps and more than 256 tiles like V4, cuts
+  non-square tiles to a square, and turns colouring per char into per project
+  (reported). Of the 25 distinct samples of CharPad 1.7, 23 write back byte
+  for byte; the other two differ in the masked tile colour bits.
 - **V3:** read and written as V4 with its own header (the map size first, one
   square tile size) and no attribute byte per char, so chars no tile cell
   uses keep material 0. The writer cuts non-square tiles to a square

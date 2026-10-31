@@ -160,7 +160,7 @@ suite "CTM V9":
     q = p
     q.map.add 0
     expect CtmError: discard q.toCtm
-    expect CtmError: discard p.toCtm(version = 2)
+    expect CtmError: discard p.toCtm(version = 1)
 
   test "writer leaves out what doesn't fit":
     let p = readCtm(dir / "mctext_pertile.ctm")
@@ -363,6 +363,52 @@ suite "CTM V5":
     expect CtmError: discard p.toCtm(version = 5)
     p.displayMode = dmMulticolourBitmap
     expect CtmError: discard p.toCtm(version = 5)
+
+suite "CTM V2":
+  const dir = filesDir / "ctm2"
+  const dir4 = filesDir / "ctm4"
+
+  test "same project as V4, apart from the version":
+    for name in ["mctext_pertile.ctm", "mctext_expanded.ctm"]:
+      checkpoint name
+      var q = readCtm(dir4 / name)
+      q.version = 2
+      check readCtm(dir / name) == q
+
+  test "writing gives back the same bytes":
+    for name in ["mctext_pertile.ctm", "mctext_expanded.ctm"]:
+      checkpoint name
+      check readCtm(dir / name).toCtm(version = 2) == cast[seq[byte]](readFile(dir / name))
+
+  test "V4 to V2 and back":
+    let p = readCtm(filesDir / "ctm4" / "hires_pertilecell.ctm")
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(2, leftOut))
+    check leftOut == @["the colours of the chars (V2 has per project and per tile)"]
+    check q.version == 2 and q.colouring == cmPerProject
+    check q.tiles == p.tiles and q.map == p.map
+
+  test "tile colours are cut to the low nibble, method 2 is an error":
+    var data = cast[seq[byte]](readFile(dir / "mctext_pertile.ctm"))
+    let p = readCtm(dir / "mctext_pertile.ctm")
+    data[data.len - p.mapWidth * p.mapHeight - p.tiles.len] = 0x1b
+    check parseCtm(data).tiles[0].colours[0] == 0x0b
+    data[8] = 2
+    expect CtmError: discard parseCtm(data[0 ..< data.len - 1])
+    data[8] = 3
+    expect CtmError: discard parseCtm(data)
+
+  test "errors and refusals":
+    let data = cast[seq[byte]](readFile(dir / "mctext_pertile.ctm"))
+    var bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad[17] = 0                  # tile size
+    expect CtmError: discard parseCtm(bad)
+    expect CtmError: discard parseCtm(data[0 ..< 50])
+    var p = readCtm(filesDir / "ctm7" / "hirestext_perchar_notiles.ctm")
+    expect CtmError: discard p.toCtm(version = 2)
 
 suite "CTM V3":
   const dir = filesDir / "ctm3"

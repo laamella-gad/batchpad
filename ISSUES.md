@@ -24,9 +24,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Started: `SpriteProject` in `src/batchpad/spd.nim` (#38), filled by the V5 reader. Keeps the 64th byte and the tile and animation attribute bytes as stored.
 - #6 [feature, low] CharPad CTM V1 reader and writer
   - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
-- #8 [feature, low] CharPad CTM V2 reader and writer
-  - CharPad 1.7. 9-byte chars (material), byte map.
-  - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #40 [task, normal] Check what CharPad C16 Pro writes
@@ -52,6 +49,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #8 [feature, low] CharPad CTM V2 reader and writer
+  - CharPad 1.7. 9-byte chars (material), byte map.
+  - Colouring method 0 or 1 only: CharPad 1.7 can't write method 2, so the Pro spec's per-tile-cell block never occurs (#52). Treat method 2 as per project, like Pro.
+  - Done 2026-10-31: `ctm.nim` reads and writes V2 (`parseV2`, `formatV2`, `fitV3V4`). Method 2 counts as per project; tile size 1 stays a 1 x 1 tile system. All 25 distinct V2 samples of CharPad 1.7 read, 23 write back byte for byte (two differ in tile colour bits above the low nibble, masked as Pro does). `convert --to ctm2`. Own test files `tests/files/ctm2/`.
 - #10 [feature, low] CharPad CTM V3 reader and writer
   - CharPad 1.8 before Rev 3. No samples; expanded char set omits tile data. Pro, Free 2.86 and Glaze have no V3 loader either.
   - Done 2026-10-31: `ctm.nim` reads and writes V3 (`parseV3V4`, `formatV3V4`, `fitV3V4`): V4 with its own header and no attribute byte per char. The writer cuts non-square tiles to a square and refuses what V4 refuses. `convert --to ctm3`. Own test files `tests/files/ctm3/` (cut from the ctm4 files); not checked in CharPad, as nothing writes V3.
