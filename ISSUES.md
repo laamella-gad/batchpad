@@ -22,10 +22,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; `$3f`, 9 x `$ff`. Layout in `docs/import-export.md`.
   - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
   - CharPad 1.7 also wrote backgrounds for the "sideways SEUCK mod" (819 x 5 map), same file layout with the map bytes reordered; see docs/import-export.md. The file doesn't say which kind it is, so this needs an option.
-- #59 [task, normal] Find out how CharPad stores ECM chars 64 and up
-  - ECM shows only 64 shapes; CharPad Pro treats chars 64-255 as copies of chars 0-63 in the other three background colour banks, each with its own colour and material (3.88 help, "ECM Mode Tips"). Pixel edits and transforms on char 64+ go to char & 63.
-  - Open: does a saved CTM hold the same 8 bytes for char n and n & 63, or the char's own (possibly stale) data? What happens with more than 256 chars? Matters for char set exports and for what our readers and writers should do with ECM projects.
-  - Check with a CharPad Pro 3.88 ECM project of more than 64 chars, saved after editing a char in the first bank, and in the decompiled code (`Form_CPV_CharEdit`, the set operations).
 - #64 [feature, normal] Read and write Spritemate `.spm` sprite projects
   - Spritemate (browser sprite editor, github.com/Esshahn/spritemate) saves JSON `.spm`. It already exports SpritePad `.spd` (V2 and 1.8.1 headerless), so only `.spm` is new. Check the format against its source before writing: sprite data, colours, overlay, double width/height, animations if any.
   - Found by a web search on 2026-10-31; format not looked at yet.
@@ -50,7 +46,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #71 [task, low] Look at HermIRES files and decide on a reader
   - HermIRES is a hires bitmap editor that a 2024 community post recommends. Find the project and export formats first. Like #68, a bitmap model would be needed.
   - Found by a web search on 2026-10-31; formats not looked at yet.
-- #72 [feature, normal] BMP export and import
+- #72 [feature, low] BMP export and import
   - BMP as the lowest common denominator picture format of the PC platform. Asked for 2026-10-31; not started.
   - Export: a `bmp` command next to `png` (same parts, `--palette`, `--scale`, `--columns`): uncompressed 8 bit BMP with a 16 colour palette, rows padded to 4 bytes, bottom row first. Share the code with `png` in `cli.nim`.
   - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
@@ -61,6 +57,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #59 [task, normal] Find out how CharPad stores ECM chars 64 and up
+  - ECM shows only 64 shapes; CharPad Pro treats chars 64-255 as copies of chars 0-63 in the other three background colour banks, each with its own colour and material (3.88 help, "ECM Mode Tips"). Pixel edits and transforms on char 64+ go to char & 63.
+  - Open: does a saved CTM hold the same 8 bytes for char n and n & 63, or the char's own (possibly stale) data? What happens with more than 256 chars? Matters for char set exports and for what our readers and writers should do with ECM projects.
+  - Check with a CharPad Pro 3.88 ECM project of more than 64 chars, saved after editing a char in the first bank, and in the decompiled code (`Form_CPV_CharEdit`, the set operations).
+  - Done 2026-10-31: the stored bytes of chars 64+ are not authoritative (CharPad edits only char & 63; the 17 ECM samples hold mostly blank bytes there, some copies, a few stale shapes). No code change needed: readers and writers keep them, drawing uses char & 63. Details in `docs/charpad.md` ("ECM chars 64 and up"). Decompiled CharPad Pro 3.88 confirms it: `CPV_ECM_Splitter` splits the set into banks of 64, applies insert/delete/paste per bank and pads or trims each bank to 64; save and export have no ECM special case (chars written as stored).
 - #6 [feature, low] CharPad CTM V1 reader and writer
   - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
   - Done 2026-10-31: `ctm.nim` reads and writes V1 (`parseV1`, `formatV1`; `readCellAttributes` is shared with V3/V4, `fitV3V4` takes version 1). Per tile cell colours become per char with copies, as in V4; the writer turns them back, and chars past 256 go back to the first char of the same shape. All three CharPad 1.0 samples write back byte for byte. `convert --to ctm1`. Own test files `tests/files/ctm1/`.

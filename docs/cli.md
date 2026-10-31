@@ -342,7 +342,7 @@ Colours, as the C64 shows them:
 | --- | --- |
 | hires text | bit 1 colour of the cell, 0 `$d021` |
 | multicolour text | colour 0-7: as hires. 8-15: `00` `$d021`, `01` `$d022`, `10` `$d023`, `11` the colour minus 8 |
-| ECM text | as hires, with the background `$d021`-`$d024` by the char number / 64; the shape is char & 63 (see #59) |
+| ECM text | as hires, with the background `$d021`-`$d024` by the char number / 64; the shape is char & 63: the bytes of chars 64 and up aren't used, see `docs/charpad.md` |
 | hires bitmap | bit 1 the high nibble of the cell's screen colour (`vmx-hi`), 0 the low one (`vmx-lo`) |
 | multicolour bitmap | `00` `$d021`, `01` high nibble, `10` low nibble, `11` the cell's colour |
 | sprite | hires: bit 1 the sprite's colour, 0 the project background. Multicolour: `00` background, `01` multicolour 1, `10` the sprite's colour, `11` multicolour 2 |

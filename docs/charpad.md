@@ -294,6 +294,42 @@ reader of ours should follow the spec, but these are the cases to test.
 - Checked on the V4 and V5 samples of the CharPad 1.8 and 2.x downloads: all
   read; V5 writes back byte for byte (apart from unused tile size fields).
 
+## ECM chars 64 and up
+
+Settled 2026-10-31 (#59), from the help ("ECM Mode Tips", "Form - Character
+Set"), the dev log, all ECM samples and the decompiled CharPad Pro 3.88
+(`CharPadC64Pro_NET.exe`): `CPV_ECM_Splitter` cuts the char set into banks of 64,
+runs insert/delete/paste on each bank and `Combine` trims or pads every bank
+to exactly 64 chars. Nothing in the project save or export code treats ECM
+specially, so chars 64 and up are written as stored.
+
+- **The model.** ECM shows 64 shapes. CharPad treats the set as four banks of
+  64 chars, bank *b* being the background colour `$d021 + b`: char *n* has the
+  shape of char *n* & 63 and background *n* >> 6. Every char still has its own
+  colour (and material). The help says CharPad "supports any number of images
+  but only 64 shapes max", and sees no use for more than 256. A cell holds
+  8 bits, so only chars 0 to 255 can be shown.
+- **The stored bytes of chars 64 and up are not authoritative.** Pixel edits
+  and transforms go to char *n* & 63 only (dev log: "transforms ... translate the
+  selection to be within the first 64"; before that they had no visible effect
+  on chars above 63, as their "real" images are hidden). So nothing keeps the
+  bytes in step, and a file holds whatever was there.
+- **What the files hold.** 17 distinct ECM files (V7 and V9, every one of the
+  774 distinct readable samples that is ECM; all have exactly 256 chars). Of
+  the chars from 64 up that a tile or the map uses, most are all-zero bytes
+  (e.g. all 56 in `ECM Icon Samples`, all 90 in `Transitions 1`), some are
+  copies of char *n* & 63, and a few hold other shapes: only the two
+  third-party `Astrid - TEC` and `Outdoors - TEC` files have non-blank
+  differing ones (10 and 12 used ones). Colours of chars 64 and up do differ
+  from those of char *n* & 63 (the point of the model); materials never did.
+- **What we do.** Readers keep the stored bytes, writers write them back, so
+  round trips are exact. Whatever draws a char (`png`, `gif`) uses the shape
+  of char & 63 and the background of char >> 6. Exports (`bin`, `asm`, `c`)
+  write the set as stored, as CharPad's own export does; a C64 program only
+  fetches the first 64 shapes (512 bytes of the charset) so the rest is
+  harmless. Nothing in our code reads the bytes of chars 64 and up as a shape.
+  Converting a project to or from ECM doesn't change them either.
+
 ## CharPad C16 (`.ctt`)
 
 CharPad C64 Pro 3.88 opens CharPad C16 projects and converts them
