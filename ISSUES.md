@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#64**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#67**.
 
 ## Open
 
@@ -44,6 +44,15 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - ECM shows only 64 shapes; CharPad Pro treats chars 64-255 as copies of chars 0-63 in the other three background colour banks, each with its own colour and material (3.88 help, "ECM Mode Tips"). Pixel edits and transforms on char 64+ go to char & 63.
   - Open: does a saved CTM hold the same 8 bytes for char n and n & 63, or the char's own (possibly stale) data? What happens with more than 256 chars? Matters for char set exports and for what our readers and writers should do with ECM projects.
   - Check with a CharPad Pro 3.88 ECM project of more than 64 chars, saved after editing a char in the first bank, and in the decompiled code (`Form_CPV_CharEdit`, the set operations).
+- #64 [feature, normal] Read and write Spritemate `.spm` sprite projects
+  - Spritemate (browser sprite editor, github.com/Esshahn/spritemate) saves JSON `.spm`. It already exports SpritePad `.spd` (V2 and 1.8.1 headerless), so only `.spm` is new. Check the format against its source before writing: sprite data, colours, overlay, double width/height, animations if any.
+  - Found by a web search on 2026-10-31; format not looked at yet.
+- #65 [feature, normal] Read and write Petmate `.petmate` screen projects
+  - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
+  - Found by a web search on 2026-10-31; format not looked at yet.
+- #66 [feature, low] Read and write Tiled maps (TMX and JSON)
+  - Many people build C64 game maps in Tiled (mapeditor.org). Read a tile layer into the map (and tile size into the tile system), write one back. Needs a decision on which Tiled features count: several layers, tile properties as tags, external tilesets, encodings (CSV, base64, zlib).
+  - Found by a web search on 2026-10-31; the TMX/JSON formats are documented at doc.mapeditor.org.
 
 ## In progress
 
