@@ -1,4 +1,4 @@
-# batchpad
+# BatchPad
 
 Command-line tool that converts CharPad and SpritePad project files into
 artifacts (e.g. binary data, source includes) that can be consumed by build
