@@ -305,6 +305,39 @@ From the decompiled exe (native Borland C++ Builder; Ghidra 12.1.4,
   palette counts only when all 16 colours parse.
 - **Save Bitmap:** a `.bmp` of the sprites; not looked at.
 
+## Spritemate `.spm`
+
+[Spritemate](https://github.com/Esshahn/spritemate) is a browser sprite editor
+by Esshahn (MIT). Layout from its source (`Save.ts`, `Load.ts`,
+`SpriteTypes.ts`, release 26.07.29) and its five example projects; not looked
+at in the program itself. It saves JSON:
+
+```
+{"version": "26.07.29", "filename": "...",
+ "colors": {"0": 11, "2": 8, "3": 6},        // background, multicolour 1, multicolour 2
+ "sprites": [{"name": "sprite1", "color": 1,  // sprite colour
+              "multicolor": true, "double_x": false, "double_y": false, "overlay": false,
+              "pixels": [[0, 0, 2, 2, ...] ...]}], // 21 rows of 24 pens
+ "current_sprite": 0, "pen": 1, "animation": {...}}
+```
+
+- Colours are C64 palette numbers 0 to 15, in the usual order.
+- Pens: 0 background, 1 sprite colour, 2 multicolour 1, 3 multicolour 2. A
+  multicolour sprite still has 24 entries per row, each pen twice; the saver reads
+  every second one. A single-colour sprite has 0 and 1 only. The pens map to
+  SPD bit pairs as 0 = `00`, 1 = `10`, 2 = `01`, 3 = `11`, the same as SpritePad.
+- Older Spritemates keyed `colors` and wrote pens as `"t"`, `"i"`, `"m1"`,
+  `"m2"`, and had no sprite `name`; the loader maps them to the numbers.
+- Spritemate has no tiles. Its animation settings (a frame range, fps, mode)
+  and the drawing pen aren't kept. Sprite names aren't either (written as
+  `spriteN`).
+- Spritemate itself saves `.spd` too (the new format as SPD V1, version byte
+  `1`, and the 1.8 headerless one) and loads `.spd`, `.spr` and `.spm`.
+
+We read and write it as a sprite project (`src/batchpad/spm.nim`, `tests/tspm.nim`):
+`convert in.spm out.spd`, `convert in.spd out.spm`. The version of a project read
+from it is -2.
+
 ## From earlier projects
 
 - A game's sprite data is usually 64-byte blocks from the VIC bank, numbered by

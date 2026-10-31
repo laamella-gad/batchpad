@@ -89,6 +89,17 @@ suite "command line":
     check readSpr(tmp / "o.spr").version == sprVersion
     check batchpad("convert", src, "-", "--to", "spr")[0] == 1
 
+  test "Spritemate .spm":
+    let src = files / "spm" / "sprites.spm"
+    let (code, text) = batchpad("info", src)
+    check code == 0 and "sprites: 6" in text
+    check batchpad("convert", src, tmp / "m.spd")[0] == 0
+    check readFile(tmp / "m.spd") == readFile(files / "spd5" / "sprites.spd")
+    check batchpad("convert", files / "spd5" / "sprites.spd", tmp / "m.spm")[0] == 0
+    check batchpad("convert", tmp / "m.spm", tmp / "m2.spd")[0] == 0
+    check readFile(tmp / "m2.spd") == readFile(files / "spd5" / "sprites.spd")
+    check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "m.spm")[0] == 1
+
   test "convert to spd3 and spd4":
     for v in [3, 4]:
       check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0

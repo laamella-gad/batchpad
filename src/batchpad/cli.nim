@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, cout, ctm, image, preview, rawbin, rawimport, spd, stats
+import asmout, cout, ctm, image, preview, rawbin, rawimport, spd, spm, stats
 
 type
   CliError* = object of CatchableError
@@ -40,17 +40,20 @@ proc readInput(path, format: string): Input =
   let kind =
     case format
     of "ctm": kCtm
-    of "spd", "spr": kSpd
+    of "spd", "spr", "spm": kSpd
     of "":
       if data.startsWith("CTM"): kCtm
-      elif data.startsWith("SPD") or path.toLowerAscii.endsWith(".spr"): kSpd
+      elif data.startsWith("SPD") or path.toLowerAscii.endsWith(".spr") or
+           path.toLowerAscii.endsWith(".spm"): kSpd
       elif data.len >= 67 and (data.len - 3) mod 64 == 0: kSpd  # headerless, SpritePad 1.8
       else: fail("not a CharPad or SpritePad project")
     else: fail("unknown input format: " & format)
   case kind
   of kCtm: Input(kind: kCtm, ctm: parseCtm(data.toOpenArrayByte(0, data.high)))
   of kSpd:
-    if format == "spr" or format == "" and path.toLowerAscii.endsWith(".spr"):
+    if format == "spm" or format == "" and path.toLowerAscii.endsWith(".spm"):
+      Input(kind: kSpd, spd: parseSpm(data))
+    elif format == "spr" or format == "" and path.toLowerAscii.endsWith(".spr"):
       if path == "-": fail("a .spr needs a file name, to find its .inf")
       Input(kind: kSpd, spd: readSpr(path))
     else:
@@ -177,7 +180,11 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
          of ".ctm": "ctm9"
          of ".spd": "spd5"
          of ".spr": "spr"
+         of ".spm": "spm"
          else: fail("can't tell the output format from " & path & "; use --to")
+  if to == "spm":
+    if input.kind != kSpd: fail("can't convert a CTM project to spm")
+    return @[Output(path: path, data: input.spd.toSpm(leftOut))]
   if to == "spr":
     if input.kind != kSpd: fail("can't convert a CTM project to spr")
     if path == "-": fail("a .spr needs a file name, to write its .inf next to it")
@@ -328,7 +335,7 @@ proc parseOrg(specs: seq[string]): seq[(string, int)] =
     result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
 
 template common() =
-  option("--input-format", choices = @["ctm", "spd", "spr"], help = "Format of the input, if not detected")
+  option("--input-format", choices = @["ctm", "spd", "spr", "spm"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
   flag("--quiet", help = "Hides warnings about what is left out")
   flag("--strict", help = "Makes those warnings errors")
@@ -339,12 +346,12 @@ let parser = newParser("batchpad"):
   flag("--version", shortcircuit = true, help = "Prints the version")
   command("info"):
     help("Prints what a project holds")
-    option("--input-format", choices = @["ctm", "spd", "spr"], help = "Format of the input, if not detected")
+    option("--input-format", choices = @["ctm", "spd", "spr", "spm"], help = "Format of the input, if not detected")
     flag("--json", help = "Prints JSON")
     arg("input")
   command("convert"):
     help("Writes the project in another project format")
-    option("--to", help = "ctm1 to ctm9, spd0 to spd5 or spr; default from the output's extension")
+    option("--to", help = "ctm1 to ctm9, spd0 to spd5, spr or spm; default from the output's extension")
     common()
     arg("input")
     arg("output")

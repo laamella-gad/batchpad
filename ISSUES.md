@@ -22,9 +22,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; `$3f`, 9 x `$ff`. Layout in `docs/import-export.md`.
   - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
   - CharPad 1.7 also wrote backgrounds for the "sideways SEUCK mod" (819 x 5 map), same file layout with the map bytes reordered; see docs/import-export.md. The file doesn't say which kind it is, so this needs an option.
-- #64 [feature, normal] Read and write Spritemate `.spm` sprite projects
-  - Spritemate (browser sprite editor, github.com/Esshahn/spritemate) saves JSON `.spm`. It already exports SpritePad `.spd` (V2 and 1.8.1 headerless), so only `.spm` is new. Check the format against its source before writing: sprite data, colours, overlay, double width/height, animations if any.
-  - Found by a web search on 2026-10-31; format not looked at yet.
 - #65 [feature, normal] Read and write Petmate `.petmate` screen projects
   - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
   - Found by a web search on 2026-10-31; format not looked at yet.
@@ -57,6 +54,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #64 [feature, normal] Read and write Spritemate `.spm` sprite projects
+  - Done 2026-10-31, `src/batchpad/spm.nim`, `tests/tspm.nim`, `tests/files/spm/`: reads and writes `.spm` as a sprite project (`convert in.spm out.spd`, `convert in.spd out.spm`, `--input-format spm`). Kept: sprites (pixels, colour, multicolour, expansion, overlay) and the three shared colours; old Spritemates' `t`/`i`/`m1`/`m2` names read too. Not kept: sprite names, drawing pen, animation settings; tiles and animations of a SPD are left out on writing. Layout from Spritemate's source and its five examples (all round trip through SPD unchanged); not opened in Spritemate itself. Note: Spritemate's own `.spd` export is SPD V1, not V2. Details in `docs/spritepad.md`.
 - #59 [task, normal] Find out how CharPad stores ECM chars 64 and up
   - ECM shows only 64 shapes; CharPad Pro treats chars 64-255 as copies of chars 0-63 in the other three background colour banks, each with its own colour and material (3.88 help, "ECM Mode Tips"). Pixel edits and transforms on char 64+ go to char & 63.
   - Open: does a saved CTM hold the same 8 bytes for char n and n & 63, or the char's own (possibly stale) data? What happens with more than 256 chars? Matters for char set exports and for what our readers and writers should do with ECM projects.
