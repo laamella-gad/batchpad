@@ -51,7 +51,7 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 | `import` | Builds a project from raw binary parts | #42, #54 |
 
 The input type comes from its contents, not its extension: CTM, SPD,
-headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), SEUCK
+headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)), SEUCK
 `.A` or `.B`. `--input-format` forces it (needed for the sideways SEUCK `.B`,
 which looks the same as the normal one).
 
@@ -92,6 +92,15 @@ SpritePad:
 | `tile-names` | names (asm and C only) |
 | `sprite-anims` | four lists: first frames, last frames, timers, attributes; frames as `--cells` says (8 or `word` only) |
 | `tile-anims` | the same for tile animations |
+
+Tiled maps (`bin`, `asm`, `c` only; details in [tiled.md](tiled.md)):
+
+| Part | Contents |
+| --- | --- |
+| `map`, `map:NAME` | tile numbers of a tile layer (the first, or `--set layer=`; or the one named) |
+| `map-flags`, `map-flags:NAME` | flip flags per cell: bit 7 horizontal, 6 vertical, 5 diagonal |
+| `tile-tags` | property `tag` per tile of the tileset |
+| `tile-names` | tile classes (asm and C only) |
 
 Cell parts (`tiles`, `map`, `submaps` and SpritePad `tiles`) in 12- or 16-bit
 split form are two files: `map-lo` and `map-hi`. For 12 bit, `map-hi` holds the
@@ -169,6 +178,14 @@ SpritePad:
 | `sprite-overlay`, `tile-overlay` | overlay distances, -32768 to 32767 |
 | `tiles` | `off` |
 
+Tiled maps:
+
+| Name | Values |
+| --- | --- |
+| `layer` | name of the tile layer `map` uses |
+| `tileset` | name of the tileset tile numbers count in |
+| `empty-tile` | tile number of an empty cell, 0-65535 |
+
 ## Commands
 
 ### info
@@ -191,7 +208,7 @@ batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `spd1`, `spd2`, `spd3`, `spd4`,
+`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `tmx` and `tiled-json` (Tiled maps, from each other only), `spd1`, `spd2`, `spd3`, `spd4`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 

@@ -2,19 +2,20 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, cout, ctm, image, preview, rawbin, rawimport, spd, spm, stats
+import asmout, cout, ctm, image, preview, rawbin, rawimport, spd, spm, stats, tiled, tiledbin
 
 type
   CliError* = object of CatchableError
     ## An error in the input or a refusal: exit code 1.
 
   Kind = enum
-    kCtm, kSpd
+    kCtm, kSpd, kTiled
 
   Input = object
     case kind: Kind
     of kCtm: ctm: ctm.Project
     of kSpd: spd: SpriteProject
+    of kTiled: tiled: TiledMap
 
   Output = object
     path: string
@@ -41,8 +42,13 @@ proc readInput(path, format: string): Input =
     case format
     of "ctm": kCtm
     of "spd", "spr", "spm": kSpd
+    of "tmx", "tiled-json": kTiled
     of "":
+      let lower = path.toLowerAscii
       if data.startsWith("CTM"): kCtm
+      elif lower.endsWith(".tmx") or lower.endsWith(".tmj") or
+           (data.strip.startsWith("<") and "<map" in data) or
+           (lower.endsWith(".json") and data.strip.startsWith("{") and "\"layers\"" in data): kTiled
       elif data.startsWith("SPD") or path.toLowerAscii.endsWith(".spr") or
            path.toLowerAscii.endsWith(".spm"): kSpd
       elif data.len >= 67 and (data.len - 3) mod 64 == 0: kSpd  # headerless, SpritePad 1.8
@@ -50,6 +56,9 @@ proc readInput(path, format: string): Input =
     else: fail("unknown input format: " & format)
   case kind
   of kCtm: Input(kind: kCtm, ctm: parseCtm(data.toOpenArrayByte(0, data.high)))
+  of kTiled:
+    let xml = format == "tmx" or format == "" and data.strip.startsWith("<")
+    Input(kind: kTiled, tiled: if xml: parseTmx(data) else: parseTiledJson(data))
   of kSpd:
     if format == "spm" or format == "" and path.toLowerAscii.endsWith(".spm"):
       Input(kind: kSpd, spd: parseSpm(data))
@@ -114,6 +123,16 @@ proc applySet(p: var SpriteProject, name, value: string) =
     p.tileAnims = @[]
   else: fail("unknown SpritePad setting: " & name)
 
+proc applySet(t: var TiledMap, name, value: string) =
+  case name
+  of "layer": t.layerName = value
+  of "tileset": t.tilesetName = value
+  of "empty-tile":
+    let n = try: parseInt(value) except ValueError: -1
+    if n notin 0 .. 0xffff: fail("empty-tile must be 0 to 65535, not " & value)
+    t.emptyTile = n
+  else: fail("unknown Tiled setting: " & name)
+
 proc applySets(input: var Input, sets: seq[string]) =
   for s in sets:
     let eq = s.find('=')
@@ -122,6 +141,7 @@ proc applySets(input: var Input, sets: seq[string]) =
     case input.kind
     of kCtm: input.ctm.applySet(name, value)
     of kSpd: input.spd.applySet(name, value)
+    of kTiled: input.tiled.applySet(name, value)
 
 proc toStr(data: seq[byte]): string =
   result = newString(data.len)
@@ -135,6 +155,28 @@ proc writeOutputs(outputs: seq[Output], alwaysWrite: bool, output: Stream) =
     elif alwaysWrite or not fileExists(o.path) or readFile(o.path) != o.data:
       try: writeFile(o.path, o.data)
       except IOError as e: fail(e.msg)
+
+proc tiledInfo(t: TiledMap): JsonNode =
+  var layers = newJArray()
+  var flipped = false
+  var empty = 0
+  for l in t.layers:
+    case l.kind
+    of lkTiles:
+      layers.add %*{"name": l.name, "kind": "tiles", "width": l.width, "height": l.height}
+      for g in l.gids:
+        if g == 0: inc empty
+        if (g and (flipH or flipV or flipD)) != 0: flipped = true
+    of lkObjects:
+      layers.add %*{"name": l.name, "kind": "objects", "objects": l.objects.len}
+  var sets = newJArray()
+  for ts in t.tilesets:
+    sets.add %*{"name": ts.name, "firstGid": ts.firstGid, "tiles": ts.tileCount,
+                "image": ts.image, "external": ts.source}
+  result = %*{"format": "tiled", "version": t.version, "width": t.width, "height": t.height,
+              "tileWidth": t.tileWidth, "tileHeight": t.tileHeight, "infinite": t.infinite,
+              "tilesets": sets, "layers": layers, "emptyCells": empty, "flippedCells": flipped}
+  if t.skipped.len > 0: result["skipped"] = %t.skipped
 
 proc info(input: Input): JsonNode =
   case input.kind
@@ -158,6 +200,8 @@ proc info(input: Input): JsonNode =
           result["subMapsAcross"] = %s.across
           result["subMapsDown"] = %s.down
         except BinError: discard
+  of kTiled:
+    result = input.tiled.tiledInfo
   of kSpd:
     let p = input.spd
     result = %*{"format": "spd", "version": p.version, "colours": p.colours,
@@ -181,7 +225,13 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
          of ".spd": "spd5"
          of ".spr": "spr"
          of ".spm": "spm"
+         of ".tmx": "tmx"
+         of ".tmj", ".json": "tiled-json"
          else: fail("can't tell the output format from " & path & "; use --to")
+  if to in ["tmx", "tiled-json"]:
+    if input.kind != kTiled: fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to " & to)
+    return @[Output(path: path, data: if to == "tmx": input.tiled.toTmx else: input.tiled.toTiledJson)]
+  if input.kind == kTiled: fail("can't convert a Tiled map to " & to)
   if to == "spm":
     if input.kind != kSpd: fail("can't convert a CTM project to spm")
     return @[Output(path: path, data: input.spd.toSpm(leftOut))]
@@ -200,6 +250,7 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
   let data = case kind
              of kCtm: input.ctm.toCtm(v, leftOut)
              of kSpd: input.spd.toSpd(v, leftOut)
+             of kTiled: fail("can't convert a Tiled map to " & to)
   @[Output(path: path, data: data.toStr)]
 
 proc usage(msg: string) {.noreturn.} = raise newException(UsageError, msg)
@@ -237,6 +288,8 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
       path = path[0 ..< at]
     case part
     of "tile-names", "tile-events": usage(part & " is only written by asm and c")
+    elif input.kind == kTiled:
+      if splitMapPart(part).base notin tiledParts: usage("unknown part: " & part)
     elif part notin ctmParts and part notin spdParts: usage("unknown part: " & part)
     template add(file: string, bytes: seq[byte]) =
       let p = file
@@ -247,7 +300,7 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
       result.add Output(path: p, data: data.toStr)
     if part.startsWith("submaps") and ("{y}" in path or "{x}" in path):
       # One file per sub-map.
-      if input.kind != kCtm: fail("a SpritePad project has no part " & part)
+      if input.kind != kCtm: fail("a " & (if input.kind == kTiled: "Tiled map" else: "SpritePad project") & " has no part " & part)
       let s = input.ctm.subMaps
       if ("{y}" notin path and s.down > 1) or ("{x}" notin path and s.across > 1):
         usage(path & ": the grid makes " & $s.across & " x " & $s.down &
@@ -258,7 +311,8 @@ proc binOutputs(input: Input, specs: seq[string], o: BinOptions, loadAddress: st
     else:
       add(path, case input.kind
                 of kCtm: input.ctm.binPart(part, o)
-                of kSpd: input.spd.binPart(part, o))
+                of kSpd: input.spd.binPart(part, o)
+                of kTiled: input.tiled.binPart(part, o))
 
 proc parseSize(name, s: string): (int, int) =
   let n = s.split({'x', 'X'})
@@ -327,6 +381,7 @@ proc asmOutput(input: Input, o: AsmOptions): string =
   case input.kind
   of kCtm: input.ctm.toAsm(o)
   of kSpd: input.spd.toAsm(o)
+  of kTiled: input.tiled.toAsm(o)
 
 proc parseOrg(specs: seq[string]): seq[(string, int)] =
   for spec in specs:
@@ -335,7 +390,7 @@ proc parseOrg(specs: seq[string]): seq[(string, int)] =
     result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
 
 template common() =
-  option("--input-format", choices = @["ctm", "spd", "spr", "spm"], help = "Format of the input, if not detected")
+  option("--input-format", choices = @["ctm", "spd", "spr", "spm", "tmx", "tiled-json"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
   flag("--quiet", help = "Hides warnings about what is left out")
   flag("--strict", help = "Makes those warnings errors")
@@ -346,12 +401,12 @@ let parser = newParser("batchpad"):
   flag("--version", shortcircuit = true, help = "Prints the version")
   command("info"):
     help("Prints what a project holds")
-    option("--input-format", choices = @["ctm", "spd", "spr", "spm"], help = "Format of the input, if not detected")
+    option("--input-format", choices = @["ctm", "spd", "spr", "spm", "tmx", "tiled-json"], help = "Format of the input, if not detected")
     flag("--json", help = "Prints JSON")
     arg("input")
   command("convert"):
     help("Writes the project in another project format")
-    option("--to", help = "ctm1 to ctm9, spd0 to spd5, spr or spm; default from the output's extension")
+    option("--to", help = "ctm1 to ctm9, spd0 to spd5, spr, spm, tmx or tiled-json; default from the output's extension")
     common()
     arg("input")
     arg("output")
@@ -501,6 +556,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       let c = case input.kind
               of kCtm: input.ctm.toC(ao, o.header, o.output.extractFilename)
               of kSpd: input.spd.toC(ao, o.header, o.output.extractFilename)
+              of kTiled: input.tiled.toC(ao, o.header, o.output.extractFilename)
       outputs.add Output(path: o.output, data: c.source)
       if o.header != "":
         if o.header == o.output: usage("--header names the same file as -o")
@@ -517,6 +573,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       let picture = case input.kind
                     of kCtm: input.ctm.previewCtm(o.part, columns)
                     of kSpd: input.spd.previewSpd(o.part, columns)
+                    of kTiled: fail("previews are for CharPad and SpritePad projects, not Tiled maps")
       outputs.add Output(path: o.output, data: picture.toPng(palette, scale))
     of "gif":
       let o = opts.argparse_gif_opts.get
@@ -565,7 +622,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     errors.writeLine "batchpad: " & e.msg
     errors.flush
     return 2
-  except CliError, CtmError, SpdError, BinError, AsmError, ImageError, PreviewError, StatsError:
+  except CliError, CtmError, SpdError, TiledError, BinError, AsmError, ImageError, PreviewError, StatsError:
     let e = getCurrentException()
     errors.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
     errors.flush

@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#73**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#79**.
 
 ## Open
 
@@ -25,9 +25,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #65 [feature, normal] Read and write Petmate `.petmate` screen projects
   - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
   - Found by a web search on 2026-10-31; format not looked at yet.
-- #66 [feature, low] Read and write Tiled maps (TMX and JSON)
-  - Many people build C64 game maps in Tiled (mapeditor.org). Read a tile layer into the map (and tile size into the tile system), write one back. Needs a decision on which Tiled features count: several layers, tile properties as tags, external tilesets, encodings (CSV, base64, zlib). Consider making the Tiled model leading if it is more flexible than CharPad.
-  - Found by a web search on 2026-10-31; the TMX/JSON formats are documented at doc.mapeditor.org.
 - #67 [task, low] Look at Spred64 files and decide on a reader
   - Spred64 (rrfreelance.itch.io/spred64-c64-sprite-editor) saves sprites as decimal byte data. Find out whether it has a project file of its own, what the text export looks like, and whether it keeps colours and modes.
   - Found by a web search on 2026-10-31; format not looked at yet.
@@ -49,11 +46,25 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
   - Colours: the shared colours (`bg0`-`bg2`, or `bg`, `mc1`, `mc2`) come from `--set` or else the most used colours of the picture. Each cell takes the cheapest fit (least colour distance) of its own colour and, in multicolour, hires or multicolour (sprites: per sprite). Text modes and sprites first; ECM and bitmap modes later.
   - Needs: tests with BMPs we build ourselves (round trip through `bmp`), `docs/cli.md`, `docs/import-export.md`, CLAUDE.md.
+- #73 [feature, low] Export Tiled object layers as data tables
+  - The objects are read and round trip TMX <-> JSON (#66) but no part writes them. Needs a layout decision (fields per object, which properties, tile or pixel units).
+- #74 [feature, low] Convert a CharPad map to a Tiled map with a tileset image
+  - CTM -> TMX/JSON: the map is a layer, the tileset image can be drawn with `preview.nim` and `image.nim`. Several CharPad features (colour per tile, ECM) need thought.
+- #75 [feature, low] Convert a Tiled map to a CharPad project
+  - Needs chars and tiles from somewhere: `--base project.ctm`, so only its map is replaced.
+- #76 [feature, low] Import tileset images from Tiled
+  - Cut a tileset PNG into chars or sprites. Overlaps #72 (image import).
+- #77 [feature, low] Read zlib and gzip compressed Tiled layers
+  - Needs an inflate in Nim (no zlib in std). Now an error that says to use CSV.
+- #78 [feature, low] Read external Tiled tilesets (`.tsx`)
+  - Tile size, count and tile properties (`tag`, class) live there when a tileset is external. Now only the `firstgid` and `source` are kept.
 
 ## In progress
 
 ## Closed
 
+- #66 [feature, low] Read and write Tiled maps (TMX and JSON)
+  - Done 2026-10-31, `src/batchpad/tiled.nim`, `src/batchpad/tiledbin.nim`, `tests/ttiled.nim`, `tests/files/tiled/`: a third kind of input, not a CharPad project. Read TMX and JSON (CSV and uncompressed base64 data, infinite maps flattened, group layers flattened), convert them into each other, and write the tile numbers of any tile layer (`map`, `map:NAME`), flip flags (`map-flags`), tile tags and names through `bin`, `asm` and `c`; settings `layer`, `tileset`, `empty-tile`. Compressed data is an error that says to use CSV (#77). Not opened in Tiled itself. Details in `docs/tiled.md`. Follow-ups #73-#78.
 - #64 [feature, normal] Read and write Spritemate `.spm` sprite projects
   - Done 2026-10-31, `src/batchpad/spm.nim`, `tests/tspm.nim`, `tests/files/spm/`: reads and writes `.spm` as a sprite project (`convert in.spm out.spd`, `convert in.spd out.spm`, `--input-format spm`). Kept: sprites (pixels, colour, multicolour, expansion, overlay) and the three shared colours; old Spritemates' `t`/`i`/`m1`/`m2` names read too. Not kept: sprite names, drawing pen, animation settings; tiles and animations of a SPD are left out on writing. Layout from Spritemate's source and its five examples (all round trip through SPD unchanged); not opened in Spritemate itself. Note: Spritemate's own `.spd` export is SPD V1, not V2. Details in `docs/spritepad.md`.
 - #59 [task, normal] Find out how CharPad stores ECM chars 64 and up

@@ -37,3 +37,8 @@ Details in [docs/spritepad.md](docs/spritepad.md).
 | SPD V3 | SpritePad 2.8 private build only, never released |
 | SPD V4 | SpritePad 2.8 |
 | SPD V5 | SpritePad 2.9 and every Pro release |
+
+### Tiled (`.tmx`, JSON)
+
+Tiled maps go straight to the binary, assembler and C exports. Details in
+[docs/tiled.md](docs/tiled.md).

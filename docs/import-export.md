@@ -518,6 +518,8 @@ Decided 2026-10-18; issues #41-#51, #53 and #54.
 - A load address option shared by binary exports and imports (#54).
 - SEUCK `.A` sprites and `.B` backgrounds, and the SEUCK attribute style for
   raw sprites (#56, #57; added 2026-10-18).
+- Tiled maps (`.tmx` and JSON): read into the binary, assembler and C exports,
+  and converted to each other (#66; see tiled.md).
 - Skipped: Koala / Art Studio / Advanced Art Studio, image import,
   VICE snapshots, Glaze's parallax build.
 

@@ -35,7 +35,7 @@ const
 
 proc fail(msg: string) {.noreturn.} = raise newException(BinError, msg)
 
-proc cells(values: openArray[uint16], what, part: string, o: BinOptions): seq[byte] =
+proc cells*(values: openArray[uint16], what, part: string, o: BinOptions): seq[byte] =
   ## `part` is the name asked for: `what`, or `what` with `-lo` or `-hi`.
   let split = o.cells in {cf12, cf16}
   if split and part == what:
@@ -68,15 +68,18 @@ proc cells(values: openArray[uint16], what, part: string, o: BinOptions): seq[by
         if i mod 2 == 0: result.add n shl 4
         else: result[^1] = result[^1] or n
 
-proc checkedArea(p: ctm.Project, o: BinOptions): Area =
+proc checkedArea*(width, height: int, o: BinOptions): Area =
   ## `o.area`, or the whole map; an error when it isn't inside the map.
-  if o.area.isNone: return Area(x: 0, y: 0, width: p.mapWidth, height: p.mapHeight)
+  if o.area.isNone: return Area(x: 0, y: 0, width: width, height: height)
   let a = o.area.get
   if a.width < 1 or a.height < 1 or a.x < 0 or a.y < 0 or
-     a.x + a.width > p.mapWidth or a.y + a.height > p.mapHeight:
+     a.x + a.width > width or a.y + a.height > height:
     fail("--area " & $a.x & "," & $a.y & "," & $a.width & "," & $a.height &
-         " is not inside the " & $p.mapWidth & " x " & $p.mapHeight & " map")
+         " is not inside the " & $width & " x " & $height & " map")
   a
+
+proc checkedArea(p: ctm.Project, o: BinOptions): Area =
+  checkedArea(p.mapWidth, p.mapHeight, o)
 
 proc mapCells(p: ctm.Project, o: BinOptions): seq[uint16] =
   if o.area.isNone: return p.map

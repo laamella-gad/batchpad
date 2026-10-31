@@ -100,6 +100,33 @@ suite "command line":
     check readFile(tmp / "m2.spd") == readFile(files / "spd5" / "sprites.spd")
     check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "m.spm")[0] == 1
 
+  test "Tiled maps":
+    let src = files / "tiled" / "csv.tmx"
+    let (code, text) = batchpad("info", src)
+    check code == 0 and "format: tiled" in text and "flippedCells: true" in text
+    check batchpad("info", files / "tiled" / "csv.json")[0] == 0
+    check batchpad("bin", src, "map=" & tmp / "t.bin", "map:sky=" & tmp / "t2.bin")[0] == 0
+    check readFile(tmp / "t.bin") == "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b"
+    check readFile(tmp / "t2.bin").len == 12
+    check batchpad("bin", src, "map=" & tmp / "t3.bin", "--set", "layer=sky")[0] == 0
+    check readFile(tmp / "t3.bin") == readFile(tmp / "t2.bin")
+    check batchpad("bin", src, "chars=" & tmp / "t4.bin")[0] == 2
+    check batchpad("bin", src, "map=" & tmp / "t4.bin", "--set", "frob=1")[0] == 1
+    check batchpad("bin", files / "tiled" / "compressed.tmx", "map=" & tmp / "t4.bin")[0] == 1
+    check not fileExists(tmp / "t4.bin")
+    let (acode, asmText) = batchpad("asm", src, "--parts", "map,map-flags:sky")
+    check acode == 0 and "map_data" in asmText and "map_sky_flags_data" in asmText
+    let (ccode, cText) = batchpad("c", src)
+    check ccode == 0 and "map_data" in cText
+    check batchpad("convert", src, tmp / "t.json")[0] == 0
+    check batchpad("convert", tmp / "t.json", tmp / "t2.tmx")[0] == 0
+    check batchpad("bin", tmp / "t2.tmx", "map:sky=" & tmp / "t5.bin")[0] == 0
+    check readFile(tmp / "t5.bin") == readFile(tmp / "t2.bin")
+    check batchpad("convert", src, tmp / "t.ctm")[0] == 1
+    check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "t6.tmx")[0] == 1
+    check batchpad("png", src, "map")[0] == 1
+    check batchpad("stats", src)[0] == 1
+
   test "convert to spd3 and spd4":
     for v in [3, 4]:
       check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0
