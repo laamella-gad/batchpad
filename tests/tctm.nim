@@ -364,6 +364,105 @@ suite "CTM V5":
     p.displayMode = dmMulticolourBitmap
     expect CtmError: discard p.toCtm(version = 5)
 
+suite "CTM V1":
+  const dir = filesDir / "ctm1"
+
+  test "multicolour text, per project":
+    let p = readCtm(dir / "mctext_project.ctm")
+    check p.version == 1
+    check p.displayMode == dmMulticolourText
+    check p.colouring == cmPerProject
+    check p.chipColours == [6'u8, 11, 12, 0]
+    check p.colours == [14'u8, 0, 0]
+    check p.chars.len == 4 and p.chars[1].data == [0x55'u8, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa]
+    check p.tileWidth == 4 and p.tileHeight == 4 and p.tiles.len == 2
+    check p.tiles[1].cells == @[3'u16, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0]
+    check p.mapWidth == 3 and p.mapHeight == 2
+    check p.map == @[0'u16, 1, 1, 1, 0, 0]
+
+  test "hires text, per tile":
+    let p = readCtm(dir / "hires_pertile.ctm")
+    check p.displayMode == dmHiresText
+    check p.colouring == cmPerTile
+    check p.tiles[0].colours == [5'u8, 0, 0]
+    check p.tiles[1].colours == [10'u8, 0, 0]
+
+  test "colour per tile cell becomes colour per char, with copies":
+    let p = readCtm(dir / "mctext_pertilecell.ctm")
+    check p.colouring == cmPerChar
+    check p.chars.len == 6
+    for i, c in [1'u8, 2, 9, 1, 7, 9]:
+      check p.chars[i].colours[0] == c
+    check p.chars[4].data == p.chars[2].data and p.chars[5].data == p.chars[1].data
+    check p.tiles[0].cells[0 .. 3] == @[0'u16, 1, 2, 3]
+    check p.tiles[1].cells[0 .. 3] == @[3'u16, 4, 5, 0]
+
+  test "writing gives back the same bytes":
+    for name in ["mctext_project.ctm", "hires_pertile.ctm"]:
+      checkpoint name
+      check readCtm(dir / name).toCtm(version = 1) == cast[seq[byte]](readFile(dir / name))
+
+  test "the copies of a colour per char are written as chars of their own":
+    # The file has 4 chars and a colour per tile cell; we read 6 chars and
+    # write 6, which reads as the same project.
+    let p = readCtm(dir / "mctext_pertilecell.ctm")
+    let bytes = p.toCtm(1)
+    check bytes.len == readFile(dir / "mctext_pertilecell.ctm").len + 2 * 8
+    check parseCtm(bytes) == p
+
+  test "the copies go back to their shapes past 256 chars":
+    var p = readCtm(dir / "mctext_pertilecell.ctm")
+    # 252 chars of their own, so the two copies come to 258
+    let extra = p.chars[3]
+    for i in 0 ..< 252:
+      var c = extra
+      c.data[0] = uint8(i + 1)
+      c.data[1] = 0x77
+      p.chars.insert(c, 4)
+    for t in p.tiles.mitems:
+      for c in t.cells.mitems:
+        if c >= 4: c += 252
+    check p.chars.len == 258
+    let q = parseCtm(p.toCtm(1))
+    check q.chars.len == 258             # 256 shapes, and the two copies read again
+    check q.tiles[1].cells[0 .. 3] == @[3'u16, 256, 257, 0]
+
+  test "V4 to V1: only 4 x 4 tiles, no materials":
+    var p = readCtm(filesDir / "ctm9" / "mctext_pertile.ctm")
+    expect CtmError: discard p.toCtm(1)      # 2 x 2 tiles
+    p = readCtm(dir / "mctext_project.ctm")
+    p.chars[1].material = 3
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(1, leftOut))
+    check leftOut == @["1 char material (V1 has none)"]
+    check q.chars[1].material == 0
+
+  test "bigger tiles are cut":
+    var p = readCtm(dir / "mctext_project.ctm")
+    p.tileWidth = 5
+    p.tileHeight = 4
+    for t in p.tiles.mitems:
+      var cells: seq[uint16]
+      for y in 0 .. 3:
+        for x in 0 .. 4: cells.add t.cells[y * 4 + min(x, 3)]
+      t.cells = cells
+    var leftOut: seq[string]
+    let q = parseCtm(p.toCtm(1, leftOut))
+    check leftOut == @["tile cells past 4 x 4 (V1 has 4 x 4 tiles; the tiles are 5 x 4)"]
+    check q.tiles == readCtm(dir / "mctext_project.ctm").tiles
+
+  test "errors and refusals":
+    let data = cast[seq[byte]](readFile(dir / "mctext_project.ctm"))
+    var bad = data
+    bad.add 0
+    expect CtmError: discard parseCtm(bad)
+    bad = data
+    bad[8] = 3                   # colouring
+    expect CtmError: discard parseCtm(bad)
+    expect CtmError: discard parseCtm(data[0 ..< 50])
+    var p = readCtm(filesDir / "ctm7" / "hirestext_perchar_notiles.ctm")
+    expect CtmError: discard p.toCtm(version = 1)    # no tiles
+
 suite "CTM V2":
   const dir = filesDir / "ctm2"
   const dir4 = filesDir / "ctm4"

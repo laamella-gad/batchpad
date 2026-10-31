@@ -6,8 +6,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Open
 
-- #6 [feature, low] CharPad CTM V1 reader and writer
-  - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 - #40 [task, normal] Check what CharPad C16 Pro writes
@@ -63,6 +61,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #6 [feature, low] CharPad CTM V1 reader and writer
+  - CharPad 1.0. 4x4 tiles, byte map, colour per tile cell. 3 samples (2 saved by hand, per tile and per tile cell).
+  - Done 2026-10-31: `ctm.nim` reads and writes V1 (`parseV1`, `formatV1`; `readCellAttributes` is shared with V3/V4, `fitV3V4` takes version 1). Per tile cell colours become per char with copies, as in V4; the writer turns them back, and chars past 256 go back to the first char of the same shape. All three CharPad 1.0 samples write back byte for byte. `convert --to ctm1`. Own test files `tests/files/ctm1/`.
 - #1 [feature, high] Parse CharPad project files (.ctm)
   - Header, charset, tiles, map, colours.
   - Umbrella: model #4, per-version readers/writers #6-#23. Specs for V1-V9: `docs/charpad.md`.

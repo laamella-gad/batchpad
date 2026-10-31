@@ -52,6 +52,11 @@ suite "command line":
     for v in [2, 3, 4, 5, 6, 8]:
       check batchpad("convert", src, tmp / "v.ctm", "--to", "ctm" & $v)[0] == 0
       check readCtm(tmp / "v.ctm").version == v
+    check batchpad("convert", src, tmp / "v1.ctm", "--to", "ctm1")[0] == 1   # 2 x 2 tiles
+    let v1 = files / "ctm1" / "mctext_project.ctm"
+    check batchpad("convert", v1, tmp / "v1.ctm", "--to", "ctm9")[0] == 0
+    check batchpad("convert", tmp / "v1.ctm", tmp / "v1b.ctm", "--to", "ctm1")[0] == 0
+    check readCtm(tmp / "v1b.ctm") == readCtm(v1)
     check batchpad("convert", src, tmp / "a8.ctm", "--to", "ctm8")[0] == 0
     check readCtm(tmp / "a8.ctm").version == 8
     check batchpad("convert", files / "ctm8" / "mcbitmap_pertile.ctm", tmp / "a9.ctm")[0] == 0

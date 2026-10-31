@@ -254,8 +254,19 @@ reader of ours should follow the spec, but these are the cases to test.
   Pro after loading ours can differ in those header bytes only (seen with
   `tests/files/ctm9/mctext_pertile.ctm`: 14, 0, 0 came back as 3, 8, 7).
 
-## How we read and write V2 to V5
+## How we read and write V1 to V5
 
+- **V1:** chars of 8 bytes (no material), always 4 x 4 tiles of byte cells, a
+  byte map. Colouring per project, per tile (a colour byte per tile; masked to
+  the low nibble as Pro does) or per tile cell, which is read like V4's: a
+  char used in several colours gets copies, and the colouring becomes per char
+  (Pro throws these colours away). The writer refuses tiles smaller than 4 x 4
+  and cuts bigger ones (reported), leaves out the materials (reported) and
+  writes colouring per char as a colour per tile cell. More than 256 chars
+  (what reading a per tile cell file gives when a char has several colours)
+  go back to the first char with the same shape; that fails when a tile cell
+  uses more than 256 shapes. The three CharPad 1.0 samples (one that comes
+  with it, two the user saved) read and write back byte for byte.
 - **V4 reader:** colour (method 2) and material are per tile cell in the file,
   but per char in our model. A char used with another colour or material gets
   a copy (added at the end of the set), and the tile cell points at the copy;
