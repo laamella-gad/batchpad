@@ -15,7 +15,7 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #80 [feature, normal] Read and write Tilemedo `.tmd` projects and its binary exports
   - Spec in `software/tilemedo.zip` (`tilemedo.html`) plus two example projects. Little endian words; the length field counts itself (checked: it equals the file size); the trigger map follows the map only when the file has map-size bytes left. Charset, colours (1 byte per char), tile set (16 bytes per 4 x 4 tile), map: fits the CTM model (tile system, per-char colour, text mode hires or multicolour). Trigger map has no CTM place: raw part only. Also the headerless binary exports and BMP map export/import (shares #72).
 - #72 [feature, low] BMP export and import
-  - In scope (decided 2026-11-01); #68 follows from the import half.
+  - In scope (decided 2026-11-01).
   - BMP as the lowest common denominator picture format of the PC platform. Asked for 2026-10-31; not started.
   - Export: a `bmp` command next to `png` (same parts, `--palette`, `--scale`, `--columns`): uncompressed 8 bit BMP with a 16 colour palette, rows padded to 4 bytes, bottom row first. Share the code with `png` in `cli.nim`.
   - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
