@@ -606,6 +606,10 @@ Koala load address: CharPad Pro writes $4000 (`$00, $40`), as its help says,
 and puts $d021 (chip colour 0) in the last byte. Koala files are also commonly
 loaded at $6000. The Art Studio loader accepts 9003 to 9012 bytes.
 
+### Multipaint (#68)
+
+[Multipaint](http://multipaint.kameli.net/) (manual: "About file import / export") has no project format. It saves Art Studio (hires) and Advanced Art Studio (multicolour), Koala (multicolour; the default since a 2019 release), PNG, and an "export emulator" `.prg` (a runnable viewer with the picture; FLI and AFLI are not exported). It also loads PNG and JPEG. We don't support Multipaint (#68): its PNG export is easy enough to use, and we don't read these bitmap formats.
+
 ## Palettes
 
 A `.pal` text file, or an image of the palette. It sets how the 16 C64

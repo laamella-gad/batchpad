@@ -12,9 +12,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #65 [feature, normal] Read and write Petmate `.petmate` screen projects
   - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
   - Found by a web search on 2026-10-31; format not looked at yet.
-- #68 [task, low] Look at Multipaint files and decide on a reader
-  - Multipaint (retro paint program) exports `.prg` bitmaps. We have no bitmap model; the question is whether raw bitmap import (CharPad bitmap modes: bitmap, screen and colour RAM) is enough, or whether it is out of scope.
-  - Found by a web search on 2026-10-31; formats not looked at yet.
 - #80 [feature, normal] Read and write Tilemedo `.tmd` projects and its binary exports
   - Spec in `software/tilemedo.zip` (`tilemedo.html`) plus two example projects. Little endian words; the length field counts itself (checked: it equals the file size); the trigger map follows the map only when the file has map-size bytes left. Charset, colours (1 byte per char), tile set (16 bytes per 4 x 4 tile), map: fits the CTM model (tile system, per-char colour, text mode hires or multicolour). Trigger map has no CTM place: raw part only. Also the headerless binary exports and BMP map export/import (shares #72).
 - #72 [feature, low] BMP export and import
@@ -54,6 +51,9 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #68 [task, low] Look at Multipaint files and decide on a reader
+  - Done 2026-11-01. Multipaint (multipaint.kameli.net, manual "About file import / export") saves: Art Studio (hires), Advanced Art Studio (multicolour), Koala (multicolour, default since a 2019 release), PNG/JPEG (also loads them), and "export emulator": a runnable `.prg` (viewer plus picture, FLI/AFLI not exported). The picture formats are the ones in `docs/import-export.md` ("C64 bitmap pictures"); the runnable `.prg` is no data format. Multipaint has no project file of its own.
+  - Decision (2026-11-01): Multipaint not supported. Its export is easy enough: users save PNG (or BMP, #72) from it. No bitmap model, no Koala/Art Studio reader.
 - #83 [task, normal] Investigate `.P00` and the other SEUCK formats
   - `.P00` (PC64 container): 26-byte header (`C64File`, 16-byte name, `$00`, `$00`), then the file. Real `.A` (8156 bytes) and `.B` (9622 bytes) samples in martinpiper/C64Public `SEUCK/Debug1/T______A.P00` and `BG1____B.P00` read fine once the header is stripped; decide whether `.P00` input is read directly (and whether `.P01`, `.S00` etc. count).
   - Other SEUCK files: `.C` to `.G` (smaller: 1440, 268, 182, 540 bytes in the same repo; probably levels, attack waves, sound effects, title screen, game settings; find the layouts), and the "save all data" `.P00` (63254 bytes: SEUCK memory from $900 after a 26-byte header and 2-byte load address; offsets in that repo's `Scroller/ScrollerDataMacro.a`, `Scroller/ScrollerData.a`). It holds sprites, chars, tiles and map too, so a whole game could be read as a sprite project and a CharPad project.
