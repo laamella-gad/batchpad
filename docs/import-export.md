@@ -14,9 +14,6 @@ has been tried in the programs yet unless it says so.
 | --- | --- | --- | --- | --- |
 | Own project (`.ctm` / `.spd`) | read V1-V9 (not V3), write V9; "Export Project" writes V5, V6, V7, V8 | read V1-V7 (not V3), write V7; export V5, V6; ECM opens as hires | read headerless 1.8 and SPD V1-V5, write V5 | read CTM V4-V9; no project save |
 | CharPad C16 project (`.ctt`) | open (file filter) | - | - | - |
-
-batchpad reads and writes `.ctt` V8 and V9 (#40, #79; see `charpad.md`): `convert` to and from `ctm`, `bin`, `asm` and `c` straight from a `.ctt`. Previews and statistics of one are not done.
-
 | Raw binary | import, export | import, export | import, export | export |
 | Assembler text (`.asm`, 64tass) | export; import map as text | export (own template); import map as text | export | export |
 | Images (BMP, PNG, GIF) | import (Image Importer), export | import BMP/PNG, export | import, export, sheets, animated GIF | - |
@@ -24,6 +21,8 @@ batchpad reads and writes `.ctt` V8 and V9 (#40, #79; see `charpad.md`): `conver
 | SEUCK | `.B` background, import, export | `.B`, import, export | `.A` sprites, import, export | - |
 | Koala Painter, Art Studio, Advanced Art Studio | import, export | - | - | - |
 | Palette (`.pal` text, or image) | import, export | - | import, export | - |
+
+batchpad reads and writes `.ctt` V8 and V9 (#40, #79; see `charpad.md`): `convert` to and from `ctm`, `bin`, `asm` and `c` straight from a `.ctt`. Previews and statistics of one are not done.
 
 Internal files, not for exchange: the clipboard files
 (`CharPadC64_CopiedChars.bin`, `SpritePad_CopiedSprites.bin`, ...), the

@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#82**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#84**.
 
 ## Open
 
@@ -38,6 +38,16 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Tile size, count and tile properties (`tag`, class) live there when a tileset is external. Now only the `firstgid` and `source` are kept.
 - #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
   - `png` and `stats` refuse a project with TED colours; `gif` never took CTM. Needs the 128-colour TED palette (chroma-major, from the CTT spec) in `image.nim` and TED-aware colour handling in `preview.nim` and `stats.nim`. Follow-up of #79.
+
+- #82 [task, normal] Release binaries for Linux, Windows and macOS
+  - Build `bin/batchpad` (Nim >= 2.2.8) for each platform, e.g. a GitHub Actions workflow on tag push that builds on `ubuntu`, `windows` and `macos` runners and attaches `batchpad-linux.tar.gz`, `batchpad-windows.zip` and `batchpad-macos.tar.gz` to a release at https://github.com/laamella-gad/batchpad/releases. Run `nimble test` per platform first. The README download links point at these names.
+
+- #83 [task, normal] Investigate `.P00` and the other SEUCK formats
+  - `.P00` (PC64 container): 26-byte header (`C64File`, 16-byte name, `$00`, `$00`), then the file. Real `.A` (8156 bytes) and `.B` (9622 bytes) samples in martinpiper/C64Public `SEUCK/Debug1/T______A.P00` and `BG1____B.P00` read fine once the header is stripped; decide whether `.P00` input is read directly (and whether `.P01`, `.S00` etc. count).
+  - Other SEUCK files: `.C` to `.G` (smaller: 1440, 268, 182, 540 bytes in the same repo; probably levels, attack waves, sound effects, title screen, game settings; find the layouts), and the "save all data" `.P00` (63254 bytes: SEUCK memory from $900 after a 26-byte header and 2-byte load address; offsets in that repo's `Scroller/ScrollerDataMacro.a`, `Scroller/ScrollerData.a`). It holds sprites, chars, tiles and map too, so a whole game could be read as a sprite project and a CharPad project.
+  - Open question: what bits 5 to 7 of the sprite colour byte mean. Real `.A` files have them set (`$B`, `$C`, `$D` in the high nibble) and we drop them on write. Also: the 128 "unused" bytes of `.B` are not zero in real files, and its last 10 bytes are `$ff` where we write `$3f` (loading ignores both).
+  - SEUCK Redux (Martin Piper's engine in that repo) reads stock SEUCK data; no format change found. His notes: `SEUCK/UnlockTheEditor.txt`, https://github.com/martinpiper/DebuggingDetails/blob/main/SEUCK.txt, and the Google Doc linked there (not read).
+  - The repo has no licence (`NOASSERTION`): do not copy its files into `tests/files/`; tests build their own bytes.
 
 ## In progress
 
