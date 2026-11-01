@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#86**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#87**.
 
 ## Open
 
@@ -45,6 +45,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Read: `.C` (and the `.C` part of a `.I`) as the animations of a sprite project; a SEUCK frame list that isn't a run of consecutive sprites needs a rule (limit to runs, or expand to several animations). Write: SpritePad animations into a `.C`, or into a game's `.I`/`.P00` with the sprites (`inject`, see the SEUCK plan). Frame lists are 18 at most; longer SpritePad animations need an error or a cut.
   - To decide: how SpritePad's timer and attribute bits map to the speed byte and the directional bits; what a frame `$ff` (end marker plus sprite 127) means; how `--sprite-attribs seuck` and the animations meet in `bin` (`sprite-anims` part exists already).
   - No SEUCK or SpritePad program was used to check any mapping.
+- #86 [feature, normal] `inject`: put edited sprites and background into a SEUCK game file
+  - SEUCK users draw in CharPad and SpritePad but the game file only holds what SEUCK saved. A command such as `batchpad inject game.I --sprites ships.spd --background level.ctm -o new.I` (and the same for `.P00`) would overwrite the sprites at `$c000` and the map, tile colours, tiles and chars at `$900` and `$f800`, and leave every other byte alone. Memory map in docs/import-export.md.
+  - Same checks as `seuck-a` and `seuck-b` (127 sprites, 128 tiles of 5 x 5, 254 chars, 8 x 512 map, per-tile colouring), reported as a clear error; `leftOut` lines as `convert` has. Keep the `.P00` header and name. Also writes `.I` and `.P00` for #84 in the narrow sense of a patched existing file; making one from nothing stays out.
+  - Round trip test: inject what `seuck-i` and `seuck-i-sprites` read out of a game and expect the same bytes (apart from the bytes `.A` and `.B` loading ignores). Foundation for #85 (animations go into `.C` at `$2c80`).
 
 ## In progress
 
