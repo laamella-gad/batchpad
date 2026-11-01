@@ -120,3 +120,40 @@ suite "SEUCK backgrounds (.B)":
     var leftOut: seq[string]
     discard p.toSeuckB(leftOut)
     check leftOut == @["tile tags and names", "char materials"]
+
+proc allData(): string =
+  ## A "save all data" file: signature, then the memory from $900 to $fff9
+  ## with known bytes where the background and the sprites live.
+  var all = newString(seuckISize)
+  all[0] = 'B'
+  let back = readFile(files / "background.B")
+  let spr = readFile(files / "sprites.A")
+  for i in 0 ..< 0x2680 - 0x900: all[2 + i] = back[2 + i]
+  for i in 0 ..< 0x10000 - 6 - 0xf800: all[2 + 0xf800 - 0x900 + i] = back[2 + 0x2680 - 0x900 + i]
+  for i in 0 ..< 127 * 64: all[2 + 0xc000 - 0x900 + i] = spr[2 + i]
+  all
+
+suite "SEUCK .P00 and .I":
+  test "unwraps a .P00":
+    let (name, body) = unwrapP00(readFile(files / "sprites.P00"))
+    check name == "SPRITES.A" and name.seuckKind == 'A'
+    check body == readFile(files / "sprites.A")
+    check unwrapP00(readFile(files / "background.P00")).name.seuckKind == 'B'
+    check "x.i".seuckKind == 'I' and "x.j".seuckKind == '\0' and "NAME.c".seuckKind == 'C' and "NAME.Z".seuckKind == '\0'
+    check not isP00(readFile(files / "sprites.A"))
+
+  test "a name that is not 'C64File' is not a .P00":
+    expect SeuckError:
+      discard unwrapP00("C64Fyle\0" & newString(30))
+
+  test "the background and sprites inside a .I are the .B and .A":
+    let all = allData()
+    check all.len == 63228
+    check seuckIBackground(all.toOpenArrayByte(0, all.high)) == readFile(files / "background.B")
+    check seuckISprites(all.toOpenArrayByte(0, all.high)) == readFile(files / "sprites.A")
+    check parseSeuckIBackground(all.toOpenArrayByte(0, all.high)).tiles.len == 128
+    check parseSeuckISprites(all.toOpenArrayByte(0, all.high)).sprites[0].colour == 5
+
+  test "a .I of another size is refused":
+    expect SeuckError:
+      discard seuckIBackground(newSeq[byte](100))

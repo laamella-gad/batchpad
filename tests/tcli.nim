@@ -161,6 +161,38 @@ suite "command line":
     check batchpad("bin", b, "chars=" & tmp / "ch.bin")[0] == 0
     check readFile(tmp / "ch.bin").len == 254 * 8
 
+  test "SEUCK .P00 and .I files":
+    let sp = files / "seuck" / "sprites.P00"
+    let bp = files / "seuck" / "background.P00"
+    check "sprites: 127" in batchpad("info", sp)[1]
+    check "mapHeight: 512" in batchpad("info", bp)[1]
+    check batchpad("convert", sp, tmp / "p.A")[0] == 0
+    check readFile(tmp / "p.A") == readFile(files / "seuck" / "sprites.A")
+    check batchpad("convert", bp, tmp / "p.B")[0] == 0
+    check readFile(tmp / "p.B") == readFile(files / "seuck" / "background.B")
+    # a "save all data" file: background and sprites, picked with --input-format
+    var all = newString(63228)
+    all[0] = 'B'
+    let back = readFile(files / "seuck" / "background.B")
+    for i in 0 ..< 0x2680 - 0x900: all[2 + i] = back[2 + i]
+    for i in 0 ..< 0x10000 - 6 - 0xf800: all[2 + 0xf800 - 0x900 + i] = back[2 + 0x2680 - 0x900 + i]
+    let spr = readFile(files / "seuck" / "sprites.A")
+    for i in 0 ..< 127 * 64: all[2 + 0xc000 - 0x900 + i] = spr[2 + i]
+    writeFile(tmp / "game.I", all)
+    check batchpad("convert", tmp / "game.I", tmp / "g.B")[0] == 0
+    check readFile(tmp / "g.B") == back
+    check batchpad("convert", tmp / "game.I", tmp / "g.A", "--input-format", "seuck-i-sprites")[0] == 0
+    check readFile(tmp / "g.A") == spr
+    # another SEUCK file, and a .P00 that is not SEUCK
+    var c = readFile(sp)
+    c[22] = '.'; c[23] = 'C'
+    writeFile(tmp / "x.P00", c)
+    let (code, err) = warnings("info", tmp / "x.P00")
+    check code == 1 and "#84" in err
+    c[23] = 'x'
+    writeFile(tmp / "y.P00", c)
+    check batchpad("info", tmp / "y.P00")[0] == 1
+
   test "convert to spd3 and spd4":
     for v in [3, 4]:
       check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0

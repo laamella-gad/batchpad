@@ -36,20 +36,33 @@ proc fail(msg: string) {.noreturn.} = raise newException(CliError, msg)
 proc notYet(issue: string) {.noreturn.} = fail("not implemented yet (" & issue & ")")
 
 proc readInput(path, format: string): Input =
-  let data = try: (if path == "-": stdin.readAll else: readFile(path))
+  let raw = try: (if path == "-": stdin.readAll else: readFile(path))
              except IOError as e: fail(e.msg)
   var format = format
+  var data = raw
+  if data.isP00:
+    # PC64 container: SEUCK names end in .A to .I, which tells what is inside
+    let (name, body) = data.unwrapP00
+    data = body
+    if format == "":
+      case name.seuckKind
+      of 'A': format = "seuck-a"
+      of 'B': format = "seuck-b"
+      of 'I': format = "seuck-i"
+      of '\0': fail("a .P00 file named '" & name & "' is not a SEUCK file")
+      else: fail("SEUCK ." & $name.seuckKind & " files aren't supported yet (#84)")
   if format == "":
     let lower = path.toLowerAscii
     if lower.endsWith(".a") and data.len == seuckASize: format = "seuck-a"
     elif lower.endsWith(".b") and data.len == seuckBSize: format = "seuck-b"
+    elif lower.endsWith(".i") and data.len == seuckISize: format = "seuck-i"
   let kind =
     case format
     of "ctm", "ctt": kCtm
     of "spd", "spr", "spm": kSpd
     of "tmx", "tiled-json": kTiled
-    of "seuck-a": kSpd
-    of "seuck-b", "seuck-b-sideways": kCtm
+    of "seuck-a", "seuck-i-sprites": kSpd
+    of "seuck-b", "seuck-b-sideways", "seuck-i": kCtm
     of "":
       let lower = path.toLowerAscii
       if data.startsWith("CTM") or data.startsWith("CTT"): kCtm
@@ -63,7 +76,9 @@ proc readInput(path, format: string): Input =
     else: fail("unknown input format: " & format)
   case kind
   of kCtm:
-    if format in ["seuck-b", "seuck-b-sideways"]:
+    if format == "seuck-i":
+      Input(kind: kCtm, ctm: parseSeuckIBackground(data.toOpenArrayByte(0, data.high)))
+    elif format in ["seuck-b", "seuck-b-sideways"]:
       Input(kind: kCtm, ctm: parseSeuckB(data.toOpenArrayByte(0, data.high), format == "seuck-b-sideways"))
     elif format == "ctt" or format == "" and data.startsWith("CTT"):
       Input(kind: kCtm, ctm: parseCtt(data.toOpenArrayByte(0, data.high)))
@@ -72,7 +87,9 @@ proc readInput(path, format: string): Input =
     let xml = format == "tmx" or format == "" and data.strip.startsWith("<")
     Input(kind: kTiled, tiled: if xml: parseTmx(data) else: parseTiledJson(data))
   of kSpd:
-    if format == "seuck-a":
+    if format == "seuck-i-sprites":
+      Input(kind: kSpd, spd: parseSeuckISprites(data.toOpenArrayByte(0, data.high)))
+    elif format == "seuck-a":
       Input(kind: kSpd, spd: parseSeuckA(data.toOpenArrayByte(0, data.high)))
     elif format == "spm" or format == "" and path.toLowerAscii.endsWith(".spm"):
       Input(kind: kSpd, spd: parseSpm(data))
@@ -419,7 +436,7 @@ proc parseOrg(specs: seq[string]): seq[(string, int)] =
     result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
 
 template common() =
-  option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways"], help = "Format of the input, if not detected")
+  option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
   flag("--quiet", help = "Hides warnings about what is left out")
   flag("--strict", help = "Makes those warnings errors")
@@ -430,7 +447,7 @@ let parser = newParser("batchpad"):
   flag("--version", shortcircuit = true, help = "Prints the version")
   command("info"):
     help("Prints what a project holds")
-    option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways"], help = "Format of the input, if not detected")
+    option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
     flag("--json", help = "Prints JSON")
     arg("input")
   command("convert"):

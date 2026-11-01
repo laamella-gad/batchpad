@@ -509,10 +509,86 @@ not use:
 Martin Piper's SEUCK Redux is a replacement game engine (`Scroller/` in that
 repository) that plays the data stock SEUCK saves. His notes
 (`Scroller/README.md`, `SEUCK/UnlockTheEditor.txt`) show no change to the file
-formats, and the files above have the stock sizes. The "save all data" `.P00`
-(63254 bytes: 26-byte header, 2-byte load address, SEUCK memory from `$900`)
-holds sprites, chars, tiles and map too; its offsets are in `Scroller/ScrollerData.a`
-and `ScrollerDataMacro.a`. Not supported: see #83.
+formats, and the files above have the stock sizes.
+
+### The original disks
+
+`Shoot-em-up-Construction-Kit_C64_EN.zip` (in `software/`, from the GameBase64
+collection) holds two `.D64` disks of the original SEUCK: the program, and four
+sample games, each as seven PRG files named `game N .a` to `.g` (the 2-byte
+PRG load address is the signature `$42 $00`). Sizes: 8130, 9596, 1414, 242,
+3062, 156, 514 bytes. All four `.A` and `.B` read, and `convert` writes them back
+changing only what is described above, plus: the original `.B` unused bytes are
+`$02`, and its last 10 bytes are `$ff` except `$3f` first in game 3 and `$cf`
+last in game 4, so loading really must ignore them. The high bits of the sprite
+colour byte are set in these original files too (`$20`, `$40`, `$80`, in all
+combinations), so they come from SEUCK itself, not from Redux. Each of these
+games is also in the repository's `SEUCK/GAME1__I.P00` to `GAME4__I.P00`, and
+their memory addresses are the ones in the table below.
+
+### Memory map (#83)
+
+Every SEUCK file is a piece of the editor's memory behind a 2-byte signature
+(`$42 $00`, not a real load address). The "save all data" file is the name
+ending `.I`: signature, then memory from `$0900` to `$fff9`, 63228 bytes, or
+63254 in a `.P00`. Found by searching the files of that repository for the
+contents of real `.A` to `.G` files (the repository's own, and the four sample
+games of the original disks, see below), which all matched byte for byte:
+
+| File | Address | Bytes | Holds |
+| --- | --- | --- | --- |
+| `.A` | `$c000` | 8128 | 127 sprites of 64 bytes |
+| `.B` | `$0900` to `$267f`, then `$f800` to `$fff9` | 7552 + 2042 | map (8 x 512, 4096), tile colours (128), 128 unused, tiles (128 x 25), then the chars (254 x 8) and the last 10 bytes |
+| `.C` | `$2c80` | 1412 | 58 animations of 20 bytes ($488), then 36 enemy property records of 7 bytes ($3108, 252): see below |
+| `.D` | `$b810` | 240 | sound effects (the repository's `BRZRKSFX.P00` is one) |
+| `.E` | `$340c` | 3060 | enemy attack waves: 7 bytes per enemy from the start, movement streams from the end; see below |
+| `.F` | `$b776` | 154 | not worked out; 6-byte records such as `00 01 00 ff 00 00` |
+| `.G` | `$f400` | 512 | 64 chars of 8 bytes: the font of the score panel |
+| `.I` | `$0900` | 63226 | everything |
+
+A `.B` made from a `.I` this way is identical to the `.B` SEUCK saves from the
+same game, and so is a `.A`. Other things in the `.I` that the repository's
+sources name: `$4085` to `$4087` the screen colour and the two extra
+background colours, `$4081` and `$4083` the two sprite multicolours, `$ae92`
+the level table (7 bytes per level: start, end, duration, type and speed,
+flags).
+
+#### Animations (`.C`)
+
+Layout from the comments in Piper's `Scroller/ScrollerData.a`, and checked
+against the four original games (frames are sprite numbers, the first animations
+of every game have plausible contiguous runs such as `32 33 34 ... 3b`):
+
+| Byte | Holds |
+| --- | --- |
+| 0 to 17 | Frames: sprite numbers (0 to 126). Bit 7 set on a frame marks the end of the animation, which then loops; the bytes after it are leftovers |
+| 18 | Animation speed |
+| 19 | Low nibble: sprite colour. High nibble: `%0001` directional, `%0010` directional hold |
+
+After the 58 animations come 36 enemy property records of 7 bytes (bullet and
+explosion sound, fire type, hits to kill, fire rate, collision and speed bits,
+explosion and bullet type, points divided by ten; Piper's file lists them).
+
+#### Attack waves (`.E`)
+
+From the start, 7 bytes per enemy: map position (2 bytes), address of its
+movement stream (2), x position / 2, y position, animation number; a position of
+`$ffff` ends the list. The movement streams grow down from the end of the
+block, each a list of bytes (low nibble the direction bits right, left, down,
+up; high nibble the number of frames) ending in `$ff`. Not checked against real
+files by batchpad.
+
+### `.P00`
+
+PC64 container (also what VICE writes with `-fs8savep00`): 26 bytes, `C64File`,
+`$00`, a 16-byte name padded with spaces or `$00`, `$00`, a record size (`$00`);
+then the file. The name is the SEUCK name, `T` and spaces ending in `.A` and so
+on, which tells what the file holds. batchpad reads a `.P00` of any name by that
+suffix (`.A`, `.B`, `.I`); the other letters are refused with a message.
+
+batchpad reads `.I` files (or a `.P00` of one): the background (`.B`) by
+default, the sprites with `--input-format seuck-i-sprites`. It does not write
+`.I` or `.P00`, and does not read `.C` to `.G` (#84).
 
 ## C64 bitmap pictures
 

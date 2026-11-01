@@ -2,7 +2,10 @@
 ## projects, `.B` backgrounds as CharPad projects. The layouts are described in
 ## docs/import-export.md under SEUCK; the rules follow CharPad Pro 3.88's
 ## loader and saver (a `.B` is not checked for its signature, only its size).
+## Also `.P00` files (PC64 container) and the "save all data" `.I` file, which
+## holds both a background and the sprites.
 
+import std/strutils
 import ctm, rawimport, spd
 
 type
@@ -19,7 +22,30 @@ const
   charCount = 254
   tileSide = 5
 
+  seuckISize* = 2 + (0x10000 - 6 - 0x900)  ## 63228: $900 to $fff9 after the 2 byte signature
+  p00HeaderSize* = 26
+
 proc fail(msg: string) {.noreturn.} = raise newException(SeuckError, msg)
+
+# .P00
+
+proc isP00*(data: string): bool =
+  ## PC64 container: "C64File", $00, a 16 byte name, $00, record size.
+  data.len >= p00HeaderSize and data.startsWith("C64File\0")
+
+proc unwrapP00*(data: string): tuple[name, body: string] =
+  ## The name stored in a `.P00` header, without trailing padding (SEUCK
+  ## names end in `.A` to `.I`), and the file after the header.
+  if not data.isP00: fail("not a .P00 file")
+  var name = data[8 ..< 24]
+  while name.len > 0 and name[^1] in {' ', '\0', '\xa0'}: name.setLen name.high
+  (name, data[p00HeaderSize .. ^1])
+
+proc seuckKind*(name: string): char =
+  ## The letter a SEUCK file name ends in, upper case, or `\0` for another name.
+  if name.len >= 2 and name[^2] == '.' and name[^1].toUpperAscii in {'A' .. 'I'}:
+    name[^1].toUpperAscii
+  else: '\0'
 
 # .A
 
@@ -176,3 +202,39 @@ proc toSeuckB*(p: ctm.Project, leftOut: var seq[string], sideways = false): stri
 proc toSeuckB*(p: ctm.Project, sideways = false): string =
   var leftOut: seq[string]
   p.toSeuckB(leftOut, sideways)
+
+# .I, "save all data"
+
+const
+  mapAt = 0x900           ## the map, tile colours, tiles: $900 to $267f
+  mapEnd = 0x2680
+  charsAt = 0xf800        ## the chars, and the 10 bytes after them
+  memEnd = 0xfffa
+  spritesAt = 0xc000
+
+proc memory(data: openArray[byte], at, len: int): string =
+  ## `len` bytes of SEUCK memory from address `at`, out of a `.I` file.
+  for i in at ..< at + len: result.add char(data[2 + i - mapAt])
+
+proc checkI(data: openArray[byte]) =
+  if data.len != seuckISize:
+    fail("not a SEUCK \"save all data\" file: " & $data.len & " bytes, expected " & $seuckISize)
+
+proc seuckIBackground*(data: openArray[byte]): string =
+  ## The `.B` file inside a `.I` file: the memory from $900 to $267f, then from
+  ## $f800 to $fff9. Raises SeuckError for another size.
+  data.checkI
+  "B\0" & memory(data, mapAt, mapEnd - mapAt) & memory(data, charsAt, memEnd - charsAt)
+
+proc seuckISprites*(data: openArray[byte]): string =
+  ## The `.A` file inside a `.I` file: the 127 sprites at $c000.
+  data.checkI
+  "B\0" & memory(data, spritesAt, 127 * 64)
+
+proc parseSeuckIBackground*(data: openArray[byte]): ctm.Project =
+  let b = seuckIBackground(data)
+  parseSeuckB(b.toOpenArrayByte(0, b.high))
+
+proc parseSeuckISprites*(data: openArray[byte]): SpriteProject =
+  let a = seuckISprites(data)
+  parseSeuckA(a.toOpenArrayByte(0, a.high))

@@ -53,7 +53,7 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 The input type comes from its contents, not its extension: CTM, SPD,
 headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)), SEUCK
 CharPad C16 `.ctt` (by its signature, or `--input-format ctt`; colours stay TED colours, 0-127, so `--set` takes those), SEUCK
-`.A` or `.B` (by extension and exact size, or `--input-format seuck-a`, `seuck-b`). `--input-format seuck-b-sideways`
+`.A` or `.B` (by extension and exact size, or `--input-format seuck-a`, `seuck-b`), a `.P00` of one of those (by the name inside it), and the "save all data" `.I` (by extension and size, or a `.P00`; `--input-format seuck-i` for the background, `seuck-i-sprites` for the sprites). `--input-format seuck-b-sideways`
 reads the sideways SEUCK `.B`, which looks the same as the normal one.
 
 `batchpad --help`, `batchpad <command> --help`, `batchpad --version`.

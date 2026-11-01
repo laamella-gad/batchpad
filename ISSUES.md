@@ -2,7 +2,7 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#84**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#86**.
 
 ## Open
 
@@ -38,6 +38,17 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Tile size, count and tile properties (`tag`, class) live there when a tileset is external. Now only the `firstgid` and `source` are kept.
 - #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
   - `png` and `stats` refuse a project with TED colours; `gif` never took CTM. Needs the 128-colour TED palette (chroma-major, from the CTT spec) in `image.nim` and TED-aware colour handling in `preview.nim` and `stats.nim`. Follow-up of #79.
+- #84 [feature, low] SEUCK `.C` to `.G` files, writing `.I` and `.P00`
+  - `.C` (animations, enemy properties; see #85) and `.E` (attack waves) layouts are in docs/import-export.md but not read by batchpad; `.F` (`$b776`, 154 bytes) is unknown; `.D` is sound effects (240 bytes at `$b810`), `.G` a 64-char font (`$f400`). See "Memory map" in docs/import-export.md. Decide what batchpad would do with them (`bin` parts? a font as a CharPad project?). Also writing `.P00` (and `.I`, from a sprite project and a CharPad project).
+- #85 [feature, normal] SpritePad animations in SEUCK games
+  - SEUCK keeps 58 animations in `.C` (at `$2c80` in memory): 20 bytes each, 18 frames (sprite numbers; bit 7 marks the last frame, which loops), a speed byte, and a colour/directional byte. Layout in docs/import-export.md, "Animations". SpritePad animations are a first and last sprite, a timer and attribute bits (`Animation` in `spd.nim`).
+  - Read: `.C` (and the `.C` part of a `.I`) as the animations of a sprite project; a SEUCK frame list that isn't a run of consecutive sprites needs a rule (limit to runs, or expand to several animations). Write: SpritePad animations into a `.C`, or into a game's `.I`/`.P00` with the sprites (`inject`, see the SEUCK plan). Frame lists are 18 at most; longer SpritePad animations need an error or a cut.
+  - To decide: how SpritePad's timer and attribute bits map to the speed byte and the directional bits; what a frame `$ff` (end marker plus sprite 127) means; how `--sprite-attribs seuck` and the animations meet in `bin` (`sprite-anims` part exists already).
+  - No SEUCK or SpritePad program was used to check any mapping.
+
+## In progress
+
+## Closed
 
 - #83 [task, normal] Investigate `.P00` and the other SEUCK formats
   - `.P00` (PC64 container): 26-byte header (`C64File`, 16-byte name, `$00`, `$00`), then the file. Real `.A` (8156 bytes) and `.B` (9622 bytes) samples in martinpiper/C64Public `SEUCK/Debug1/T______A.P00` and `BG1____B.P00` read fine once the header is stripped; decide whether `.P00` input is read directly (and whether `.P01`, `.S00` etc. count).
@@ -45,10 +56,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Open question: what bits 5 to 7 of the sprite colour byte mean. Real `.A` files have them set (`$B`, `$C`, `$D` in the high nibble) and we drop them on write. Also: the 128 "unused" bytes of `.B` are not zero in real files, and its last 10 bytes are `$ff` where we write `$3f` (loading ignores both).
   - SEUCK Redux (Martin Piper's engine in that repo) reads stock SEUCK data; no format change found. His notes: `SEUCK/UnlockTheEditor.txt`, https://github.com/martinpiper/DebuggingDetails/blob/main/SEUCK.txt, and the Google Doc linked there (not read).
   - The repo has no licence (`NOASSERTION`): do not copy its files into `tests/files/`; tests build their own bytes.
+  - Done 2026-11-01. Memory map worked out and documented (docs/import-export.md, "Memory map"): `.A` `$c000`, `.B` `$900`-`$267f` + `$f800`-`$fff9`, `.C` `$2c80`, `.D` `$b810` (sound effects), `.F` `$b776`, `.G` `$f400` (score panel font), `.I` everything. Code: `.P00` input (by the SEUCK name inside), `.I` input as background or (`--input-format seuck-i-sprites`) sprites; own test files `tests/files/seuck/*.P00`. Bits 5-7 of the sprite colour byte still unexplained (they are in the original disks' files too). The original disks (`software/Shoot-em-up-Construction-Kit_C64_EN.zip`) gave 4 games of `.A` to `.G`, including `.E`; all four `.A` and `.B` read. Rest is #84.
 
-## In progress
-
-## Closed
 
 - #82 [task, normal] Release binaries for Linux, Windows and macOS
   - Build `bin/batchpad` (Nim >= 2.2.8) for each platform, e.g. a GitHub Actions workflow on tag push that builds on `ubuntu`, `windows` and `macos` runners and attaches `batchpad-linux.tar.gz`, `batchpad-windows.zip` and `batchpad-macos.tar.gz` to a release at https://github.com/laamella-gad/batchpad/releases. Run `nimble test` per platform first. The README download links point at these names.
