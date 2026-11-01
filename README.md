@@ -69,8 +69,8 @@ versions.
 | SPD V5 | SpritePad 2.9 | yes | yes | Checked (112 files); what every Pro release saves |
 | **Other editors** | | | | |
 | Spritemate `.spm` | Spritemate | yes | yes | Checked (Spritemate's 5 examples). Sprites only: tiles, animations and sprite names aren't kept; older layouts are read too |
-| SEUCK `.A` sprites | SEUCK (1987) | yes | yes | No files to check. Read and written as a sprite project |
-| SEUCK `.B` background | SEUCK (1987) | yes | yes | No files to check. Read and written as a CharPad project; also the sideways kind of CharPad 1.7 |
+| SEUCK `.A` sprites | SEUCK (1987) | yes | yes | Real files read ([details](docs/import-export.md#real-files-checked-2026-11-01)), but none from the original program. Read and written as a sprite project |
+| SEUCK `.B` background | SEUCK (1987) | yes | yes | Real files read, as `.A`. Read and written as a CharPad project; also the sideways kind of CharPad 1.7 |
 | Tiled `.tmx` | Tiled | yes | yes | No files to check. A map, not a CharPad project: goes to `bin`, `asm` and `c`, and converts to and from JSON; CSV and base64 data, no compression (#77) |
 | Tiled JSON (`.tmj`, `.json`) | Tiled | yes | yes | No files to check. As `.tmx` |
 | **Exports and imports** | | | | |

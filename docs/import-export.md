@@ -485,6 +485,35 @@ and 9 x `$ff`. `.A` follows SpritePad Pro's rules (above). The sideways
 variant follows 1.7 as noted here and has not been checked against a real
 file; it pads fewer tiles and chars and keeps tile colours unmasked.
 
+### Real files (checked 2026-11-01)
+
+Real `.A` and `.B` files are in Martin Piper's repository
+[martinpiper/C64Public](https://github.com/martinpiper/C64Public) (no licence,
+so none are copied into `tests/files/`; tests build their own bytes): `SEUCK/Debug1/T______A.P00`
+and `T______B.P00`, `SEUCK/BG1____B.P00`, and many "save all data" `.P00`
+files. They are `.P00` (PC64) files: a 26-byte header (`C64File`, a 16-byte
+name, two zero bytes), then the file as SEUCK saved it. With the header cut off
+they are 8130 bytes (`.A`) and 9596 bytes (`.B`), start with `$42 $00`, and
+batchpad reads them with the sizes and layouts above.
+
+Writing such a file back with `convert` changes only bytes that loading does
+not use:
+
+- `.A`: the high bits 5 to 7 of the 64th byte of some sprites (`$CC` becomes
+  `$0C`). Colour and multicolour are kept. What those bits mean is not known.
+- `.B`: the 128 unused bytes (not zero in real files; we write zeros), the high
+  nibble of some tile colours (masked with `$0f`, as Pro does), and the last 10
+  bytes (`$ff` in the real file where we write `$3f`). Map, tiles and chars are
+  identical.
+
+Martin Piper's SEUCK Redux is a replacement game engine (`Scroller/` in that
+repository) that plays the data stock SEUCK saves. His notes
+(`Scroller/README.md`, `SEUCK/UnlockTheEditor.txt`) show no change to the file
+formats, and the files above have the stock sizes. The "save all data" `.P00`
+(63254 bytes: 26-byte header, 2-byte load address, SEUCK memory from `$900`)
+holds sprites, chars, tiles and map too; its offsets are in `Scroller/ScrollerData.a`
+and `ScrollerDataMacro.a`. Not supported: see #83.
+
 ## C64 bitmap pictures
 
 All three are PRG files: a load address, then the data. CharPad exports them
