@@ -119,10 +119,19 @@ proc binSubMap*(p: ctm.Project, y, x: int, part: string, o = BinOptions()): seq[
 func isBitmap(p: ctm.Project): bool = p.displayMode in {dmHiresBitmap, dmMulticolourBitmap}
 
 func l1(c: Colours, p: ctm.Project, colouring: ColouringMethod): byte =
-  if p.colouring == colouring and p.displayMode != dmHiresBitmap: c[0] and 0x0f else: 0
+  ## The colour RAM byte; for a CharPad C16 project (TED colours) CharPad C16's
+  ## L1 byte: the colour (luma and chroma) in the text modes, the two lumas in
+  ## the bitmap modes (pen 10/0 high, 01/1 low).
+  if p.colouring != colouring: return 0
+  if p.ted:
+    if p.isBitmap: ((c[1] shr 4) and 7) shl 4 or ((c[2] shr 4) and 7) else: c[0] and 0x7f
+  elif p.displayMode != dmHiresBitmap: c[0] and 0x0f
+  else: 0
 
 func l2(c: Colours, p: ctm.Project, colouring: ColouringMethod): byte =
-  if p.colouring == colouring and p.isBitmap: (c[1] and 0x0f) or ((c[2] and 0x0f) shl 4) else: 0
+  ## The screen RAM byte; on the C16 the two chromas (pen 01/1 high, 10/0 low).
+  if p.colouring != colouring or not p.isBitmap: return 0
+  (c[1] and 0x0f) or ((c[2] and 0x0f) shl 4)
 
 proc needTiles(p: ctm.Project) =
   if not p.tileSystem: fail("the project has no tiles")
@@ -162,7 +171,7 @@ proc colourMap(p: ctm.Project, o: BinOptions): seq[byte] =
               of cmPerProject: p.colours
               of cmPerTile: p.tiles[tile].colours
               of cmPerChar: p.chars[ch].colours
-      result.add c[0] and 0x0f
+      result.add c[0] and (if p.ted: 0x7f else: 0x0f)
 
 proc needBitmap(p: ctm.Project, part: string) =
   if not p.isBitmap: fail(part & " is only there in bitmap modes")
@@ -173,7 +182,8 @@ proc binPart*(p: ctm.Project, part: string, o = BinOptions()): seq[byte] =
   of "chars":
     for c in p.chars: result.add c.data
   of "char-attribs":
-    for c in p.chars: result.add byte(c.material shl 4) or c.colours.l1(p, cmPerChar)
+    # a TED colour takes 7 bits, so the material has no room: see char-materials
+    for c in p.chars: result.add (if p.ted: 0'u8 else: byte(c.material shl 4)) or c.colours.l1(p, cmPerChar)
   of "char-attribs-l2":
     p.needBitmap(part)
     for c in p.chars: result.add c.colours.l2(p, cmPerChar)

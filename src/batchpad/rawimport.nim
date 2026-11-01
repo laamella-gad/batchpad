@@ -165,7 +165,7 @@ proc importCtm*(parts: Parts, o: ImportOptions, base = newCtmProject()): ctm.Pro
   elif o.mapWidth != 0 or o.mapHeight != 0:
     fail("--map-size needs a map")
 
-proc seuckToSpritePad(b: byte): byte =
+proc seuckToSpritePad*(b: byte): byte =
   ## Bit 4 is multicolour in SEUCK: it becomes bit 7; bits 5-7 are dropped.
   (b and 0x0f) or (if b.testBit(4): 0x80'u8 else: 0)
 

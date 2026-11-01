@@ -14,6 +14,9 @@ has been tried in the programs yet unless it says so.
 | --- | --- | --- | --- | --- |
 | Own project (`.ctm` / `.spd`) | read V1-V9 (not V3), write V9; "Export Project" writes V5, V6, V7, V8 | read V1-V7 (not V3), write V7; export V5, V6; ECM opens as hires | read headerless 1.8 and SPD V1-V5, write V5 | read CTM V4-V9; no project save |
 | CharPad C16 project (`.ctt`) | open (file filter) | - | - | - |
+
+batchpad reads and writes `.ctt` V8 and V9 (#40, #79; see `charpad.md`): `convert` to and from `ctm`, `bin`, `asm` and `c` straight from a `.ctt`. Previews and statistics of one are not done.
+
 | Raw binary | import, export | import, export | import, export | export |
 | Assembler text (`.asm`, 64tass) | export; import map as text | export (own template); import map as text | export | export |
 | Images (BMP, PNG, GIF) | import (Image Importer), export | import BMP/PNG, export | import, export, sheets, animated GIF | - |
@@ -471,6 +474,18 @@ on disk their names are 16 characters ending in `.A` to `.G`.
   $d021 to `$0b`, $d022 to `$00`, $d023 to `$01` and the char colour to `$0d`.
   Pro has no sideways option.
 
+batchpad (`src/batchpad/seuck.nim`, #56, #57) follows Pro 3.88's loader and
+saver, read from the decompiled code (`CPV_FileIO_SEUCK`): the loader only
+checks that the file is 9596 bytes, not the signature; it reads the file's map
+rows into the project's rows 511 down to 0, masks the 128 tile colours with
+`$0f`, skips the 128 unused bytes and the last 10 bytes, and leaves everything
+else at defaults (multicolour text, per-tile colouring, 254 chars, 128 tiles,
+5 x 5). The saver refuses a project that isn't exactly that, and writes
+`$42 $00`, the map, the tile colours, 128 zeros, the tiles, the chars, `$3f`
+and 9 x `$ff`. `.A` follows SpritePad Pro's rules (above). The sideways
+variant follows 1.7 as noted here and has not been checked against a real
+file; it pads fewer tiles and chars and keeps tile colours unmasked.
+
 ## C64 bitmap pictures
 
 All three are PRG files: a load address, then the data. CharPad exports them
@@ -514,12 +529,13 @@ Decided 2026-10-18; issues #41-#51, #53 and #54.
   jump table (#46), usage statistics (#47).
 - PNG previews (#48), animated GIFs of SpritePad animations (#49), `.pal`
   palettes for colouring both (#50).
-- CharPad C16 `.ctt`: decide after #40 (#51).
+- CharPad C16 `.ctt` V8 and V9: read and write (#40, #79; done 2026-11-01).
 - A load address option shared by binary exports and imports (#54).
 - SEUCK `.A` sprites and `.B` backgrounds, and the SEUCK attribute style for
   raw sprites (#56, #57; added 2026-10-18).
 - Tiled maps (`.tmx` and JSON): read into the binary, assembler and C exports,
   and converted to each other (#66; see tiled.md).
+- SEUCK `.A` and `.B` files: read and write through `convert` (#56, #57; done).
 - Skipped: Koala / Art Studio / Advanced Art Studio, image import,
   VICE snapshots, Glaze's parallax build.
 

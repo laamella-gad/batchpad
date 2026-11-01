@@ -332,29 +332,61 @@ specially, so chars 64 and up are written as stored.
 
 ## CharPad C16 (`.ctt`)
 
-CharPad C64 Pro 3.88 opens CharPad C16 projects and converts them
-(`CPV_FileIO_CTT8_Converter`, `CTT9_Converter`); the layout below comes from
-that code, not from CharPad C16 itself. Magic `CTT`, version 8 or 9. The blocks
-are those of CTM V8 and V9; the header and colours differ:
+CharPad C16 Pro (3.69 and 3.81 checked, 2026-11-01) saves `.ctt` projects: magic
+`CTT`, version 8 (CharPad C16 3.4) or 9 (3.5; the key map in the high nibble of
+the flags byte was added in October 2023). Official specs: `Help/File Format -
+CTT (V8|V9).htm` in its releases, which also hold 807 V9 samples and no V8 file.
+CharPad C64 Pro 3.88 can also open them (`CPV_FileIO_CTT8_Converter`,
+`CTT9_Converter`) and the layout below agrees with that code. The blocks are
+those of CTM V8 and V9; the header and colours differ:
 
 | Offset | CTT V8 | CTT V9 |
 | --- | --- | --- |
 | 4 | display mode | display mode |
 | 5 | colouring method | colouring method |
-| 6 | flags, bit 0 tile system | flags, key map in the high nibble |
+| 6 | flags, bit 0 tile system | flags, key map (0-10) in the high nibble |
 | 7 | 4 chip colours | flexi-grid width, height, settings (as CTM V9) |
-| 11 | 2 project colours (text modes use the first) | |
+| 11 | 2 project colours | |
 | 12 | | 4 chip colours |
 | 16 | | 2 project colours |
 | size | 13 | 18 |
 
-- Colours are TED values, 7 bits (`& $7f`): luminance and hue, not the C64's 16.
-- Per-char and per-tile colour blocks: 1 byte in text modes, 2 in bitmap modes
-  (the two screen-RAM colours, high one first). There is no colour-RAM byte;
-  multicolour bitmap takes its third colour from chip colour 1, the same for
-  every cell.
-- The converter maps each TED colour to the nearest C64 colour and changes the
-  file name to `.ctm`, so the result is an ordinary C64 project.
+- Colours are TED colours, 7 bits: luma (bits 4-6) times 16 plus chroma (bits
+  0-3). The palette has 16 chromas of 8 lumas; black stays black at every luma
+  (120 different colours). `src/batchpad/ctt.nim` holds VICE 3.9's internal TED palette (xplus4, default colour controls, read off a screenshot with the render filter off), not CharPad C16's own (see `docs/palettes/`).
+- The project colours are two bytes in every mode. Text modes use the first;
+  the second is unused but samples keep a value in it, so we keep it (in
+  `colours[1]`) to write files back as read. Bitmap modes use both.
+- Per-char and per-tile colour blocks: 1 byte in text modes, 2 in bitmap modes.
+  The spec calls them the Colour Matrix and Screen Matrix colour; C64 Pro's
+  converter reads the first as pen 01/1 and the second as pen 10/0, which is
+  what we do (first into `colours[2]`, second into `colours[1]`). There is no
+  colour-RAM byte; multicolour bitmap takes pen 11 from chip colour 1, the same
+  for every cell.
+- Multicolour text: bit 3 of a cell's chroma says multicolour, as bit 3 of a
+  C64 colour does, so only chromas 0-7 are usable. Chromas 0-7 are the same
+  colours as C64 colours 0-7 (black, white, red, cyan, purple, green, blue,
+  yellow).
+- The tile name block is there as in CTM V8. Limits: the format holds 65536
+  chars and tiles, tiles of 255 x 255 and maps of 65535 x 65535; CharPad C16
+  3.5 itself stops at tiles of 10 x 10 and maps of 8192 x 8192.
+- CharPad C64 Pro's converter maps each TED colour to the nearest C64 colour
+  and changes the file name to `.ctm`; in per-project multicolour bitmap it
+  moves chip colour 1 to the colour RAM colour. CharPad C16 has a C64 to C16
+  converter of its own, using the VICE palettes (dev log, 3.5 and later).
+- What we do: `ctt.nim` reads and writes V8 and V9 (all 807 samples read and
+  write back byte for byte; V8 has no sample, so it follows the spec) and keeps
+  the TED colours (`Project.ted`). `convert` to `ctm` maps them to the nearest
+  VICE colour as above; `convert` from a CTM to `ctt` maps back (multicolour
+  text keeps the multicolour flag and only the luma is picked, multicolour
+  bitmap makes pen 11 the shared chip colour 1 and reports cells that differ).
+  The colour conversions are approximate and not CharPad's own.
+- Raw exports follow CharPad C16's text: `char-attribs` and `tile-attribs`
+  hold the TED colour in the text modes (luma and chroma, no material, see
+  `char-materials`) and in the bitmap modes the lumas (pen 10/0 high, 01/1
+  low); `char-attribs-l2` and `tile-attribs-l2` the chromas (01/1 high, 10/0
+  low). These two are there in both bitmap modes.
+- Not done: `png`, `gif` and `stats` of a `.ctt` (they say so).
 
 ## What has been checked in CharPad itself
 

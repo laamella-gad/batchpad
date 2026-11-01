@@ -33,6 +33,7 @@ type
 
   Project* = object
     version*: int
+    ted*: bool                     ## a CharPad C16 project (`.ctt`): colours are 7 bit TED colours
     displayMode*: DisplayMode
     colouring*: ColouringMethod
     tileSystem*: bool
@@ -843,6 +844,7 @@ proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
   ## without a line. Raises CtmError on other versions, on projects that don't
   ## hold together, such as one without chars, and on bitmap modes in V6 and V7 and ECM in V2 to V6, and on char maps and more than 256 tiles in V1 to V4, and on tiles smaller than 4 x 4 and more than 256 chars in V1.
   p.check
+  if p.ted: fail("the project has TED colours (CharPad C16); convert them with toC64 first")
   case version
   of 1: formatV1(p.fitV3V4(1, leftOut))
   of 2: formatV2(p.fitV3V4(2, leftOut))

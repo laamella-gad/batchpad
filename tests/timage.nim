@@ -50,7 +50,7 @@ proc charProject(mode: DisplayMode, colouring = cmPerProject): ctm.Project =
 
 suite "palettes":
   test "the colours, names and comments":
-    var text = "; Pepto\n"
+    var text = "; VICE\n"
     for i in 0 .. 15: text.add "#" & toHex(i * 16 + 1, 2) & "0203" & (if i == 3: " \"Cyan\"\n" else: "\n")
     let p = parsePalette(text & "\n")
     check p[0] == [1'u8, 2, 3] and p[3] == [0x31'u8, 2, 3] and p[15] == [0xf1'u8, 2, 3]
@@ -67,17 +67,17 @@ suite "PNG":
   test "indexed, scaled":
     var img = newImage(3, 2)
     img.pixels = @[0'u8, 1, 2, 15, 7, 3]
-    let d = decode(img.toPng(pepto, 2))
+    let d = decode(img.toPng(vice, 2))
     check (d.width, d.height) == (6, 4)
     check d.rows[0] == "\0\0\1\1\2\2"
     check d.rows[1] == d.rows[0]
     check d.rows[3] == "\x0f\x0f\7\7\3\3"
     check d.palette.len == 48 and d.palette[3 .. 5] == "\xff\xff\xff"
-    expect ImageError: discard img.toPng(pepto, 0)
+    expect ImageError: discard img.toPng(vice, 0)
 
   test "bigger than one stored block":
     let img = newImage(300, 300, 5)
-    let d = decode(img.toPng(pepto))
+    let d = decode(img.toPng(vice))
     check d.rows.len == 300 and d.rows[299] == "\5".repeat(300)
 
 proc lzwDecode(data: string): seq[int] =
@@ -145,13 +145,13 @@ suite "GIF":
     var a = newImage(3, 2)
     a.pixels = @[0'u8, 1, 2, 3, 4, 5]
     var b = newImage(3, 2, 15)
-    let d = decodeGif(toGif(@[a, b], pepto, 7, 2))
+    let d = decodeGif(toGif(@[a, b], vice, 7, 2))
     check (d.width, d.height) == (6, 4)
     check d.delays == @[7, 7]
     check d.frames[1] == newSeqWith(24, 15)
     check d.frames[0][0 .. 5] == @[0, 0, 1, 1, 2, 2]
     check d.frames[0][18 .. 23] == @[3, 3, 4, 4, 5, 5]
-    check "NETSCAPE2.0" in toGif(@[a], pepto, 7)
+    check "NETSCAPE2.0" in toGif(@[a], vice, 7)
 
   test "long frames: the code size grows and the table is reset":
     var img = newImage(150, 150)
@@ -159,16 +159,16 @@ suite "GIF":
     for p in img.pixels.mitems:
       x = x * 1664525 + 1013904223
       p = uint8((x shr 24) and 15)
-    let d = decodeGif(toGif(@[img], pepto, 2))
+    let d = decodeGif(toGif(@[img], vice, 2))
     check d.frames[0].len == 150 * 150
     check d.frames[0] == img.pixels.mapIt(int(it))
     var flat = newImage(200, 200, 3)
-    check decodeGif(toGif(@[flat], pepto, 2)).frames[0] == newSeqWith(40000, 3)
+    check decodeGif(toGif(@[flat], vice, 2)).frames[0] == newSeqWith(40000, 3)
 
   test "mistakes":
-    expect ImageError: discard toGif(@[], pepto, 2)
-    expect ImageError: discard toGif(@[newImage(2, 2), newImage(3, 2)], pepto, 2)
-    expect ImageError: discard toGif(@[newImage(2, 2)], pepto, 2, 0)
+    expect ImageError: discard toGif(@[], vice, 2)
+    expect ImageError: discard toGif(@[newImage(2, 2), newImage(3, 2)], vice, 2)
+    expect ImageError: discard toGif(@[newImage(2, 2)], vice, 2, 0)
 
 suite "CharPad previews":
   test "hires text: the char's colour on $d021":

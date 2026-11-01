@@ -127,6 +127,40 @@ suite "command line":
     check batchpad("png", src, "map")[0] == 1
     check batchpad("stats", src)[0] == 1
 
+  test "CharPad C16 files":
+    let t = files / "ctt9" / "text-mc-tiles.ctt"
+    check "ctt" in batchpad("info", t)[1]
+    check batchpad("convert", t, tmp / "c16.ctm")[0] == 0
+    check readCtm(tmp / "c16.ctm").chars.len > 0
+    check batchpad("convert", t, tmp / "c16b.ctt")[0] == 0
+    check readFile(tmp / "c16b.ctt") == readFile(t)
+    check batchpad("convert", t, tmp / "c16c.ctt", "--to", "ctt8")[0] == 0
+    check batchpad("convert", tmp / "c16.ctm", tmp / "c16d.ctt")[0] == 0
+    check batchpad("bin", t, "chars=" & tmp / "c16.bin")[0] == 0
+    check fileExists(tmp / "c16.bin")
+    let (code, err) = warnings("png", t, "map")
+    check code == 1 and "not there yet" in err
+    check batchpad("stats", t)[0] == 1
+
+  test "SEUCK files":
+    let a = files / "seuck" / "sprites.A"
+    let b = files / "seuck" / "background.B"
+    check "sprites: 127" in batchpad("info", a)[1]
+    check "mapHeight: 512" in batchpad("info", b)[1]
+    check batchpad("convert", a, tmp / "seuck.spd")[0] == 0
+    check batchpad("convert", tmp / "seuck.spd", tmp / "seuck.A")[0] == 0
+    check readFile(tmp / "seuck.A") == readFile(a)
+    check batchpad("convert", b, tmp / "b.ctm")[0] == 0
+    check batchpad("convert", tmp / "b.ctm", tmp / "b.B")[0] == 0
+    check readFile(tmp / "b.B") == readFile(b)
+    check batchpad("convert", files / "seuck" / "sideways.B", tmp / "sw.ctm", "--input-format", "seuck-b-sideways")[0] == 0
+    check batchpad("convert", tmp / "sw.ctm", tmp / "sw.B", "--to", "seuck-b-sideways")[0] == 0
+    check readFile(tmp / "sw.B") == readFile(files / "seuck" / "sideways.B")
+    check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "x.B")[0] == 1
+    check batchpad("convert", b, tmp / "x.A")[0] == 1
+    check batchpad("bin", b, "chars=" & tmp / "ch.bin")[0] == 0
+    check readFile(tmp / "ch.bin").len == 254 * 8
+
   test "convert to spd3 and spd4":
     for v in [3, 4]:
       check batchpad("convert", files / "spd5" / "tiles_anims.spd", tmp / "v.spd", "--to", "spd" & $v)[0] == 0
@@ -164,9 +198,9 @@ suite "command line":
     check text.startsWith("batchpad: " & tmp / "w.spd" & ": warning: left out the tiles (V1 has none)\n")
     check warnings("convert", src, tmp / "w5.spd") == (0, "")
     check warnings("convert", src, tmp / "q.spd", "--to", "spd1", "--quiet") == (0, "")
-    let (scode, stext) = warnings("convert", src, tmp / "s.spd", "--to", "spd1", "--strict")
+    let (scode, stext) = warnings("convert", src, tmp / "se.spd", "--to", "spd1", "--strict")
     check scode == 1 and "--strict" in stext and "the tiles (V1 has none)" in stext
-    check not fileExists(tmp / "s.spd")
+    check not fileExists(tmp / "se.spd")
 
   test "unchanged output is not written again":
     let src = files / "ctm9" / "mctext_pertile.ctm"

@@ -52,8 +52,9 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 
 The input type comes from its contents, not its extension: CTM, SPD,
 headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)), SEUCK
-`.A` or `.B`. `--input-format` forces it (needed for the sideways SEUCK `.B`,
-which looks the same as the normal one).
+CharPad C16 `.ctt` (by its signature, or `--input-format ctt`; colours stay TED colours, 0-127, so `--set` takes those), SEUCK
+`.A` or `.B` (by extension and exact size, or `--input-format seuck-a`, `seuck-b`). `--input-format seuck-b-sideways`
+reads the sideways SEUCK `.B`, which looks the same as the normal one.
 
 `batchpad --help`, `batchpad <command> --help`, `batchpad --version`.
 
@@ -208,7 +209,7 @@ batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `tmx` and `tiled-json` (Tiled maps, from each other only), `spd1`, `spd2`, `spd3`, `spd4`,
+`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `ctt8` and `ctt9` (CharPad C16; TED colours from the nearest VICE colour, and a `.ctt` converted to `ctm` goes the other way), `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `tmx` and `tiled-json` (Tiled maps, from each other only), `seuck-a` (127 sprites; a sprite project), `seuck-b` and `seuck-b-sideways` (a CharPad project with exactly 128 tiles of 5 x 5, 254 chars, per-tile colouring and an 8 x 512 map; sideways: 819 x 5, see import-export.md), `spd1`, `spd2`, `spd3`, `spd4`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 
@@ -337,7 +338,7 @@ at its addresses in the PRG.
 ### png, gif
 
 ```
-batchpad png level.ctm map -o map.png [--palette pepto.pal] [--scale 2]
+batchpad png level.ctm map -o map.png [--palette my.pal] [--scale 2]
 batchpad png ships.spd sprites -o sheet.png --columns 8
 batchpad gif ships.spd -o walk.gif --anim 0 [--scale 2]
 batchpad gif ships.spd -o door.gif --tile-anim 1
@@ -350,7 +351,7 @@ The picture is an 8 bit indexed PNG (16 colours) in the C64's own pixels:
 row of a sheet (default 16 chars, 8 tiles or sprites; the rest of the last row
 is background). The map is the whole map with tiles expanded. `--palette FILE`
 reads a `.pal` file (16 lines of `#RRGGBB`, each with an optional name after
-it; blank lines and `;` or `//` lines are skipped); the default is Pepto.
+it; blank lines and `;` or `//` lines are skipped); the default is VICE's (the internal VIC-II palette of VICE 3.9, pictured in `docs/palettes/`).
 There is no compression yet: files are as big as their pixels.
 
 Colours, as the C64 shows them:

@@ -2,45 +2,23 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#79**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#82**.
 
 ## Open
 
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
-- #40 [task, normal] Check what CharPad C16 Pro writes
-  - Paid, on itch.io. Find out whether it uses CTM, which version, and what differs.
-  - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`. Still to check: what C16 Pro itself writes.
-  - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
-- #51 [feature, low] Read CharPad C16 `.ctt` projects
-  - Decide after #40.
-- #56 [feature, low] Read and write SEUCK `.A` sprite files
-  - `$42 $00`, then 127 sprites of 64 bytes (8130 bytes); the 64th byte is `000M CCCC`. Layout in `docs/import-export.md`, conversions in `docs/spritepad.md` (SpritePad 1.8 and Pro agree).
-  - Export: colour + `$10` if multicolour, pad to 127 sprites with zero blocks, refuse more than 127. Import: bit 4 becomes multicolour (bit 7), bits 5-7 dropped.
-  - Also as an attribute style for raw sprite export/import (#41, #42): SpritePad, SEUCK or Blank (`Ignore` in the code) (`$8c` on import, 0 on export).
-- #57 [feature, low] Read and write SEUCK `.B` background files
-  - 9596 bytes: `$42 $00`; map 8 x 512 bytes, bottom to top; 128 tile colours; 128 unused bytes; 128 tiles of 5 x 5; 254 chars; `$3f`, 9 x `$ff`. Layout in `docs/import-export.md`.
-  - Only for a project with exactly those sizes and per-tile colouring, as CharPad does; report what doesn't fit.
-  - CharPad 1.7 also wrote backgrounds for the "sideways SEUCK mod" (819 x 5 map), same file layout with the map bytes reordered; see docs/import-export.md. The file doesn't say which kind it is, so this needs an option.
+
 - #65 [feature, normal] Read and write Petmate `.petmate` screen projects
   - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
-  - Found by a web search on 2026-10-31; format not looked at yet.
-- #67 [task, low] Look at Spred64 files and decide on a reader
-  - Spred64 (rrfreelance.itch.io/spred64-c64-sprite-editor) saves sprites as decimal byte data. Find out whether it has a project file of its own, what the text export looks like, and whether it keeps colours and modes.
   - Found by a web search on 2026-10-31; format not looked at yet.
 - #68 [task, low] Look at Multipaint files and decide on a reader
   - Multipaint (retro paint program) exports `.prg` bitmaps. We have no bitmap model; the question is whether raw bitmap import (CharPad bitmap modes: bitmap, screen and colour RAM) is enough, or whether it is out of scope.
   - Found by a web search on 2026-10-31; formats not looked at yet.
-- #69 [task, low] Look at Tilemedo files and decide on a reader
-  - Tilemedo (see blog.retroleum.co.uk) builds game maps from a charset and tiles on the PC. Little is documented: find the project and export formats first.
-  - Found by a web search on 2026-10-31; formats not looked at yet.
-- #70 [task, low] Look at Pixcen files and decide on a reader
-  - Pixcen is a C64 bitmap editor that forums recommend. The searches found nothing on it: find the project and export formats first. Like #68, a bitmap model would be needed.
-  - Found by a web search on 2026-10-31; formats not looked at yet.
-- #71 [task, low] Look at HermIRES files and decide on a reader
-  - HermIRES is a hires bitmap editor that a 2024 community post recommends. Find the project and export formats first. Like #68, a bitmap model would be needed.
-  - Found by a web search on 2026-10-31; formats not looked at yet.
+- #80 [feature, normal] Read and write Tilemedo `.tmd` projects and its binary exports
+  - Spec in `software/tilemedo.zip` (`tilemedo.html`) plus two example projects. Little endian words; the length field counts itself (checked: it equals the file size); the trigger map follows the map only when the file has map-size bytes left. Charset, colours (1 byte per char), tile set (16 bytes per 4 x 4 tile), map: fits the CTM model (tile system, per-char colour, text mode hires or multicolour). Trigger map has no CTM place: raw part only. Also the headerless binary exports and BMP map export/import (shares #72).
 - #72 [feature, low] BMP export and import
+  - In scope (decided 2026-11-01); #68 follows from the import half.
   - BMP as the lowest common denominator picture format of the PC platform. Asked for 2026-10-31; not started.
   - Export: a `bmp` command next to `png` (same parts, `--palette`, `--scale`, `--columns`): uncompressed 8 bit BMP with a 16 colour palette, rows padded to 4 bytes, bottom row first. Share the code with `png` in `cli.nim`.
   - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
@@ -58,11 +36,36 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Needs an inflate in Nim (no zlib in std). Now an error that says to use CSV.
 - #78 [feature, low] Read external Tiled tilesets (`.tsx`)
   - Tile size, count and tile properties (`tag`, class) live there when a tileset is external. Now only the `firstgid` and `source` are kept.
+- #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
+  - `png` and `stats` refuse a project with TED colours; `gif` never took CTM. Needs the 128-colour TED palette (chroma-major, from the CTT spec) in `image.nim` and TED-aware colour handling in `preview.nim` and `stats.nim`. Follow-up of #79.
 
 ## In progress
 
 ## Closed
 
+- #79 [feature, normal] Read and write CharPad C16 `.ctt` projects (V8 and V9)
+  - Was #51 (blocked on #40). Official specs and 419 samples now in `software/`. Same blocks as CTM V8/V9 with a 13/18 byte header, TED colours (7 bits), colour per cell 1 byte (text) or 2 (bitmap). Decide how TED colours map into the project model (keep the raw 7 bits, convert to the C64 palette as CharPad C64 Pro does, or both) and how `png`/`gif` draw them (TED palette). Done after #40.
+  - Done 2026-11-01. `src/batchpad/ctt.nim`: read/write V8 and V9 as CharPad projects with TED colours (`Project.ted`), `convert` to and from ctm/ctt8/ctt9, `bin`/`asm`/`c` from a `.ctt` (L1/L2 colour bytes as CharPad C16). Colour conversion is nearest colour, not CharPad's own. `png`, `gif` and `stats` refuse a `.ctt`: see #81.
+- #40 [task, normal] Check what CharPad C16 Pro writes
+  - Files arrived 2026-11-01 in `software/` (CharPad C16 Pro 3.69 and 3.81, with 419 `.ctt` samples and the official `File Format - CTT (V8|V9).htm` specs). Still to do: compare the specs and samples with the layout in `docs/charpad.md` (so far from CharPad C64 Pro's converter), write what differs.
+  - CharPad C64 Pro 3.88 converts `.ctt` V8 and V9 (TED colours); that layout is in `docs/charpad.md`.
+  - CharPad Glaze C64 already checked: it reads CTM V4-V9 only and its examples are V9; see `docs/charpad.md`.
+  - Done 2026-11-01. Specs and the code agree on the layout. Differences found: the project colours are two bytes in every mode (text modes use the first; the second is non-zero in samples, kept for exact round trip); bitmap colour bytes are named differently (first byte = pen 10/0, second = pen 01/1); key maps go 0-10; limits are tiles 10x10 and map 8192x8192. 807 samples (3.69: 388, 3.81: 419) all read and write back byte-identical. No V8 sample exists: V8 is from the spec and one own file only. Written up in `docs/charpad.md`.
+- #67 [task, low] Look at Spred64 files and decide on a reader
+  - Spred64 (rrfreelance.itch.io/spred64-c64-sprite-editor) saves sprites as decimal byte data. Find out whether it has a project file of its own, what the text export looks like, and whether it keeps colours and modes.
+  - Looked at 2026-11-01: the itch page documents no file layout (save/load with Ctrl+S/L, Alt+B binary export, PNG export); sprites are mono only. Download (Beta 1.47) is a name-your-price purchase. Without a sample there is nothing to read: closed 2026-11-01; reopen with a sample file.
+- #71 [task, low] Look at HermIRES files and decide on a reader
+  - Closed 2026-11-01: no format found; reopen with a sample.
+- #70 [task, low] Look at Pixcen files and decide on a reader
+  - Closed 2026-11-01: no format found; reopen with a sample.
+- #69 [task, low] Look at Tilemedo files and decide on a reader
+  - Done 2026-11-01: format documented and samples found; reader is #80.
+- #51 [feature, low] Read CharPad C16 `.ctt` projects
+  - Moved to #79 (2026-11-01), now unblocked.
+- #57 [feature, low] Read and write SEUCK `.B` background files
+  - Done 2026-10-31, `src/batchpad/seuck.nim`, `tests/tseuck.nim`, `tests/files/seuck/`: `.B` is read as a CharPad project and written from one (`convert level.B level.ctm`, `convert level.ctm level.B`, `--input-format seuck-b`). Rules from CharPad Pro 3.88's decompiled loader and saver: exact sizes required on writing (128 tiles of 5 x 5, 254 chars, per-tile colouring, 8 x 512 map), tile colours masked on reading, the map stored bottom row first. The sideways variant of CharPad 1.7 (`seuck-b-sideways`, 819 x 5 map) follows the notes in `docs/import-export.md`; no real sideways file was available to check it.
+- #56 [feature, low] Read and write SEUCK `.A` sprite files
+  - Done 2026-10-31, same files: `.A` is read as a sprite project of 127 sprites and written from one, padded with empty sprites (`seuck-a`); more than 127 is refused; expansion and overlay bits are left out with a warning. The raw-sprite attribute style was already there (#41, #42).
 - #66 [feature, low] Read and write Tiled maps (TMX and JSON)
   - Done 2026-10-31, `src/batchpad/tiled.nim`, `src/batchpad/tiledbin.nim`, `tests/ttiled.nim`, `tests/files/tiled/`: a third kind of input, not a CharPad project. Read TMX and JSON (CSV and uncompressed base64 data, infinite maps flattened, group layers flattened), convert them into each other, and write the tile numbers of any tile layer (`map`, `map:NAME`), flip flags (`map-flags`), tile tags and names through `bin`, `asm` and `c`; settings `layer`, `tileset`, `empty-tile`. Compressed data is an error that says to use CSV (#77). Not opened in Tiled itself. Details in `docs/tiled.md`. Follow-ups #73-#78.
 - #64 [feature, normal] Read and write Spritemate `.spm` sprite projects

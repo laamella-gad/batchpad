@@ -540,6 +540,8 @@ proc head*(p: ctm.Project, o: AsmOptions): seq[HeadLine] =
   h.blank
   h.comment "Colour values..."
   h.blank
+  if p.ted:
+    h.comment "nb. CharPad C16 project: colours are TED colours, luma * 16 + chroma (0-127)."
   h.comment "cmxlo = colour matrix low nybble."
   h.comment "vmxlo = video matrix low nybble."
   h.comment "vmxhi = video matrix high nybble."
