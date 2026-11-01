@@ -388,6 +388,58 @@ those of CTM V8 and V9; the header and colours differ:
   low). These two are there in both bitmap modes.
 - Not done: `png`, `gif` and `stats` of a `.ctt` (they say so).
 
+## Tilemedo (`.tmd`)
+
+Tilemedo (Phil / Retroleum, freeware, Windows; `software/tilemedo.zip` holds
+version 1.10, its help `tilemedo.html` with the format, and two example
+projects) is a 4 x 4 tile map editor for C64 text modes. batchpad reads and
+writes its projects as CharPad projects (#80): `src/batchpad/tmd.nim`.
+
+All numbers little-endian:
+
+| Size | Contents |
+| --- | --- |
+| 4 | length of the file, counting itself |
+| 1 | mode: 0 mixed (hires and multicolour chars), 1 hires chars only |
+| 1 | background colour ($d021) |
+| 1 | multicolour 0 ($d022) |
+| 1 | multicolour 1 ($d023) |
+| 2 | number of chars |
+| 8 per char | char data |
+| 1 per char | char colour (colour RAM: in mixed mode 8-15 are multicolour chars) |
+| 1 | tile width |
+| 1 | tile height |
+| 2 | number of tiles |
+| width x height per tile | char numbers, a byte each |
+| 2 | map width, in tiles |
+| 2 | map height |
+| 1 per map cell | tile numbers |
+| 1 per map cell | trigger map: only when it is switched on in Tilemedo |
+
+There is no signature: batchpad takes a `.tmd` whose first 4 bytes are its size
+and whose mode is 0 or 1. The trigger map is there when the file has a map's
+worth of bytes left; any other number of bytes left is an error.
+
+As a CharPad project: per char colouring, tile system on, hires or multicolour
+text. Char and tile numbers are bytes, so at most 256 of each are usable. The
+trigger map has no place in a CTM: the model keeps it in `Project.triggers`,
+`bin`/`asm`/`c` write it as part `triggers`, and writing a CTM or CTT leaves it
+out with a warning. Writing a `.tmd` leaves out (with a warning) materials, tile
+tags and names, the key map, the flexi-grid, chars and tiles past 256; ECM is
+written as hires; per project or per tile colours become per char colours (a
+char in tiles of different colours keeps the first). Bitmap modes and projects
+without tiles are refused.
+
+Checked: both example projects read and write back byte for byte (directly
+and through a CTM V9), and `png ... map` of each gives the same pixels as the
+`.bmp` Tilemedo exported of it (one RGB colour for one RGB colour; the palettes
+differ). Tilemedo itself was not run.
+
+Tilemedo's headerless exports are batchpad's raw parts: charset `chars`,
+colours `char-attribs` (the material nibble is 0), tile set `tiles` with
+`--cells 8`, map `map` with `--cells 8`, trigger map `triggers`. Its BMP map
+import and export belong with #72.
+
 ## What has been checked in CharPad itself
 
 - CharPad opened the version 7 file from `grotten_playfield.py` without problems

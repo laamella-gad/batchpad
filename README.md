@@ -4,7 +4,7 @@ BatchPad is the conversion step between the graphics editor and your build. You
 draw characters, tiles, maps and sprites in an editor such as
 [CharPad](https://subchristsoftware.itch.io/charpad-c64-pro),
 [SpritePad](https://subchristsoftware.itch.io/spritepad-c64-pro),
-[Spritemate](https://www.spritemate.com/) or [Tiled](https://www.mapeditor.org/)
+[Spritemate](https://www.spritemate.com/), Tilemedo or [Tiled](https://www.mapeditor.org/)
 and keep the project file in your repository.
 BatchPad turns that file into what your assembler or compiler wants: raw binary
 files to `incbin`, assembler source (64tass, acme, KickAssembler, ca65), or C
@@ -48,7 +48,7 @@ batchpad import -o level.ctm chars=chars.bin map=map.bin
 ```
 
 Inputs: CharPad `.ctm`, CharPad C16 `.ctt`, SpritePad `.spd` and `.spr`,
-Spritemate `.spm`, Tiled `.tmx` and JSON, SEUCK `.A` and `.B`. The design is in
+Spritemate `.spm`, Tilemedo `.tmd`, Tiled `.tmx` and JSON, SEUCK `.A` and `.B`. The design is in
 [docs/cli.md](docs/cli.md). Previews use VICE's palettes, pictured in
 [docs/palettes](docs/palettes/).
 
@@ -87,6 +87,7 @@ versions.
 | SPD V5 | SpritePad 2.9 | yes | yes | Checked (112 files); what every Pro release saves |
 | **Other editors** | | | | |
 | Spritemate `.spm` | Spritemate | yes | yes | Checked (Spritemate's 5 examples). Sprites only: tiles, animations and sprite names aren't kept; older layouts are read too |
+| Tilemedo `.tmd` | Tilemedo 1.10 | yes | yes | Checked (Tilemedo's 2 examples, byte for byte, and its BMP map exports). Read and written as a CharPad project; the trigger map is part `triggers` |
 | SEUCK `.A` sprites | SEUCK (1987) | yes | yes | Checked (the 4 sample games of the original SEUCK disks; [details](docs/import-export.md#the-original-disks)). Read and written as a sprite project; also from a `.P00` or the "save all data" `.I` (read only) |
 | SEUCK `.B` background | SEUCK (1987) | yes | yes | Checked (4 files), as `.A`. Read and written as a CharPad project; also from a `.P00` or `.I` (read only); also the sideways kind of CharPad 1.7 |
 | Tiled `.tmx` | Tiled | yes | yes | No files to check. A map, not a CharPad project: goes to `bin`, `asm` and `c`, and converts to and from JSON; CSV and base64 data (zlib and gzip too); external `.tsx` tilesets; object layers as data tables |

@@ -2,18 +2,21 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#87**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#88**.
 
 ## Open
 
+- #87 [task, normal] Check Tiled support against real Tiled files
+  - All files in `tests/files/tiled/` are hand-made from the format docs; none was saved by Tiled. Risky spots: tile objects (`gid`), object templates (`.tx`), `class` vs `type` across versions, external `.tsj` tilesets in JSON maps, zlib/gzip data from Tiled (only Python-made data tested), infinite maps with negative chunk positions.
+  - Without Tiled: run the example maps of the mapeditor/tiled GitHub repo through `info`, `bin`, `asm` and `convert` in a scratch dir (don't copy them into the repo).
+  - With Tiled (by hand): draw a small map (two tile layers, a flipped tile, an external tileset, an object layer with classes and an `hp` property), save as TMX CSV, TMX zlib and JSON; run `info`, `bin`, `asm` on each; open the `convert` output back in Tiled. `apt` has Tiled 1.8.2 only (we write 1.10).
+  - Fix what turns up; write the result in `docs/tiled.md` and the README row.
 - #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
   - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
 
 - #65 [feature, normal] Read and write Petmate `.petmate` screen projects
   - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
   - Found by a web search on 2026-10-31; format not looked at yet.
-- #80 [feature, normal] Read and write Tilemedo `.tmd` projects and its binary exports
-  - Spec in `software/tilemedo.zip` (`tilemedo.html`) plus two example projects. Little endian words; the length field counts itself (checked: it equals the file size); the trigger map follows the map only when the file has map-size bytes left. Charset, colours (1 byte per char), tile set (16 bytes per 4 x 4 tile), map: fits the CTM model (tile system, per-char colour, text mode hires or multicolour). Trigger map has no CTM place: raw part only. Also the headerless binary exports and BMP map export/import (shares #72).
 - #72 [feature, low] BMP export and import
   - In scope (decided 2026-11-01).
   - BMP as the lowest common denominator picture format of the PC platform. Asked for 2026-10-31; not started.
@@ -45,6 +48,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #80 [feature, normal] Read and write Tilemedo `.tmd` projects and its binary exports
+  - Done 2026-11-01. `src/batchpad/tmd.nim` (`parseTmd`, `toTmd`, `isTmd`) as CharPad projects; the trigger map is `Project.triggers` (new; CTM/CTT writers leave it out with a warning) and part `triggers` in `bin`/`asm`/`c`. CLI: detected by `.tmd` + length field, `--input-format tmd`, `convert --to tmd`. Tilemedo's 2 examples round trip byte for byte (also through CTM V9), and our map PNGs match its BMP exports pixel for pixel. The headerless exports are existing raw parts (docs/charpad.md); BMP map import/export stays with #72. Tests: `tests/ttmd.nim`, `tests/tcli.nim`, own files `tests/files/tmd/`.
 - #73 [feature, low] Export Tiled object layers as data tables
   - Done 2026-11-01. Part `objects` / `objects:NAME` (`tiledbin.nim`): a record per object, class number (sorted classes, `$ff` none), x and y words, width, height, then a byte per `--set object-fields=` property; tiles or pixels (`--set object-units=`). Asm/C: `objects_data`, `object_size`, `object_class_NAME`. Test file `tests/files/tiled/objects.tmx`; checked with 64tass, ca65 and oscar64 by hand.
 - #77 [feature, low] Read zlib and gzip compressed Tiled layers

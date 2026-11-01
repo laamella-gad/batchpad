@@ -52,7 +52,7 @@ type
 const
   ctmAsmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                   "tiles", "tile-attribs", "tile-attribs-l2", "tile-tags",
-                  "tile-names", "tile-events", "map", "submaps", "colour-map"]
+                  "tile-names", "tile-events", "map", "submaps", "colour-map", "triggers"]
   spdAsmParts* = ["sprites", "sprite-attribs", "tiles", "tile-attribs",
                   "tile-tags", "tile-names", "sprite-anims", "tile-anims"]
 
@@ -242,6 +242,10 @@ proc blocks(p: ctm.Project, part: string, ao: AsmOptions): seq[Block] =
     one("colourmap_data", @["ColourMap Data...",
         $w & "x" & $h & " (" & $(w * h) & ") cells, 8 bits per cell, " & sizeText(w * h)])
   of "tile-events": result = p.eventBlocks(ao)
+  of "triggers":
+    let (w, h) = p.mapSize(o)
+    one("triggermap_data", @["TriggerMap Data (Tilemedo)...",
+        $w & "x" & $h & " (" & $(w * h) & ") cells, 8 bits per cell, " & sizeText(w * h)])
   else: fail("a CharPad project has no part " & part)
 
 func defaultParts(p: ctm.Project): seq[string] =
@@ -255,6 +259,7 @@ func defaultParts(p: ctm.Project): seq[string] =
       if p.isBitmap: result.add "tile-attribs-l2"
     result.add "tile-tags"
   result.add "map"
+  if p.triggers.len > 0: result.add "triggers"
 
 # SpritePad
 

@@ -100,6 +100,20 @@ suite "command line":
     check readFile(tmp / "m2.spd") == readFile(files / "spd5" / "sprites.spd")
     check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "m.spm")[0] == 1
 
+  test "Tilemedo projects":
+    let src = files / "tmd" / "multicolour.tmd"
+    let (code, text) = batchpad("info", src)
+    check code == 0 and "triggerMap: true" in text and "tiles: 2" in text
+    check batchpad("convert", src, tmp / "t.tmd")[0] == 0
+    check readFile(tmp / "t.tmd") == readFile(src)
+    check batchpad("bin", src, "triggers=" & tmp / "trig.bin")[0] == 0
+    check readFile(tmp / "trig.bin") == "\x00\x05\x00\x00\x00\xff"
+    let (wcode, warned) = warnings("convert", src, tmp / "t.ctm")
+    check wcode == 0 and "trigger map" in warned
+    check batchpad("convert", tmp / "t.ctm", tmp / "t2.tmd")[0] == 0
+    check batchpad("bin", files / "tmd" / "hires.tmd", "triggers=" & tmp / "trig2.bin")[0] == 1
+    check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "x.tmd")[0] == 1
+
   test "Tiled maps":
     let src = files / "tiled" / "csv.tmx"
     let (code, text) = batchpad("info", src)

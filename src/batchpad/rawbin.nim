@@ -29,7 +29,7 @@ const
   ctmParts* = ["chars", "char-attribs", "char-attribs-l2", "char-materials",
                "tiles", "tiles-lo", "tiles-hi", "tile-attribs", "tile-attribs-l2",
                "tile-tags", "map", "map-lo", "map-hi",
-               "submaps", "submaps-lo", "submaps-hi", "colour-map"]
+               "submaps", "submaps-lo", "submaps-hi", "colour-map", "triggers"]
   spdParts* = ["sprites", "sprite-attribs", "tiles", "tiles-lo", "tiles-hi",
                "tile-attribs", "tile-tags", "sprite-anims", "tile-anims"]
 
@@ -215,6 +215,12 @@ proc binPart*(p: ctm.Project, part: string, o = BinOptions()): seq[byte] =
     result = cells(all, "submaps", part, o)
   of "colour-map":
     result = p.colourMap(o)
+  of "triggers":
+    if p.triggers.len == 0: fail("the project has no trigger map (only Tilemedo projects have one)")
+    if p.triggers.len != p.map.len: fail("the trigger map doesn't match the map")
+    var q = p
+    for i, t in p.triggers: q.map[i] = t
+    for c in q.mapCells(o): result.add byte(c)
   else:
     fail("a CharPad project has no part " & part)
 

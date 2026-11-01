@@ -184,6 +184,7 @@ proc toCtt*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
         fail("tile " & $i & " has " & $t.cells.len & " cells, not " & $(p.tileWidth * p.tileHeight))
   if p.mapWidth notin 0 .. 65535 or p.mapHeight notin 0 .. 65535 or p.map.len != p.mapWidth * p.mapHeight:
     fail("map has " & $p.map.len & " cells, not " & $p.mapWidth & " x " & $p.mapHeight)
+  if p.triggers.len > 0: leftOut.add "the trigger map (no CTT has one)"
   var keyMap = p.keyMap
   if keyMap > 10:
     leftOut.add "key map " & $keyMap & " (CharPad C16 has 0-10)"

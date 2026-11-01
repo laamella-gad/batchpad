@@ -46,6 +46,7 @@ type
     tiles*: seq[Tile]              ## empty when the tile system is off
     mapWidth*, mapHeight*: int
     map*: seq[uint16]              ## tile numbers, or char numbers without tiles
+    triggers*: seq[uint8]          ## a byte per map cell, or empty: Tilemedo's trigger map, no CTM has one
 
 func colourCount*(mode: DisplayMode): int =
   ## Colour bytes per char or tile in the V8/V9 colour blocks.
@@ -845,6 +846,7 @@ proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
   ## hold together, such as one without chars, and on bitmap modes in V6 and V7 and ECM in V2 to V6, and on char maps and more than 256 tiles in V1 to V4, and on tiles smaller than 4 x 4 and more than 256 chars in V1.
   p.check
   if p.ted: fail("the project has TED colours (CharPad C16); convert them with toC64 first")
+  if p.triggers.len > 0 and version in 1 .. 9: leftOut.add "the trigger map (no CTM has one)"
   case version
   of 1: formatV1(p.fitV3V4(1, leftOut))
   of 2: formatV2(p.fitV3V4(2, leftOut))

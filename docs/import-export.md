@@ -610,6 +610,15 @@ loaded at $6000. The Art Studio loader accepts 9003 to 9012 bytes.
 
 [Multipaint](http://multipaint.kameli.net/) (manual: "About file import / export") has no project format. It saves Art Studio (hires) and Advanced Art Studio (multicolour), Koala (multicolour; the default since a 2019 release), PNG, and an "export emulator" `.prg` (a runnable viewer with the picture; FLI and AFLI are not exported). It also loads PNG and JPEG. We don't support Multipaint (#68): its PNG export is easy enough to use, and we don't read these bitmap formats.
 
+## Tilemedo (#80)
+
+Tilemedo 1.10 saves its own `.tmd` project, which batchpad reads and writes as a
+CharPad project (layout in [charpad.md](charpad.md#tilemedo-tmd)). Its
+headerless binary exports are batchpad's `bin` parts: charset `chars`, colours
+`char-attribs`, tile set `tiles --cells 8`, map `map --cells 8`, trigger map
+`triggers`. `import` does not take a trigger map. Its BMP map import and export
+are #72.
+
 ## Palettes
 
 A `.pal` text file, or an image of the palette. It sets how the 16 C64
@@ -644,6 +653,8 @@ Decided 2026-10-18; issues #41-#51, #53 and #54.
 - Tiled maps (`.tmx` and JSON): read into the binary, assembler and C exports,
   and converted to each other (#66; see tiled.md).
 - SEUCK `.A` and `.B` files: read and write through `convert` (#56, #57; done).
+- Tilemedo `.tmd`: read and write as a CharPad project; trigger map as part
+  `triggers` (#80; done 2026-11-01).
 - Skipped: Koala / Art Studio / Advanced Art Studio, image import,
   VICE snapshots, Glaze's parallax build.
 

@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, cout, ctm, ctt, image, preview, rawbin, rawimport, seuck, spd, spm, stats, tiled, tiledbin
+import asmout, cout, ctm, ctt, image, preview, rawbin, rawimport, seuck, spd, spm, stats, tiled, tiledbin, tmd
 
 type
   CliError* = object of CatchableError
@@ -56,9 +56,10 @@ proc readInput(path, format: string): Input =
     if lower.endsWith(".a") and data.len == seuckASize: format = "seuck-a"
     elif lower.endsWith(".b") and data.len == seuckBSize: format = "seuck-b"
     elif lower.endsWith(".i") and data.len == seuckISize: format = "seuck-i"
+    elif lower.endsWith(".tmd") and data.toOpenArrayByte(0, data.high).isTmd: format = "tmd"
   let kind =
     case format
-    of "ctm", "ctt": kCtm
+    of "ctm", "ctt", "tmd": kCtm
     of "spd", "spr", "spm": kSpd
     of "tmx", "tiled-json": kTiled
     of "seuck-a", "seuck-i-sprites": kSpd
@@ -76,7 +77,9 @@ proc readInput(path, format: string): Input =
     else: fail("unknown input format: " & format)
   case kind
   of kCtm:
-    if format == "seuck-i":
+    if format == "tmd":
+      Input(kind: kCtm, ctm: parseTmd(data.toOpenArrayByte(0, data.high)))
+    elif format == "seuck-i":
       Input(kind: kCtm, ctm: parseSeuckIBackground(data.toOpenArrayByte(0, data.high)))
     elif format in ["seuck-b", "seuck-b-sideways"]:
       Input(kind: kCtm, ctm: parseSeuckB(data.toOpenArrayByte(0, data.high), format == "seuck-b-sideways"))
@@ -233,6 +236,7 @@ proc info(input: Input): JsonNode =
       result["tiles"] = %p.tiles.len
       result["tileWidth"] = %p.tileWidth
       result["tileHeight"] = %p.tileHeight
+    if p.triggers.len > 0: result["triggerMap"] = %true
     if p.version >= 9:
       result["keyMap"] = %p.keyMap
       if p.flexiGrid.settings.testBit(7):
@@ -265,6 +269,7 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
     to = case path.splitFile.ext.toLowerAscii
          of ".ctm": "ctm9"
          of ".ctt": "ctt9"
+         of ".tmd": "tmd"
          of ".spd": "spd5"
          of ".spr": "spr"
          of ".spm": "spm"
@@ -283,6 +288,9 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
     if input.kind != kCtm: fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to " & to)
     return @[Output(path: path, data: input.ctm.toSeuckB(leftOut, to == "seuck-b-sideways"))]
   if input.kind == kTiled: fail("can't convert a Tiled map to " & to)
+  if to == "tmd":
+    if input.kind != kCtm: fail("can't convert a SpritePad project to tmd")
+    return @[Output(path: path, data: input.ctm.toC64.toTmd(leftOut).toStr)]
   if to == "spm":
     if input.kind != kSpd: fail("can't convert a CTM project to spm")
     return @[Output(path: path, data: input.spd.toSpm(leftOut))]
@@ -445,7 +453,7 @@ proc parseOrg(specs: seq[string]): seq[(string, int)] =
     result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
 
 template common() =
-  option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
+  option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmd", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
   flag("--quiet", help = "Hides warnings about what is left out")
   flag("--strict", help = "Makes those warnings errors")
@@ -456,12 +464,12 @@ let parser = newParser("batchpad"):
   flag("--version", shortcircuit = true, help = "Prints the version")
   command("info"):
     help("Prints what a project holds")
-    option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
+    option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmd", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
     flag("--json", help = "Prints JSON")
     arg("input")
   command("convert"):
     help("Writes the project in another project format")
-    option("--to", help = "ctm1 to ctm9, spd0 to spd5, spr, spm, tmx, tiled-json, seuck-a, seuck-b or seuck-b-sideways; default from the output's extension")
+    option("--to", help = "ctm1 to ctm9, ctt8, ctt9, spd0 to spd5, spr, spm, tmd, tmx, tiled-json, seuck-a, seuck-b or seuck-b-sideways; default from the output's extension")
     common()
     arg("input")
     arg("output")

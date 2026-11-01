@@ -51,7 +51,7 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 | `import` | Builds a project from raw binary parts | #42, #54 |
 
 The input type comes from its contents, not its extension: CTM, SPD,
-headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)), SEUCK
+headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tilemedo `.tmd` (by its extension and its length field, or `--input-format tmd`; a CharPad project, see [charpad.md](charpad.md)), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)), SEUCK
 CharPad C16 `.ctt` (by its signature, or `--input-format ctt`; colours stay TED colours, 0-127, so `--set` takes those), SEUCK
 `.A` or `.B` (by extension and exact size, or `--input-format seuck-a`, `seuck-b`), a `.P00` of one of those (by the name inside it), and the "save all data" `.I` (by extension and size, or a `.P00`; `--input-format seuck-i` for the background, `seuck-i-sprites` for the sprites). `--input-format seuck-b-sideways`
 reads the sideways SEUCK `.B`, which looks the same as the normal one.
@@ -80,6 +80,7 @@ CharPad:
 | `map` | the map, or the area given by `--area` | Map, MapArea |
 | `submaps` | flexi-grid sub-maps (#44) | SubMaps, SubMap |
 | `colour-map` | colour matrix colour per char cell of the map, or of the area given by `--area` (#45) | ColourMap |
+| `triggers` | Tilemedo's trigger map: a byte per map cell, or of `--area` (only projects read from a `.tmd`) | |
 
 SpritePad:
 
@@ -212,7 +213,7 @@ batchpad convert level.ctm level.B --to seuck-b-sideways
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `ctt8` and `ctt9` (CharPad C16; TED colours from the nearest VICE colour, and a `.ctt` converted to `ctm` goes the other way), `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `tmx` and `tiled-json` (Tiled maps, from each other only), `seuck-a` (127 sprites; a sprite project), `seuck-b` and `seuck-b-sideways` (a CharPad project with exactly 128 tiles of 5 x 5, 254 chars, per-tile colouring and an 8 x 512 map; sideways: 819 x 5, see import-export.md), `spd1`, `spd2`, `spd3`, `spd4`,
+`.spd` SPD V5, `.tmd` Tilemedo, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `ctt8` and `ctt9` (CharPad C16; TED colours from the nearest VICE colour, and a `.ctt` converted to `ctm` goes the other way), `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `tmd` (Tilemedo: needs tiles, no bitmap modes; at most 256 chars and tiles), `tmx` and `tiled-json` (Tiled maps, from each other only), `seuck-a` (127 sprites; a sprite project), `seuck-b` and `seuck-b-sideways` (a CharPad project with exactly 128 tiles of 5 x 5, 254 chars, per-tile colouring and an 8 x 512 map; sideways: 819 x 5, see import-export.md), `spd1`, `spd2`, `spd3`, `spd4`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
 
