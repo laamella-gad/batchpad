@@ -12,8 +12,8 @@ Get the latest build from the [releases page](https://github.com/laamella-gad/ba
 - [Windows](https://github.com/laamella-gad/batchpad/releases/latest/download/batchpad-windows.zip)
 - [macOS](https://github.com/laamella-gad/batchpad/releases/latest/download/batchpad-macos.tar.gz)
 
-No release exists yet: the links work once the builds of #82 are published. Until
-then, build it yourself with `nimble build` (Nim 2.2.8 or later).
+The macOS build is for Apple silicon. Or build it yourself with `nimble build`
+(Nim 2.2.8 or later); the binary lands in `bin/`.
 
 ## Commands
 

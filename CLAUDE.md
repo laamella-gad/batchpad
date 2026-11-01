@@ -35,6 +35,10 @@ nim c -r -p:src tests/tctm.nim   # run a single test file (also tests/tspd.nim, 
 # tests/tasm.nim assembles with 64tass, acme, ca65 when on the PATH, and KickAssembler when KICKASS_JAR names its jar; tests/tcout.nim compiles with oscar64 when on the PATH
 ```
 
+## Releases
+
+`.github/workflows/release.yml` builds and tests on Linux, Windows and macOS, and publishes `batchpad-linux.tar.gz`, `batchpad-windows.zip` and `batchpad-macos.tar.gz` to a GitHub release when a `v*` tag is pushed. The README download links use these names.
+
 ## Layout
 
 - `srcDir = "src"`, `binDir = "bin"`; the binary entry point is `src/batchpad.nim` (code under `when isMainModule:`).

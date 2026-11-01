@@ -1,0 +1,60 @@
+# Builds batchpad for Linux, Windows and macOS (Apple silicon) and attaches the
+# archives to a GitHub release when a tag like v0.1.0 is pushed. The asset names
+# are the ones the README download links use.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:   # build and test only; the release step needs a tag
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: batchpad-linux.tar.gz
+          - os: windows-latest
+            asset: batchpad-windows.zip
+          - os: macos-latest
+            asset: batchpad-macos.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: "2.2.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test
+        run: nimble test -y
+      - name: Build
+        run: nimble build -d:release -y
+      - name: Package (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: tar -czf "${{ matrix.asset }}" -C bin batchpad -C .. README.md
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path bin\batchpad.exe, README.md -DestinationPath "${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes

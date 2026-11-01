@@ -39,9 +39,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
 - #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
   - `png` and `stats` refuse a project with TED colours; `gif` never took CTM. Needs the 128-colour TED palette (chroma-major, from the CTT spec) in `image.nim` and TED-aware colour handling in `preview.nim` and `stats.nim`. Follow-up of #79.
 
-- #82 [task, normal] Release binaries for Linux, Windows and macOS
-  - Build `bin/batchpad` (Nim >= 2.2.8) for each platform, e.g. a GitHub Actions workflow on tag push that builds on `ubuntu`, `windows` and `macos` runners and attaches `batchpad-linux.tar.gz`, `batchpad-windows.zip` and `batchpad-macos.tar.gz` to a release at https://github.com/laamella-gad/batchpad/releases. Run `nimble test` per platform first. The README download links point at these names.
-
 - #83 [task, normal] Investigate `.P00` and the other SEUCK formats
   - `.P00` (PC64 container): 26-byte header (`C64File`, 16-byte name, `$00`, `$00`), then the file. Real `.A` (8156 bytes) and `.B` (9622 bytes) samples in martinpiper/C64Public `SEUCK/Debug1/T______A.P00` and `BG1____B.P00` read fine once the header is stripped; decide whether `.P00` input is read directly (and whether `.P01`, `.S00` etc. count).
   - Other SEUCK files: `.C` to `.G` (smaller: 1440, 268, 182, 540 bytes in the same repo; probably levels, attack waves, sound effects, title screen, game settings; find the layouts), and the "save all data" `.P00` (63254 bytes: SEUCK memory from $900 after a 26-byte header and 2-byte load address; offsets in that repo's `Scroller/ScrollerDataMacro.a`, `Scroller/ScrollerData.a`). It holds sprites, chars, tiles and map too, so a whole game could be read as a sprite project and a CharPad project.
@@ -52,6 +49,11 @@ Move an issue between sections to change its status. Never reuse a number; next 
 ## In progress
 
 ## Closed
+
+- #82 [task, normal] Release binaries for Linux, Windows and macOS
+  - Build `bin/batchpad` (Nim >= 2.2.8) for each platform, e.g. a GitHub Actions workflow on tag push that builds on `ubuntu`, `windows` and `macos` runners and attaches `batchpad-linux.tar.gz`, `batchpad-windows.zip` and `batchpad-macos.tar.gz` to a release at https://github.com/laamella-gad/batchpad/releases. Run `nimble test` per platform first. The README download links point at these names.
+  - Done 2026-11-01. `.github/workflows/release.yml`: on a pushed tag `v*`, builds on ubuntu, windows and macos (Apple silicon) runners, runs `nimble test`, packages `batchpad-linux.tar.gz`, `batchpad-windows.zip`, `batchpad-macos.tar.gz` (binary + README) and creates the release with them. Only the Linux build and packaging were tried locally; the workflow has not run on GitHub yet (push a tag such as `v0.1.0` to try it; `workflow_dispatch` builds and tests without releasing). No Intel macOS or Linux arm64 builds.
+
 
 - #79 [feature, normal] Read and write CharPad C16 `.ctt` projects (V8 and V9)
   - Was #51 (blocked on #40). Official specs and 419 samples now in `software/`. Same blocks as CTM V8/V9 with a 13/18 byte header, TED colours (7 bits), colour per cell 1 byte (text) or 2 (bitmap). Decide how TED colours map into the project model (keep the raw 7 bits, convert to the C64 palette as CharPad C64 Pro does, or both) and how `png`/`gif` draw them (TED palette). Done after #40.
