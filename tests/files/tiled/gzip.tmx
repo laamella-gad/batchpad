@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal" renderorder="right-down" width="4" height="3" tilewidth="8" tileheight="8" infinite="0" nextlayerid="3" nextobjectid="1">
+<tileset firstgid="1" name="tiles" tilewidth="8" tileheight="8" tilecount="16" columns="4">
+ <image source="tiles.png" width="32" height="32"/>
+ <tile id="0" class="wall"><properties><property name="tag" type="int" value="3"/></properties></tile>
+ <tile id="4" class="floor"><properties><property name="tag" type="int" value="7"/></properties></tile>
+</tileset>
+ <layer id="1" name="ground" width="4" height="3">
+  <data encoding="base64" compression="gzip">H4sIAAAAAAACAw3Dhw0AIAwAoDrr+v9eIaFERLXZHU7T5fZ4fX7IclqAMAAAAA==</data>
+ </layer>
+ <layer id="2" name="sky" width="4" height="3">
+  <data encoding="base64" compression="gzip">H4sIAAAAAAACA2NgwASMDAwNWIQZWIEYAAmPyWkwAAAA</data>
+ </layer>
+</map>

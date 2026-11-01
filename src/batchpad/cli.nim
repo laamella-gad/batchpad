@@ -85,7 +85,9 @@ proc readInput(path, format: string): Input =
     else: Input(kind: kCtm, ctm: parseCtm(data.toOpenArrayByte(0, data.high)))
   of kTiled:
     let xml = format == "tmx" or format == "" and data.strip.startsWith("<")
-    Input(kind: kTiled, tiled: if xml: parseTmx(data) else: parseTiledJson(data))
+    var m = if xml: parseTmx(data) else: parseTiledJson(data)
+    m.resolveTilesets(path.parentDir)
+    Input(kind: kTiled, tiled: m)
   of kSpd:
     if format == "seuck-i-sprites":
       Input(kind: kSpd, spd: parseSeuckISprites(data.toOpenArrayByte(0, data.high)))

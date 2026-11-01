@@ -114,6 +114,8 @@ suite "command line":
     check batchpad("bin", src, "map=" & tmp / "t4.bin", "--set", "frob=1")[0] == 1
     check batchpad("bin", files / "tiled" / "compressed.tmx", "map=" & tmp / "t4.bin")[0] == 1
     check not fileExists(tmp / "t4.bin")
+    check batchpad("bin", files / "tiled" / "external.tmx", "tile-tags=" & tmp / "t5.bin")[0] == 0
+    check readFile(tmp / "t5.bin").len == 16
     let (acode, asmText) = batchpad("asm", src, "--parts", "map,map-flags:sky")
     check acode == 0 and "map_data" in asmText and "map_sky_flags_data" in asmText
     let (ccode, cText) = batchpad("c", src)

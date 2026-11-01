@@ -6,6 +6,9 @@
  <tile id="4" class="floor"><properties><property name="tag" type="int" value="7"/></properties></tile>
 </tileset>
  <layer id="1" name="ground" width="4" height="3">
-  <data encoding="base64" compression="zlib">eJwBAAD//wAAAAAAAQAB</data>
+  <data encoding="base64" compression="zstd">AQAAAAIAAAADAAAABAAAAAUAAAAGAAAABwAAAAgAAAAJAAAACgAAAAsAAAAMAAAA</data>
+ </layer>
+ <layer id="2" name="sky" width="4" height="3">
+  <data encoding="base64" compression="zstd">AAAAAAAAAAAAAAAAAAAAAAAAAAABAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</data>
  </layer>
 </map>

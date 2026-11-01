@@ -4,7 +4,8 @@
 ## a tileset names. So this model is not a CharPad project; `tiledbin.nim` turns
 ## its layers into the parts the binary exports write.
 
-import std/[base64, json, strtabs, strutils, xmlparser, xmltree]
+import std/[base64, json, os, strtabs, strutils, xmlparser, xmltree]
+import inflate
 
 type
   TiledError* = object of ValueError
@@ -39,7 +40,7 @@ type
 
   Tileset* = object
     firstGid*: int
-    source*: string                ## an external .tsx, which isn't read
+    source*: string                ## an external .tsx or .tsj; `resolveTilesets` reads it
     name*, image*: string
     tileWidth*, tileHeight*, tileCount*, columns*, spacing*, margin*: int
     imageWidth*, imageHeight*: int
@@ -81,14 +82,18 @@ proc decodeData(encoding, compression, text: string, count: int, what: string): 
       try: result.add uint32(parseBiggestUInt(f))
       except ValueError, OverflowDefect: fail(what & ": not a tile number: " & f)
   of "base64":
-    if compression != "":
+    if compression notin ["", "zlib", "gzip"]:
       fail(what & ": " & compression & " compressed data isn't supported; " &
-           "set the tile layer format to CSV in Tiled (Map Properties)")
+           "set the tile layer compression to zlib or gzip, or the format to CSV (Map Properties)")
     var raw = ""
     for c in text:
       if c notin Whitespace: raw.add c
-    let bytes = try: decode(raw)
+    var bytes = try: decode(raw)
                 except ValueError as e: fail(what & ": bad base64: " & e.msg)
+    try:
+      if compression == "zlib": bytes = unzlib(bytes, count * 4)
+      elif compression == "gzip": bytes = ungzip(bytes, count * 4)
+    except InflateError as e: fail(what & ": " & e.msg)
     if bytes.len mod 4 != 0: fail(what & ": the data is not a whole number of cells")
     for i in 0 ..< bytes.len div 4:
       result.add uint32(bytes[4 * i].byte) or (uint32(bytes[4 * i + 1].byte) shl 8) or
@@ -331,6 +336,20 @@ proc jsonLayers(layers: JsonNode, prefix: string, m: var TiledMap) =
       m.skipped.add "image layer " & name
     else: discard
 
+proc jsonTileset(s: JsonNode): Tileset =
+  result = Tileset(firstGid: s.jsonInt("firstgid", 1), source: s.getOrDefault("source").getStr,
+                   name: s.getOrDefault("name").getStr, image: s.getOrDefault("image").getStr,
+                   tileWidth: s.jsonInt("tilewidth"), tileHeight: s.jsonInt("tileheight"),
+                   tileCount: s.jsonInt("tilecount"), columns: s.jsonInt("columns"),
+                   spacing: s.jsonInt("spacing"), margin: s.jsonInt("margin"),
+                   imageWidth: s.jsonInt("imagewidth"), imageHeight: s.jsonInt("imageheight"))
+  let tiles = s.getOrDefault("tiles")
+  if tiles != nil and tiles.kind == JArray:
+    for k in tiles:
+      result.tiles.add TilesetTile(id: k.jsonInt("id"),
+          class: k.getOrDefault("class").getStr(k.getOrDefault("type").getStr),
+          properties: k.jsonProperties)
+
 proc parseTiledJson*(text: string): TiledMap =
   ## Parses a whole Tiled JSON map (.tmj or .json). Raises TiledError on anything it can't read.
   let j = try: parseJson(text)
@@ -349,28 +368,39 @@ proc parseTiledJson*(text: string): TiledMap =
   result.properties = j.jsonProperties
   let sets = j.getOrDefault("tilesets")
   if sets != nil and sets.kind == JArray:
-    for s in sets:
-      var t = Tileset(firstGid: s.jsonInt("firstgid", 1), source: s.getOrDefault("source").getStr,
-                      name: s.getOrDefault("name").getStr, image: s.getOrDefault("image").getStr,
-                      tileWidth: s.jsonInt("tilewidth"), tileHeight: s.jsonInt("tileheight"),
-                      tileCount: s.jsonInt("tilecount"), columns: s.jsonInt("columns"),
-                      spacing: s.jsonInt("spacing"), margin: s.jsonInt("margin"),
-                      imageWidth: s.jsonInt("imagewidth"), imageHeight: s.jsonInt("imageheight"))
-      let tiles = s.getOrDefault("tiles")
-      if tiles != nil and tiles.kind == JArray:
-        for k in tiles:
-          t.tiles.add TilesetTile(id: k.jsonInt("id"),
-              class: k.getOrDefault("class").getStr(k.getOrDefault("type").getStr),
-              properties: k.jsonProperties)
-      result.tilesets.add t
+    for s in sets: result.tilesets.add s.jsonTileset
   j["layers"].jsonLayers("", result)
 
 # --- reading and finding things ---
 
+proc resolveTilesets*(m: var TiledMap, dir: string) =
+  ## Reads the external tilesets (`.tsx`, or JSON `.tsj`) the map names, looking in
+  ## `dir`. Their `firstgid` and `source` stay as the map has them.
+  for t in m.tilesets.mitems:
+    if t.source == "": continue
+    let path = dir / t.source
+    if not fileExists(path): fail("can't find the tileset " & t.source & " (looked for " & path & ")")
+    let text = readFile(path)
+    let (firstGid, source) = (t.firstGid, t.source)
+    if text.strip.startsWith("<"):
+      var root: XmlNode
+      try: root = parseXml(text)
+      except CatchableError as e: fail("tileset " & t.source & " is not valid XML: " & e.msg)
+      if root.tag != "tileset": fail("tileset " & t.source & " is not a tileset")
+      t = root.tmxTileset
+    else:
+      var j: JsonNode
+      try: j = parseJson(text)
+      except CatchableError as e: fail("tileset " & t.source & " is not valid JSON: " & e.msg)
+      t = j.jsonTileset
+    t.firstGid = firstGid
+    t.source = source
+
 proc readTiled*(path: string): TiledMap =
-  ## Reads a .tmx, or else a JSON map.
+  ## Reads a .tmx, or else a JSON map, and the external tilesets it names.
   let text = readFile(path)
-  if text.strip.startsWith("<"): parseTmx(text) else: parseTiledJson(text)
+  result = if text.strip.startsWith("<"): parseTmx(text) else: parseTiledJson(text)
+  result.resolveTilesets(path.parentDir)
 
 func tileLayer*(m: TiledMap, name = ""): Layer =
   ## The tile layer called `name`, `m.layerName` when that is empty, and then the first one.

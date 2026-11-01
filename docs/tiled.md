@@ -18,15 +18,18 @@ from Tiled; its chars and tiles come from CharPad as before.
 
 - Orthogonal maps, finite or infinite. Other orientations are an error.
 - Tile layers, with data as CSV, uncompressed base64, or (JSON) a plain array.
-  Compressed layers (gzip, zlib, zstd) are an error that says to switch the tile
-  layer format to CSV in Tiled (Map Properties). Inflating is #77.
+  zlib and gzip compressed base64 layers are inflated (`inflate.nim`, our own,
+  checked against Python's zlib; the checksums are not verified). zstd layers are
+  an error that says to switch the compression or the format to CSV in Tiled
+  (Map Properties).
 - Infinite maps (`<chunk>`s) are flattened to the bounding box of their chunks;
   cells in no chunk are empty.
 - Object layers (name, class, position, size, properties): kept in the model and
   in TMX <-> JSON conversion, not exported (#73).
 - Group layers are flattened; a layer in a group is called `group/layer`.
-- Image layers are skipped. External tilesets (`source="x.tsx"`) are noted but not
-  read (#78), so their size and tile properties are not known.
+- Image layers are skipped. External tilesets (`source="x.tsx"`, or a JSON
+  `.tsj`) are read from the map's folder (#78); a missing file is an error. The
+  map keeps the `firstgid` and `source`, so `convert` writes the reference again.
 - Properties on the map, layers, objects and tiles. Tile property `tag` (an
   integer 0-255) and the tile's class (or property `name`) are exported.
 

@@ -36,7 +36,23 @@ suite "Tiled maps":
     check back.tilesets == m.tilesets
     check back.width == 4 and back.tileHeight == 8
 
-  test "compressed data is refused with a hint":
+  test "external tileset":
+    let m = readTiled(files / "external.tmx")
+    let inline = readTiled(files / "csv.tmx")
+    check m.tilesets[0].source == "tiles.tsx" and m.tilesets[0].firstGid == 1
+    check m.tilesets[0].tileCount == 16 and m.tilesets[0].tileWidth == 8
+    check m.tilesets[0].tiles == inline.tilesets[0].tiles
+    check m.binPart("tile-tags") == inline.binPart("tile-tags")
+    check parseTmx(m.toTmx).tilesets[0].source == "tiles.tsx"
+    var broken = parseTmx("""<map width="1" height="1" tilewidth="8" tileheight="8"><tileset firstgid="1" source="nope.tsx"/></map>""")
+    expect TiledError: broken.resolveTilesets(files)
+
+  test "zlib and gzip layers":
+    let m = readTiled(files / "csv.tmx")
+    check readTiled(files / "zlib.tmx").gids == m.gids
+    check readTiled(files / "gzip.tmx").gids == m.gids
+
+  test "zstd data is refused with a hint":
     try:
       discard readTiled(files / "compressed.tmx")
       fail()

@@ -29,10 +29,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Needs chars and tiles from somewhere: `--base project.ctm`, so only its map is replaced.
 - #76 [feature, low] Import tileset images from Tiled
   - Cut a tileset PNG into chars or sprites. Overlaps #72 (image import).
-- #77 [feature, low] Read zlib and gzip compressed Tiled layers
-  - Needs an inflate in Nim (no zlib in std). Now an error that says to use CSV.
-- #78 [feature, low] Read external Tiled tilesets (`.tsx`)
-  - Tile size, count and tile properties (`tag`, class) live there when a tileset is external. Now only the `firstgid` and `source` are kept.
 - #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
   - `png` and `stats` refuse a project with TED colours; `gif` never took CTM. Needs the 128-colour TED palette (chroma-major, from the CTT spec) in `image.nim` and TED-aware colour handling in `preview.nim` and `stats.nim`. Follow-up of #79.
 - #84 [feature, low] SEUCK `.C` to `.G` files, writing `.I` and `.P00`
@@ -51,6 +47,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #77 [feature, low] Read zlib and gzip compressed Tiled layers
+  - Done 2026-11-01. `src/batchpad/inflate.nim` (`unzlib`, `ungzip`: stored, fixed and dynamic deflate blocks; checksums not verified; output limited to the expected cell count), used by `decodeData` in `tiled.nim`; `tests/tinflate.nim`, `tests/files/tiled/zlib.tmx`, `gzip.tmx`. zstd is still an error with a hint.
+- #78 [feature, low] Read external Tiled tilesets (`.tsx`)
+  - Done 2026-11-01. `resolveTilesets` in `tiled.nim` reads `.tsx` (and JSON `.tsj`) files named by `source`, relative to the map; `readTiled` and the CLI call it. Tile size, count and tile properties are then known. The reference is kept, so TMX <-> JSON conversion writes it again. Tests: `tests/files/tiled/external.tmx`, `tiles.tsx`.
 - #68 [task, low] Look at Multipaint files and decide on a reader
   - Done 2026-11-01. Multipaint (multipaint.kameli.net, manual "About file import / export") saves: Art Studio (hires), Advanced Art Studio (multicolour), Koala (multicolour, default since a 2019 release), PNG/JPEG (also loads them), and "export emulator": a runnable `.prg` (viewer plus picture, FLI/AFLI not exported). The picture formats are the ones in `docs/import-export.md` ("C64 bitmap pictures"); the runnable `.prg` is no data format. Multipaint has no project file of its own.
   - Decision (2026-11-01): Multipaint not supported. Its export is easy enough: users save PNG (or BMP, #72) from it. No bitmap model, no Koala/Art Studio reader.
