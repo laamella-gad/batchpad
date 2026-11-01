@@ -1,8 +1,26 @@
 # BatchPad
 
-Command-line tool that converts CharPad and SpritePad project files into
-artifacts (e.g. binary data, source includes) that can be consumed by build
-pipelines.
+BatchPad is the conversion step between the graphics editor and your build. You
+draw characters, tiles, maps and sprites in an editor such as
+[CharPad](https://subchristsoftware.itch.io/charpad-c64-pro),
+[SpritePad](https://subchristsoftware.itch.io/spritepad-c64-pro),
+[Spritemate](https://www.spritemate.com/) or [Tiled](https://www.mapeditor.org/)
+and keep the project file in your repository.
+BatchPad turns that file into what your assembler or compiler wants: raw binary
+files to `incbin`, assembler source (64tass, acme, KickAssembler, ca65), or C
+source for oscar64. Run it from a makefile or a build script, so the project
+file stays the single source and the generated files are never edited by hand.
+It also converts between the editors' formats and versions, and makes previews
+and usage statistics. For the Shoot 'em-up Construction Kit
+([SEUCK](https://www.c64-wiki.com/wiki/SEUCK)) it reads and writes the sprite
+and background files, so you can draw them in CharPad and SpritePad instead.
+
+It is meant to work well with AI coding assistants too. Everything is a plain
+command with text output: `info` and `stats` describe a project in words, errors
+say what is wrong and what to try, the same project file always gives the same
+output, and the formats are documented in [docs](docs/), so an assistant can
+inspect a binary project file, convert it and wire it into a build without a
+GUI.
 
 ## Download
 
