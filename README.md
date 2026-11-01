@@ -89,7 +89,7 @@ versions.
 | Spritemate `.spm` | Spritemate | yes | yes | Checked (Spritemate's 5 examples). Sprites only: tiles, animations and sprite names aren't kept; older layouts are read too |
 | SEUCK `.A` sprites | SEUCK (1987) | yes | yes | Checked (the 4 sample games of the original SEUCK disks; [details](docs/import-export.md#the-original-disks)). Read and written as a sprite project; also from a `.P00` or the "save all data" `.I` (read only) |
 | SEUCK `.B` background | SEUCK (1987) | yes | yes | Checked (4 files), as `.A`. Read and written as a CharPad project; also from a `.P00` or `.I` (read only); also the sideways kind of CharPad 1.7 |
-| Tiled `.tmx` | Tiled | yes | yes | No files to check. A map, not a CharPad project: goes to `bin`, `asm` and `c`, and converts to and from JSON; CSV and base64 data (zlib and gzip too); external `.tsx` tilesets |
+| Tiled `.tmx` | Tiled | yes | yes | No files to check. A map, not a CharPad project: goes to `bin`, `asm` and `c`, and converts to and from JSON; CSV and base64 data (zlib and gzip too); external `.tsx` tilesets; object layers as data tables |
 | Tiled JSON (`.tmj`, `.json`) | Tiled | yes | yes | No files to check. As `.tmx` |
 | **Exports and imports** | | | | |
 | Raw binary (`bin`) | | | yes | Parts such as chars, tiles, map, colours, sprites |

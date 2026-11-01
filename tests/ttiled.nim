@@ -111,6 +111,28 @@ suite "Tiled parts":
     m.tilesetName = "nope"
     expect BinError: discard m.binPart("map")
 
+  test "objects":
+    var m = readTiled(files / "objects.tmx")
+    check m.objectClasses == @["alien", "bat", "key"]
+    check m.binPart("objects") == @[byte 1, 2, 0, 1, 0, 1, 1,
+                                         0, 3, 0, 0, 0, 2, 2,
+                                         255, 0, 0, 2, 0, 0, 0]
+    check m.binPart("objects:items") == @[byte 2, 1, 0, 2, 0, 1, 1]
+    m.objectPixels = true
+    m.objectFields = @["hp", "boss"]
+    check m.binPart("objects") == @[byte 1, 16, 0, 8, 0, 8, 8, 3, 1,
+                                         0, 25, 0, 0, 0, 16, 16, 10, 0,
+                                         255, 0, 0, 16, 0, 0, 0, 0, 0]
+    expect BinError: discard m.binPart("objects:nope")
+    expect BinError: discard readTiled(files / "csv.tmx").binPart("objects")
+    m.objectFields = @["first"]
+    m.layers[2].objects[0].properties.add Property(name: "first", kind: "int", value: "300")
+    expect BinError: discard m.binPart("objects")
+    m.objectFields = @["hp"]
+    let a = m.toAsm(AsmOptions(parts: @["objects", "objects:items"]))
+    check "objects_data" in a and "objects_items_data" in a
+    check "object_size = 8" in a and "object_class_key = 2" in a
+
   test "assembler and C":
     let m = readTiled(files / "csv.tmx")
     let a = m.toAsm(AsmOptions(parts: @["map", "map:sky", "map-flags:sky", "tile-tags", "tile-names"],

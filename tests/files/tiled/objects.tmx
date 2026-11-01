@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal" renderorder="right-down" width="4" height="3" tilewidth="8" tileheight="8" infinite="0" nextlayerid="5" nextobjectid="5">
+<tileset firstgid="1" name="tiles" tilewidth="8" tileheight="8" tilecount="16" columns="4">
+ <image source="tiles.png" width="32" height="32"/>
+ <tile id="0" class="wall"><properties><property name="tag" type="int" value="3"/></properties></tile>
+ <tile id="4" class="floor"><properties><property name="tag" type="int" value="7"/></properties></tile>
+</tileset>
+ <layer id="1" name="ground" width="4" height="3">
+  <data encoding="csv">
+1,2,3,4,
+5,6,7,8,
+9,10,11,12
+  </data>
+ </layer>
+ <layer id="2" name="sky" width="4" height="3">
+  <data encoding="csv">
+0,0,0,0,
+0,2147483649,0,0,
+0,0,0,5
+  </data>
+ </layer>
+ <objectgroup id="3" name="enemies">
+  <object id="1" name="first" class="bat" x="16" y="8" width="8" height="8">
+   <properties><property name="hp" type="int" value="3"/><property name="boss" type="bool" value="true"/></properties>
+  </object>
+  <object id="2" class="alien" x="24.5" y="0" width="16" height="16">
+   <properties><property name="hp" type="int" value="10"/></properties>
+  </object>
+  <object id="3" x="0" y="16"><point/></object>
+ </objectgroup>
+ <objectgroup id="4" name="items">
+  <object id="4" class="key" x="8" y="16" width="8" height="8"/>
+ </objectgroup>
+</map>

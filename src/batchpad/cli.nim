@@ -166,6 +166,13 @@ proc applySet(t: var TiledMap, name, value: string) =
     let n = try: parseInt(value) except ValueError: -1
     if n notin 0 .. 0xffff: fail("empty-tile must be 0 to 65535, not " & value)
     t.emptyTile = n
+  of "object-units":
+    if value notin ["tiles", "pixels"]: fail("object-units must be tiles or pixels, not " & value)
+    t.objectPixels = value == "pixels"
+  of "object-fields":
+    t.objectFields = @[]
+    for f in value.split(','):
+      if f.strip != "": t.objectFields.add f.strip
   else: fail("unknown Tiled setting: " & name)
 
 proc applySets(input: var Input, sets: seq[string]) =

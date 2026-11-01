@@ -102,6 +102,7 @@ Tiled maps (`bin`, `asm`, `c` only; details in [tiled.md](tiled.md)):
 | `map-flags`, `map-flags:NAME` | flip flags per cell: bit 7 horizontal, 6 vertical, 5 diagonal |
 | `tile-tags` | property `tag` per tile of the tileset |
 | `tile-names` | tile classes (asm and C only) |
+| `objects`, `objects:NAME` | a record per object of an object layer (the first, or the one named) |
 
 Cell parts (`tiles`, `map`, `submaps` and SpritePad `tiles`) in 12- or 16-bit
 split form are two files: `map-lo` and `map-hi`. For 12 bit, `map-hi` holds the
@@ -186,6 +187,8 @@ Tiled maps:
 | `layer` | name of the tile layer `map` uses |
 | `tileset` | name of the tileset tile numbers count in |
 | `empty-tile` | tile number of an empty cell, 0-65535 |
+| `object-units` | `tiles` (default) or `pixels`: units of object positions and sizes |
+| `object-fields` | integer properties written after each object, e.g. `hp,speed` |
 
 ## Commands
 

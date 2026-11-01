@@ -56,8 +56,9 @@ const
   spdAsmParts* = ["sprites", "sprite-attribs", "tiles", "tile-attribs",
                   "tile-tags", "tile-names", "sprite-anims", "tile-anims"]
 
-  tiledAsmParts* = ["map", "map-flags", "tile-tags", "tile-names"]
-    ## `map` and `map-flags` can also name a layer: `map:ground`
+  tiledAsmParts* = ["map", "map-flags", "tile-tags", "tile-names", "objects"]
+    ## `map` and `map-flags` can also name a layer: `map:ground`; `objects` an
+    ## object layer: `objects:enemies`
 
 proc fail(msg: string) {.noreturn.} = raise newException(AsmError, msg)
 
@@ -381,6 +382,18 @@ proc blocks(t: TiledMap, part: string, ao: AsmOptions): seq[Block] =
     result.add Block(part: part, label: "tiles_names", names: names,
                      comments: @["Tile Names...",
                                  count(names.len, "names") & " (one per tile, each is zero-terminated)."])
+  of "objects":
+    let layer = try: t.objectLayer(name)
+                except TiledError as e: fail(e.msg)
+    let data = t.objectRecords(name)
+    var fields = "class, x (word), y (word), width, height"
+    for f in t.objectFields: fields.add ", " & f
+    result.add Block(part: part, label: if name == "": "objects_data" else: "objects_" & name.labelPart & "_data",
+        comments: @["Object Data (layer " & layer.name & ")...",
+                    count(layer.objects.len, "objects") & ", " & $t.objectRecordSize & " bytes each, " & sizeText(data.len),
+                    "nb. Fields: " & fields & "; in " & (if t.objectPixels: "pixels" else: "tiles") &
+                    ". Class $ff = none."],
+        chunks: @[Chunk(data: data)])
   else: fail("a Tiled map has no part " & part)
 
 func defaultParts(t: TiledMap): seq[string] = @["map"]
@@ -628,6 +641,18 @@ proc head*(t: TiledMap, o: AsmOptions): seq[HeadLine] =
   h.constant("map_hei", $h2)
   h.constant("tile_wid_pxls", $t.tileWidth)
   h.constant("tile_hei_pxls", $t.tileHeight)
+  var objects = false
+  for p in o.parts:
+    if splitMapPart(p).base == "objects": objects = true
+  if objects:
+    h.constant("object_size", $t.objectRecordSize)
+    let classes = t.objectClasses
+    if classes.len > 0:
+      h.blank
+      h.blank
+      h.comment "Object classes..."
+      h.blank
+      for i, c in classes: h.constant("object_class_" & c.labelPart, $i)
   h
 
 proc render(w: var Writer, h: seq[HeadLine]) =

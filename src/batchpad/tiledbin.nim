@@ -6,20 +6,23 @@ import std/[options, strutils]
 import rawbin, tiled
 
 const
-  tiledParts* = ["map", "map-lo", "map-hi", "map-flags", "tile-tags"]
-    ## `map` can also name a layer: `map:ground`, `map-lo:ground` is written `map:ground-lo`.
+  tiledParts* = ["map", "map-lo", "map-hi", "map-flags", "tile-tags", "objects"]
+    ## `map` can also name a layer: `map:ground`, `map-lo:ground` is written `map:ground-lo`;
+    ## `objects` an object layer: `objects:enemies`.
+  noClass* = 0xff                  ## the class number of an object without a class
 
 proc fail(msg: string) {.noreturn.} = raise newException(BinError, msg)
 
 func splitMapPart*(part: string): tuple[base, layer: string] =
   ## `map:ground-lo` is ("map-lo", "ground"); `map` is ("map", "").
   var prefix = ""
-  for p in ["map:", "map-flags:"]:
+  for p in ["map:", "map-flags:", "objects:"]:
     if part.startsWith(p): prefix = p
   if prefix != "":
     var name = part[prefix.len .. ^1]
     var suffix = ""
     for s in ["-lo", "-hi"]:
+      if prefix == "objects:": break
       if name.endsWith(s) and name.len > s.len:
         suffix = s
         name = name[0 ..< name.len - s.len]
@@ -52,6 +55,42 @@ proc layerCells(t: TiledMap, layer: Layer, o: BinOptions): seq[uint32] =
 func hasLayer(t: TiledMap, name: string): bool =
   for l in t.layers:
     if l.kind == lkTiles and l.name == name: return true
+
+func objectRecordSize*(t: TiledMap): int = 7 + t.objectFields.len
+  ## class, x and y (words), width and height, then a byte per field
+
+proc objectRecords*(t: TiledMap, name: string): seq[byte] =
+  ## The objects of a layer, a record each: class number ($ff: none), x and y
+  ## (little-endian words), width, height, then one byte per `objectFields`.
+  let layer = try: t.objectLayer(name)
+              except TiledError as e: fail(e.msg)
+  let classes = t.objectClasses
+  if classes.len > noClass: fail("the map has " & $classes.len & " object classes; at most 255 fit in a byte")
+  let (uw, uh) = if t.objectPixels: (1.0, 1.0) else: (float(t.tileWidth), float(t.tileHeight))
+  if uw <= 0 or uh <= 0: fail("the map has no tile size, so object positions can't be in tiles")
+  for o in layer.objects:
+    let what = "object " & (if o.name != "": o.name & " (id " & $o.id & ")" else: $o.id)
+    proc unit(v, u: float, field: string, limit: int): int =
+      result = if t.objectPixels: int(v + 0.5) else: int(v / u)   # pixels round, tiles floor
+      if v < 0: fail(what & ": " & field & " is negative (" & $v & ")")
+      if result > limit: fail(what & ": " & field & " " & $result & " doesn't fit in " &
+                              (if limit == 255: "a byte" else: "a word"))
+    result.add byte(if o.class == "": noClass else: classes.find(o.class))
+    for (v, u, f) in [(o.x, uw, "x"), (o.y, uh, "y")]:
+      let n = unit(v, u, f, 0xffff)
+      result.add [byte(n and 0xff), byte(n shr 8)]
+    result.add byte(unit(o.width, uw, "width", 255))
+    result.add byte(unit(o.height, uh, "height", 255))
+    for f in t.objectFields:
+      var v = ""
+      var kind = ""
+      for p in o.properties:
+        if p.name == f: (v, kind) = (p.value, p.kind)
+      if v == "": result.add 0; continue
+      let n = if kind == "bool": (if v == "true": 1 else: 0)
+              else: (try: parseInt(v) except ValueError: fail(what & ": " & f & " is not an integer: " & v))
+      if n notin -128 .. 255: fail(what & ": " & f & " " & $n & " doesn't fit in a byte")
+      result.add byte(n and 0xff)
 
 proc binPart*(t: TiledMap, part: string, o = BinOptions()): seq[byte] =
   ## One part of a Tiled map, `part` one of `tiledParts` or `map:LAYER`.
@@ -87,5 +126,7 @@ proc binPart*(t: TiledMap, part: string, o = BinOptions()): seq[byte] =
       let n = try: parseInt(v) except ValueError: fail("tile " & $k.id & ": tag is not a number: " & v)
       if n notin 0 .. 255: fail("tile " & $k.id & ": tag " & $n & " doesn't fit in a byte")
       result[k.id] = byte(n)
+  of "objects":
+    result = t.objectRecords(name)
   else:
     fail("a Tiled map has no part " & part)

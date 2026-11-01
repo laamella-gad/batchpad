@@ -116,6 +116,11 @@ suite "command line":
     check not fileExists(tmp / "t4.bin")
     check batchpad("bin", files / "tiled" / "external.tmx", "tile-tags=" & tmp / "t5.bin")[0] == 0
     check readFile(tmp / "t5.bin").len == 16
+    let obj = files / "tiled" / "objects.tmx"
+    check batchpad("bin", obj, "objects:items=" & tmp / "o.bin", "--set", "object-units=pixels",
+                   "--set", "object-fields=hp")[0] == 0
+    check readFile(tmp / "o.bin") == "\x02\x08\x00\x10\x00\x08\x08\x00"
+    check batchpad("bin", obj, "objects=" & tmp / "o2.bin", "--set", "object-units=feet")[0] == 1
     let (acode, asmText) = batchpad("asm", src, "--parts", "map,map-flags:sky")
     check acode == 0 and "map_data" in asmText and "map_sky_flags_data" in asmText
     let (ccode, cText) = batchpad("c", src)

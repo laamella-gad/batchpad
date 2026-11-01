@@ -4,7 +4,7 @@
 ## a tileset names. So this model is not a CharPad project; `tiledbin.nim` turns
 ## its layers into the parts the binary exports write.
 
-import std/[base64, json, os, strtabs, strutils, xmlparser, xmltree]
+import std/[algorithm, base64, json, os, strtabs, strutils, xmlparser, xmltree]
 import inflate
 
 type
@@ -58,6 +58,8 @@ type
       ## what `map` and the tile numbers use: the layer and the tileset to
       ## take; the first of each when empty
     emptyTile*: int                ## the tile number an empty cell (gid 0) gets
+    objectPixels*: bool            ## object positions and sizes in pixels, not tiles
+    objectFields*: seq[string]     ## integer properties written after each object
 
 const
   flipH* = 0x80000000'u32
@@ -409,6 +411,22 @@ func tileLayer*(m: TiledMap, name = ""): Layer =
     if l.kind == lkTiles and (want == "" or l.name == want): return l
   if want == "": fail("the map has no tile layer")
   fail("the map has no tile layer " & want)
+
+func objectLayer*(m: TiledMap, name = ""): Layer =
+  ## The object layer called `name`, or the first one.
+  for l in m.layers:
+    if l.kind == lkObjects and (name == "" or l.name == name): return l
+  if name == "": fail("the map has no object layer")
+  fail("the map has no object layer " & name)
+
+func objectClasses*(m: TiledMap): seq[string] =
+  ## The classes of all objects in the map, sorted: an object's class number is
+  ## its place in this list.
+  for l in m.layers:
+    if l.kind == lkObjects:
+      for o in l.objects:
+        if o.class != "" and o.class notin result: result.add o.class
+  result.sort
 
 func tilesetIndex*(m: TiledMap): int =
   ## The tileset `m.tilesetName` names, or the first.

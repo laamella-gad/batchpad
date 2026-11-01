@@ -21,8 +21,6 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
   - Colours: the shared colours (`bg0`-`bg2`, or `bg`, `mc1`, `mc2`) come from `--set` or else the most used colours of the picture. Each cell takes the cheapest fit (least colour distance) of its own colour and, in multicolour, hires or multicolour (sprites: per sprite). Text modes and sprites first; ECM and bitmap modes later.
   - Needs: tests with BMPs we build ourselves (round trip through `bmp`), `docs/cli.md`, `docs/import-export.md`, CLAUDE.md.
-- #73 [feature, low] Export Tiled object layers as data tables
-  - The objects are read and round trip TMX <-> JSON (#66) but no part writes them. Needs a layout decision (fields per object, which properties, tile or pixel units).
 - #74 [feature, low] Convert a CharPad map to a Tiled map with a tileset image
   - CTM -> TMX/JSON: the map is a layer, the tileset image can be drawn with `preview.nim` and `image.nim`. Several CharPad features (colour per tile, ECM) need thought.
 - #75 [feature, low] Convert a Tiled map to a CharPad project
@@ -47,6 +45,8 @@ Move an issue between sections to change its status. Never reuse a number; next 
 
 ## Closed
 
+- #73 [feature, low] Export Tiled object layers as data tables
+  - Done 2026-11-01. Part `objects` / `objects:NAME` (`tiledbin.nim`): a record per object, class number (sorted classes, `$ff` none), x and y words, width, height, then a byte per `--set object-fields=` property; tiles or pixels (`--set object-units=`). Asm/C: `objects_data`, `object_size`, `object_class_NAME`. Test file `tests/files/tiled/objects.tmx`; checked with 64tass, ca65 and oscar64 by hand.
 - #77 [feature, low] Read zlib and gzip compressed Tiled layers
   - Done 2026-11-01. `src/batchpad/inflate.nim` (`unzlib`, `ungzip`: stored, fixed and dynamic deflate blocks; checksums not verified; output limited to the expected cell count), used by `decodeData` in `tiled.nim`; `tests/tinflate.nim`, `tests/files/tiled/zlib.tmx`, `gzip.tmx`. zstd is still an error with a hint.
 - #78 [feature, low] Read external Tiled tilesets (`.tsx`)

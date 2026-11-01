@@ -15,3 +15,4 @@ and the other images are named but not present: batchpad never reads them.
 | `twotilesets.tmx` | 2 x 1 map with two tilesets, `tiles` (firstgid 1) and `more` (firstgid 5), one cell of each |
 | `external.tmx` | `csv.tmx` with its tileset in `tiles.tsx` (external, firstgid 1) |
 | `tiles.tsx` | the external tileset: the same as `csv.tmx` holds inline |
+| `objects.tmx` | `csv.tmx` plus object layers `enemies` (bat "first" at 16,8 8x8 with `hp` 3 and `boss` true; alien at 24.5,0 16x16 with `hp` 10; a point without class at 0,16) and `items` (key at 8,16 8x8) |

@@ -25,7 +25,7 @@ from Tiled; its chars and tiles come from CharPad as before.
 - Infinite maps (`<chunk>`s) are flattened to the bounding box of their chunks;
   cells in no chunk are empty.
 - Object layers (name, class, position, size, properties): kept in the model and
-  in TMX <-> JSON conversion, not exported (#73).
+  in TMX <-> JSON conversion, and written by the `objects` part (#73).
 - Group layers are flattened; a layer in a group is called `group/layer`.
 - Image layers are skipped. External tilesets (`source="x.tsx"`, or a JSON
   `.tsj`) are read from the map's folder (#78); a missing file is an error. The
@@ -56,6 +56,7 @@ tile of the tileset is 0, as in a CharPad map.
 | `map-flags`, `map-flags:NAME` | one byte per cell: bit 7 flipped horizontally, bit 6 vertically, bit 5 diagonally |
 | `tile-tags` | property `tag` per tile of the tileset, 0 where there is none; as many as the tileset has tiles |
 | `tile-names` | class (or property `name`) per tile, zero-terminated (asm and C only) |
+| `objects`, `objects:NAME` | a record per object of the first object layer, or of the layer NAME |
 
 `--cells`, `--area` and `--org` work as for CharPad's `map`. A layer called
 `x-lo` is found by its whole name before the suffix is cut off.
@@ -64,6 +65,30 @@ Assembler labels: `map_data`, `map_NAME_data`, `map_flags_data`,
 `map_NAME_flags_data`, `tiles_tag_data`, `tiles_names` (characters in a layer
 name that can't be in a label become `_`). Constants: `map_wid`, `map_hei`
 (cells, after `--area`), `tile_wid_pxls`, `tile_hei_pxls` (Tiled's tile size).
+
+## Objects
+
+The `objects` part is a record per object, in the layer's order:
+
+| Byte | Contents |
+| --- | --- |
+| 0 | class number: the place of the object's class in the sorted list of all classes in the map; `$ff` for no class |
+| 1-2 | x, little-endian word |
+| 3-4 | y, little-endian word |
+| 5 | width |
+| 6 | height |
+| 7... | one byte per name in `--set object-fields=a,b`: that integer property (`bool` gives 0 or 1), 0 when the object doesn't have it |
+
+Positions and sizes are in tiles (pixels divided by Tiled's tile size, rounded
+down), or in pixels (rounded) with `--set object-units=pixels`. They are Tiled's
+own numbers: the top left corner, except for tile objects, where Tiled puts y at
+the bottom. A negative value, a size over 255, a position over 65535 or a field
+outside -128 to 255 is an error. Objects have no end marker: the count is the
+size divided by the record size.
+
+Assembler labels: `objects_data`, `objects_NAME_data`. Constants (when an
+`objects` part is written): `object_size` (record size) and
+`object_class_NAME` per class.
 
 ## Conversion
 
