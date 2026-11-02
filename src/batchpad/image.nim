@@ -1,5 +1,5 @@
-## Indexed images with a 16 colour palette, `.pal` palette files and PNG
-## output, for the previews of `png` (docs/cli.md).
+## Indexed images with a 16 colour palette, `.pal` palette files and PNG,
+## BMP and GIF output, for the previews of `png`, `bmp` and `gif` (docs/cli.md).
 
 import std/[strutils, tables]
 
@@ -88,15 +88,17 @@ proc zlibStored(data: string): string =
     b = (b + a) mod 65521
   result.add be32((b shl 16) or a)
 
-proc toPng*(img: Image, palette: Palette, scale = 1): string =
-  ## An 8 bit indexed PNG, each pixel `scale` times as wide and high.
+proc toPng*(img: Image, palette: openArray[Rgb], scale = 1): string =
+  ## An 8 bit indexed PNG, each pixel `scale` times as wide and high. With 16
+  ## colours (a C64 palette) pixels count modulo 16; with more (TED's 128)
+  ## modulo the palette size, which must then be a power of two.
   if scale < 1 or scale > 64: raise newException(ImageError, "scale must be 1-64, not " & $scale)
   let (w, h) = (img.width * scale, img.height * scale)
   var raw = newStringOfCap((w + 1) * h)
   for y in 0 ..< h:
     raw.add '\0'
     for x in 0 ..< img.width:
-      let c = char(img.pixels[(y div scale) * img.width + x] and 0x0f)
+      let c = char(img.pixels[(y div scale) * img.width + x] and uint8(palette.len - 1))
       for _ in 0 ..< scale: raw.add c
   var plte = ""
   for c in palette:
@@ -104,6 +106,27 @@ proc toPng*(img: Image, palette: Palette, scale = 1): string =
   result = "\x89PNG\r\n\x1a\n" &
            chunk("IHDR", be32(uint32(w)) & be32(uint32(h)) & "\x08\x03\x00\x00\x00") &
            chunk("PLTE", plte) & chunk("IDAT", zlibStored(raw)) & chunk("IEND", "")
+
+proc le32(v: int): string =
+  for s in [0, 8, 16, 24]: result.add char((v shr s) and 0xff)
+
+proc toBmp*(img: Image, palette: openArray[Rgb], scale = 1): string =
+  ## An uncompressed 8 bit BMP (Windows BITMAPINFOHEADER) with `palette` as its
+  ## colour table, each pixel `scale` times as wide and high; rows bottom
+  ## first, padded to 4 bytes. Pixels count as in `toPng`.
+  if scale < 1 or scale > 64: raise newException(ImageError, "scale must be 1-64, not " & $scale)
+  let (w, h) = (img.width * scale, img.height * scale)
+  let stride = (w + 3) and not 3
+  let offset = 14 + 40 + 4 * palette.len
+  result = "BM" & le32(offset + stride * h) & le32(0) & le32(offset) &
+           le32(40) & le32(w) & le32(h) & "\x01\x00\x08\x00" & le32(0) & le32(stride * h) &
+           le32(2835) & le32(2835) & le32(palette.len) & le32(0)
+  for c in palette: result.add char(c[2]) & char(c[1]) & char(c[0]) & '\0'
+  for y in countdown(h - 1, 0):
+    for x in 0 ..< img.width:
+      let c = char(img.pixels[(y div scale) * img.width + x] and uint8(palette.len - 1))
+      for _ in 0 ..< scale: result.add c
+    for _ in w ..< stride: result.add '\0'
 
 proc lzw(pixels: openArray[uint8]): string =
   ## GIF's LZW for 4 bit pixels, as sub-blocks of at most 255 bytes.

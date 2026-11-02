@@ -3,7 +3,15 @@
 [Tiled](https://www.mapeditor.org) (mapeditor.org) saves maps as `.tmx` (XML)
 or JSON (`.tmj`, or `.json`). Layouts: doc.mapeditor.org, "TMX Map Format" and
 "JSON Map Format". We wrote the readers from those pages and made our own test
-files (`tests/files/tiled/`); none of them was opened in Tiled itself.
+files (`tests/files/tiled/`); none of them was opened in Tiled itself. On
+2026-11-02 the example and test maps of the Tiled repository (github.com/mapeditor/tiled,
+`examples/` and `tests/`, 87 `.tmx` files and one JSON map, saved by Tiled 1.0 to 1.11) went
+through `info`, `asm` and `convert` to JSON and back: every orthogonal map reads,
+the JSON reads back to the same layers and cells. What was refused was right to
+be (isometric and hexagonal maps, tile numbers over 255 without a wider
+`--cells`, tilesets in Qt resources or missing files). That run found two bugs,
+fixed since: object templates were not read, and a map with object layers only
+had no `asm` or `c` output.
 
 ## What a Tiled map holds
 
@@ -12,7 +20,9 @@ the image a tileset names (`<image source="tiles.png">`), which batchpad never
 reads. So a Tiled map is not a CharPad project: there are no chars and no tile
 cells to put in one. batchpad keeps it as a third kind of input and writes it
 straight to the binary exports: `bin`, `asm` and `c`. The game's map bytes come
-from Tiled; its chars and tiles come from CharPad as before.
+from Tiled; its chars and tiles come from CharPad as before, or `convert --base`
+puts the map into a CharPad project, and `convert level.ctm level.tmx` makes a
+Tiled map with a tileset image from one (see Conversion).
 
 ## What we read
 
@@ -24,8 +34,13 @@ from Tiled; its chars and tiles come from CharPad as before.
   (Map Properties).
 - Infinite maps (`<chunk>`s) are flattened to the bounding box of their chunks;
   cells in no chunk are empty.
-- Object layers (name, class, position, size, properties): kept in the model and
-  in TMX <-> JSON conversion, and written by the `objects` part (#73).
+- Object layers (name, class, position, size, properties, the tile of a tile
+  object): kept in the model and in TMX <-> JSON conversion, and written by the
+  `objects` part (#73).
+- Object templates (`template="x.tx"`, or a JSON `.tj`) are read from the map's
+  folder: what the object doesn't set itself (name, class, width, height, tile,
+  properties) comes from the template. `convert` keeps the template reference.
+  A template's tileset is not read: its tile number is taken as the map's.
 - Group layers are flattened; a layer in a group is called `group/layer`.
 - Image layers are skipped. External tilesets (`source="x.tsx"`, or a JSON
   `.tsj`) are read from the map's folder (#78); a missing file is an error. The
@@ -82,7 +97,8 @@ The `objects` part is a record per object, in the layer's order:
 Positions and sizes are in tiles (pixels divided by Tiled's tile size, rounded
 down), or in pixels (rounded) with `--set object-units=pixels`. They are Tiled's
 own numbers: the top left corner, except for tile objects, where Tiled puts y at
-the bottom. A negative value, a size over 255, a position over 65535 or a field
+the bottom. A map without tile layers writes `objects` by default, and `map_wid`,
+`map_hei` are the map's size. A negative value, a size over 255, a position over 65535 or a field
 outside -128 to 255 is an error. Objects have no end marker: the count is the
 size divided by the record size.
 
@@ -96,4 +112,30 @@ Assembler labels: `objects_data`, `objects_NAME_data`. Constants (when an
 `.tmx`, `.tmj`, `.json`). The writers produce CSV data, finite, orthogonal maps,
 version 1.10. Properties, object layers and tilesets that have an image are kept;
 group structure is flattened, image layers dropped.
-Tiled <-> CharPad/SpritePad conversion doesn't exist (#74, #75).
+
+`convert level.tmx level.ctm --base art.ctm` (#75) makes a CharPad project: the
+chars, tiles and colours of `art.ctm` (any CharPad project batchpad reads, also
+`.ctt`), with its map replaced by a tile layer (the first, or `--set layer=NAME`).
+Tile numbers are counted as for `bin` (`--set tileset=`, `--set empty-tile=`). They
+are tile numbers when the base project uses tiles and char numbers when not; a
+number past the base's last tile or char is an error. Flip flags don't fit a
+CharPad map and are left out with a warning, as are a trigger map or cell
+colours of the base (they belong to its old map). Any CharPad output works
+(`ctm1`-`ctm9`, `ctt`, `tmd`, `petmate`, `seuck-b`), within what it can hold.
+
+`convert level.ctm level.tmx` (or `.json`, `--to tmx|tiled-json`; #74) goes the
+other way: a map with one tile layer `map` and one tileset, and its image
+`level.png` written next to the map (so the output can't be `-`). With tiles the
+tileset holds the tiles (8 per row), without tiles the chars (16 per row: every
+char number up to the highest the map uses, so in ECM the numbers past the set
+are drawn on their background). Tiles are drawn as `png ... tiles` draws them:
+the project's colouring method, VICE colours, or TED colours for a `.ctt`. Tile
+numbers stay CharPad's, so `bin map=` gives the same bytes from either file,
+and `convert level.tmx back.ctm --base level.ctm` gives the map back. Left out
+with a warning: Petmate's colour per cell (a char has one colour in the tileset)
+and Tilemedo's trigger map. Not opened in Tiled itself.
+
+A tileset image drawn elsewhere becomes CharPad tiles with `fromimage
+tileset.png -o tileset.ctm --tiles 2x2` (#76; see cli.md): tile numbers follow
+Tiled's, so `convert level.tmx level.ctm --base tileset.ctm` then gives the
+whole level as a CharPad project.

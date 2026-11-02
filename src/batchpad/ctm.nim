@@ -47,6 +47,17 @@ type
     mapWidth*, mapHeight*: int
     map*: seq[uint16]              ## tile numbers, or char numbers without tiles
     triggers*: seq[uint8]          ## a byte per map cell, or empty: Tilemedo's trigger map, no CTM has one
+    cellColours*: seq[uint8]       ## a colour per map cell of a char map, or empty: Petmate's colour RAM, no CTM has one
+    screen*: ScreenExtras          ## what else a Petmate screen holds
+
+  ScreenExtras* = object
+    ## The parts of a Petmate screen a CharPad project has no room for.
+    border*: uint8
+    romChars*: string              ## "upper" or "lower": the screen uses the C64 ROM charset, which
+                                   ## isn't in `chars` (they are blank stand-ins)
+    name*: string                  ## the screen's name
+    fontName*: string              ## the name of its own charset
+    screens*: int                  ## how many screens the workspace holds
 
 func colourCount*(mode: DisplayMode): int =
   ## Colour bytes per char or tile in the V8/V9 colour blocks.
@@ -446,6 +457,26 @@ proc writeColours(w: var Writer, c: Colours, mode: DisplayMode) =
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(CtmError, msg)
+
+proc leaveOutScreen*(p: Project, leftOut: var seq[string]) =
+  ## The lines for `leftOut` when a format without Petmate's extras is
+  ## written: cell colours that differ from what the colouring gives (the
+  ## colouring stays), and the ROM charset (the blank chars are written).
+  if p.cellColours.len > 0:
+    var differ = 0
+    if p.tileSystem or p.cellColours.len != p.map.len:
+      differ = p.cellColours.len
+    else:
+      for i, c in p.cellColours:
+        let ch = int(p.map[i])
+        let given = case p.colouring
+                    of cmPerProject: p.colours[0]
+                    of cmPerChar: (if ch < p.chars.len: p.chars[ch].colours[0] else: c)
+                    of cmPerTile: c
+        if given != c: inc differ
+    if differ > 0: leftOut.add "colours of " & count(differ, "map cells") & " (only Petmate has a colour per cell)"
+  if p.screen.romChars != "":
+    leftOut.add "the C64 ROM charset (" & p.screen.romChars & " case); the chars are blank"
 
 proc check(p: Project) =
   ## What no version can write: a project that doesn't hold together.
@@ -847,6 +878,7 @@ proc toCtm*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
   p.check
   if p.ted: fail("the project has TED colours (CharPad C16); convert them with toC64 first")
   if p.triggers.len > 0 and version in 1 .. 9: leftOut.add "the trigger map (no CTM has one)"
+  if version in 1 .. 9: p.leaveOutScreen(leftOut)
   case version
   of 1: formatV1(p.fitV3V4(1, leftOut))
   of 2: formatV2(p.fitV3V4(2, leftOut))

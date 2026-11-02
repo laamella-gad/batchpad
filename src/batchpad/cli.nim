@@ -2,7 +2,7 @@
 
 import std/[bitops, json, options, os, streams, strutils, tables]
 import argparse
-import asmout, cout, ctm, ctt, image, preview, rawbin, rawimport, seuck, spd, spm, stats, tiled, tiledbin, tmd
+import asmout, cout, ctm, ctt, image, petmate, picture, preview, rawbin, rawimport, seuck, spd, spm, stats, tiled, tiledbin, tmd
 
 type
   CliError* = object of CatchableError
@@ -35,7 +35,8 @@ proc fail(msg: string) {.noreturn.} = raise newException(CliError, msg)
 
 proc notYet(issue: string) {.noreturn.} = fail("not implemented yet (" & issue & ")")
 
-proc readInput(path, format: string): Input =
+proc readInput(path, format: string, screen = -1): Input =
+  ## `screen` is the Petmate screen to read, -1 when not given (the first).
   let raw = try: (if path == "-": stdin.readAll else: readFile(path))
              except IOError as e: fail(e.msg)
   var format = format
@@ -57,9 +58,11 @@ proc readInput(path, format: string): Input =
     elif lower.endsWith(".b") and data.len == seuckBSize: format = "seuck-b"
     elif lower.endsWith(".i") and data.len == seuckISize: format = "seuck-i"
     elif lower.endsWith(".tmd") and data.toOpenArrayByte(0, data.high).isTmd: format = "tmd"
+    elif lower.endsWith(".petmate") or data.isPetmate: format = "petmate"
+  if screen >= 0 and format != "petmate": fail("screen is a setting of Petmate workspaces only")
   let kind =
     case format
-    of "ctm", "ctt", "tmd": kCtm
+    of "ctm", "ctt", "tmd", "petmate": kCtm
     of "spd", "spr", "spm": kSpd
     of "tmx", "tiled-json": kTiled
     of "seuck-a", "seuck-i-sprites": kSpd
@@ -79,6 +82,8 @@ proc readInput(path, format: string): Input =
   of kCtm:
     if format == "tmd":
       Input(kind: kCtm, ctm: parseTmd(data.toOpenArrayByte(0, data.high)))
+    elif format == "petmate":
+      Input(kind: kCtm, ctm: parsePetmate(data, max(screen, 0)))
     elif format == "seuck-i":
       Input(kind: kCtm, ctm: parseSeuckIBackground(data.toOpenArrayByte(0, data.high)))
     elif format in ["seuck-b", "seuck-b-sideways"]:
@@ -90,6 +95,7 @@ proc readInput(path, format: string): Input =
     let xml = format == "tmx" or format == "" and data.strip.startsWith("<")
     var m = if xml: parseTmx(data) else: parseTiledJson(data)
     m.resolveTilesets(path.parentDir)
+    m.resolveTemplates(path.parentDir)
     Input(kind: kTiled, tiled: m)
   of kSpd:
     if format == "seuck-i-sprites":
@@ -237,6 +243,9 @@ proc info(input: Input): JsonNode =
       result["tileWidth"] = %p.tileWidth
       result["tileHeight"] = %p.tileHeight
     if p.triggers.len > 0: result["triggerMap"] = %true
+    if p.cellColours.len > 0: result["cellColours"] = %true
+    if p.screen.romChars != "": result["romCharset"] = %p.screen.romChars
+    if p.screen.screens > 1: result["screens"] = %p.screen.screens
     if p.version >= 9:
       result["keyMap"] = %p.keyMap
       if p.flexiGrid.settings.testBit(7):
@@ -270,6 +279,7 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
          of ".ctm": "ctm9"
          of ".ctt": "ctt9"
          of ".tmd": "tmd"
+         of ".petmate": "petmate"
          of ".spd": "spd5"
          of ".spr": "spr"
          of ".spm": "spm"
@@ -279,25 +289,43 @@ proc convert(input: Input, path, to: string, leftOut: var seq[string]): seq[Outp
          of ".tmj", ".json": "tiled-json"
          else: fail("can't tell the output format from " & path & "; use --to")
   if to in ["tmx", "tiled-json"]:
-    if input.kind != kTiled: fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to " & to)
-    return @[Output(path: path, data: if to == "tmx": input.tiled.toTmx else: input.tiled.toTiledJson)]
+    case input.kind
+    of kTiled:
+      return @[Output(path: path, data: if to == "tmx": input.tiled.toTmx else: input.tiled.toTiledJson)]
+    of kCtm:
+      # the tileset image goes next to the map
+      if path == "-": fail("a Tiled map made from a CharPad project needs a file name, to write its tileset image next to it")
+      let imagePath = path.changeFileExt("png")
+      let sheet = input.ctm.tileSheet
+      let m = input.ctm.fromProject(imagePath.extractFilename, sheet.count, sheet.columns,
+                                    sheet.image.width, sheet.image.height, leftOut)
+      let palette = if input.ctm.ted: tedPalette() else: @vice
+      return @[Output(path: path, data: if to == "tmx": m.toTmx else: m.toTiledJson),
+               Output(path: imagePath, data: sheet.image.toPng(palette))]
+    of kSpd: fail("can't convert a SpritePad project to " & to)
   if to == "seuck-a":
     if input.kind != kSpd: fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to seuck-a")
     return @[Output(path: path, data: input.spd.toSeuckA(leftOut))]
   if to in ["seuck-b", "seuck-b-sideways"]:
     if input.kind != kCtm: fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to " & to)
     return @[Output(path: path, data: input.ctm.toSeuckB(leftOut, to == "seuck-b-sideways"))]
-  if input.kind == kTiled: fail("can't convert a Tiled map to " & to)
+  if input.kind == kTiled:
+    if to.startsWith("ctm") or to.startsWith("ctt") or to in ["tmd", "petmate", "seuck-b"]:
+      fail("a Tiled map has no chars: give them with --base project.ctm")
+    fail("can't convert a Tiled map to " & to)
+  if to == "petmate":
+    if input.kind != kCtm: fail("can't convert a SpritePad project to petmate")
+    return @[Output(path: path, data: input.ctm.toC64.toPetmate(leftOut))]
   if to == "tmd":
     if input.kind != kCtm: fail("can't convert a SpritePad project to tmd")
     return @[Output(path: path, data: input.ctm.toC64.toTmd(leftOut).toStr)]
   if to == "spm":
     if input.kind != kSpd: fail("can't convert a CTM project to spm")
     return @[Output(path: path, data: input.spd.toSpm(leftOut))]
-  if to == "spr":
-    if input.kind != kSpd: fail("can't convert a CTM project to spr")
+  if to in ["spr", "spr12"]:
+    if input.kind != kSpd: fail("can't convert a CTM project to " & to)
     if path == "-": fail("a .spr needs a file name, to write its .inf next to it")
-    let (spr, inf) = input.spd.toSpr(leftOut)
+    let (spr, inf) = if to == "spr": input.spd.toSpr(leftOut) else: input.spd.toSprPainter(leftOut)
     return @[Output(path: path, data: spr.toStr), Output(path: path & ".inf", data: inf.toStr)]
   if to.startsWith("ctt"):
     if input.kind != kCtm: fail("can't convert a " & ($input.kind)[1 .. ^1].toUpperAscii & " project to " & to)
@@ -440,6 +468,61 @@ proc importOutput(o: auto, warnings: var seq[string]): Output =
   for l in leftOut: warnings.add o.output & ": left out " & l
   Output(path: o.output, data: data.toStr)
 
+proc imageOutput(o: auto, leftOut: var seq[string]): Output =
+  ## `fromimage`: reads the picture, cuts it up and formats the project.
+  var to = o.to
+  if to == "":
+    to = case o.output.splitFile.ext.toLowerAscii
+         of ".ctm": "ctm9"
+         of ".spd": "spd5"
+         else: usage("can't tell the output format from " & o.output & "; use --to")
+  let isCtm = to.startsWith("ctm")
+  if not isCtm and not to.startsWith("spd"): usage("unknown output format: " & to)
+  let version = try: parseInt(to[3 .. ^1]) except ValueError: usage("unknown output format: " & to)
+  let scale = try: parseInt(o.scale) except ValueError: 0
+  if scale notin 1..64: usage("--scale must be 1-64, not " & o.scale)
+  let palette = if o.palette == "": vice else: readPalette(o.palette)
+  let text = try: (if o.picture == "-": stdin.readAll else: readFile(o.picture))
+             except IOError as e: fail(e.msg)
+  var tiles = (w: 0, h: 0)
+  if o.tiles != "":
+    if not isCtm: usage("--tiles is for CharPad output")
+    let n = o.tiles.toLowerAscii.split('x')
+    tiles = try: (if n.len == 2: (parseInt(n[0]), parseInt(n[1])) else: (0, 0))
+            except ValueError: (0, 0)
+    if tiles.w notin 1..255 or tiles.h notin 1..255:
+      usage("--tiles needs a size in chars like 2x2, not " & o.tiles)
+  let img = parsePicture(text).quantise(palette, scale)
+  var fixed: Fixed
+  var data: seq[byte]
+  if isCtm:
+    var p = newCtmProject()
+    p.displayMode = dmHiresText
+    for s in o.set:
+      let eq = s.find('=')
+      if eq < 1: fail("--set needs name=value, not " & s)
+      let name = s[0 ..< eq]
+      if name notin ["mode", "bg0", "bg1", "bg2"]:
+        fail("fromimage sets mode, bg0, bg1 and bg2, not " & name)
+      p.applySet(name, s[eq + 1 .. ^1])
+      if name != "mode": fixed.colours[ord(name[2]) - ord('0')] = true
+    var q = img.charsFromPicture(p, fixed, palette)
+    if tiles.w > 0: q = q.intoTiles(tiles.w, tiles.h)
+    data = q.toCtm(version, leftOut)
+  else:
+    var p = newSpdProject()
+    for s in o.set:
+      let eq = s.find('=')
+      if eq < 1: fail("--set needs name=value, not " & s)
+      let name = s[0 ..< eq]
+      let i = ["bg", "mc1", "mc2"].find(name)
+      if i < 0: fail("fromimage sets bg, mc1 and mc2, not " & name)
+      p.applySet(name, s[eq + 1 .. ^1])
+      fixed.colours[i] = true
+    data = img.spritesFromPicture(p, fixed, o.sprites != "multicolour", o.sprites != "hires",
+                                  palette).toSpd(version, leftOut)
+  Output(path: o.output, data: data.toStr)
+
 proc asmOutput(input: Input, o: AsmOptions): string =
   case input.kind
   of kCtm: input.ctm.toAsm(o)
@@ -453,7 +536,7 @@ proc parseOrg(specs: seq[string]): seq[(string, int)] =
     result.add (spec[0 ..< eq], parseAddress(spec[eq + 1 .. ^1]))
 
 template common() =
-  option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmd", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
+  option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmd", "petmate", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
   option("--set", multiple = true, help = "Overrides a project setting: name=value")
   flag("--quiet", help = "Hides warnings about what is left out")
   flag("--strict", help = "Makes those warnings errors")
@@ -464,12 +547,13 @@ let parser = newParser("batchpad"):
   flag("--version", shortcircuit = true, help = "Prints the version")
   command("info"):
     help("Prints what a project holds")
-    option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmd", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
+    option("--input-format", choices = @["ctm", "ctt", "spd", "spr", "spm", "tmd", "petmate", "tmx", "tiled-json", "seuck-a", "seuck-b", "seuck-b-sideways", "seuck-i", "seuck-i-sprites"], help = "Format of the input, if not detected")
     flag("--json", help = "Prints JSON")
     arg("input")
   command("convert"):
     help("Writes the project in another project format")
-    option("--to", help = "ctm1 to ctm9, ctt8, ctt9, spd0 to spd5, spr, spm, tmd, tmx, tiled-json, seuck-a, seuck-b or seuck-b-sideways; default from the output's extension")
+    option("--to", help = "ctm1 to ctm9, ctt8, ctt9, spd0 to spd5, spr, spr12, spm, tmd, petmate, tmx, tiled-json, seuck-a, seuck-b or seuck-b-sideways; default from the output's extension")
+    option("--base", help = "For a Tiled map: the CharPad project its chars and tiles come from")
     common()
     arg("input")
     arg("output")
@@ -526,6 +610,15 @@ let parser = newParser("batchpad"):
     common()
     arg("input")
     arg("part")
+  command("bmp"):
+    help("Writes a preview image as a BMP")
+    option("-o", "--output", default = some("-"), help = "Output file")
+    option("--palette", help = ".pal file")
+    option("--scale", default = some("1"))
+    option("--columns", help = "Items per row in a sheet")
+    common()
+    arg("input")
+    arg("part")
   command("gif"):
     help("Writes an animated GIF of a SpritePad animation")
     option("-o", "--output", default = some("-"), help = "Output file")
@@ -555,6 +648,29 @@ let parser = newParser("batchpad"):
     option("--set", multiple = true, help = "Sets a project setting: name=value")
     flag("--always-write", help = "Writes the output even when unchanged")
     arg("parts", nargs = -1)
+  command("fromimage"):
+    help("Builds a project from a picture (BMP or PNG): chars and a map, or sprites")
+    option("-o", "--output", required = true, help = "Project file to write")
+    option("--to", help = "ctm1 to ctm9, spd0 to spd5; default from the output's extension")
+    option("--palette", help = ".pal file the picture's colours are matched to")
+    option("--scale", default = some("1"), help = "The picture is enlarged this many times")
+    option("--sprites", choices = @["any", "hires", "multicolour"], default = some("any"),
+           help = "Sprite modes to choose from, per sprite")
+    option("--tiles", help = "Cuts the picture into tiles of WxH chars, e.g. 2x2 (a tileset image)")
+    option("--set", multiple = true, help = "Sets a project setting: name=value")
+    flag("--quiet", help = "Hides warnings about what is left out")
+    flag("--strict", help = "Makes those warnings errors")
+    flag("--always-write", help = "Writes the output even when unchanged")
+    arg("picture")
+  command("inject"):
+    help("Puts sprites and a background into a SEUCK game file (.I or .P00)")
+    option("-o", "--output", required = true, help = "Game file to write")
+    option("--sprites", help = "Sprite project for the game's 127 sprites")
+    option("--background", help = "CharPad project for the game's map, tiles and chars")
+    flag("--quiet", help = "Hides warnings about what is left out")
+    flag("--strict", help = "Makes those warnings errors")
+    flag("--always-write", help = "Writes the output even when unchanged")
+    arg("game")
 
 proc run*(args: seq[string], output: Stream = newFileStream(stdout),
            errors: Stream = newFileStream(stderr)): int =
@@ -564,8 +680,33 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
 
   proc load(path, format: string, sets: seq[string] = @[]): Input =
     inputPath = path
-    result = readInput(path, format)
-    result.applySets(sets)
+    var screen = -1
+    var rest: seq[string]
+    for s in sets:
+      if s.startsWith("screen="):
+        screen = try: parseInt(s[7 .. ^1]) except ValueError: -2
+        if screen < 0: fail("screen must be 0 or more, not " & s[7 .. ^1])
+      else: rest.add s
+    result = readInput(path, format, screen)
+    result.applySets(rest)
+
+  proc still(path, format: string, sets: seq[string], part, paletteFile, scaleText,
+             columnsText: string): (Image, seq[Rgb], int) =
+    ## The picture, palette and scale of `png` and `bmp`.
+    let scale = try: parseInt(scaleText) except ValueError: 0
+    if scale notin 1..64: usage("--scale must be 1-64, not " & scaleText)
+    let columns = if columnsText == "": 0 else: (try: parseInt(columnsText) except ValueError: 0)
+    if columnsText != "" and columns < 1: usage("--columns must be a positive number, not " & columnsText)
+    let input = load(path, format, sets)
+    let ted = input.kind == kCtm and input.ctm.ted
+    if ted and paletteFile != "":
+      fail("--palette holds 16 C64 colours; a CharPad C16 project uses the 128 TED colours")
+    let palette = if ted: tedPalette() elif paletteFile == "": @vice else: @(readPalette(paletteFile))
+    let picture = case input.kind
+                  of kCtm: input.ctm.previewCtm(part, columns)
+                  of kSpd: input.spd.previewSpd(part, columns)
+                  of kTiled: fail("previews are for CharPad and SpritePad projects, not Tiled maps")
+    (picture, palette, scale)
 
   try:
     let opts = parser.parse(args, quitOnHelp = false)
@@ -580,7 +721,14 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       let o = opts.argparse_convert_opts.get
       alwaysWrite = o.alwaysWrite
       var leftOut: seq[string]
-      outputs.add load(o.input, o.inputFormat, o.set).convert(o.output, o.to, leftOut)
+      var input = load(o.input, o.inputFormat, o.set)
+      if o.base != "":
+        if input.kind != kTiled: fail("--base is for a Tiled map")
+        let base = load(o.base, "")
+        if base.kind != kCtm: fail("--base needs a CharPad project, " & o.base & " isn't one")
+        inputPath = o.input
+        input = Input(kind: kCtm, ctm: input.tiled.withMap(base.ctm, leftOut))
+      outputs.add input.convert(o.output, o.to, leftOut)
       if o.strict and leftOut.len > 0:
         fail("--strict: " & o.output & " can't hold " & leftOut.join("; "))
       if not o.quiet:
@@ -627,19 +775,13 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     of "png":
       let o = opts.argparse_png_opts.get
       alwaysWrite = o.alwaysWrite
-      let scale = try: parseInt(o.scale) except ValueError: 0
-      if scale notin 1..64: usage("--scale must be 1-64, not " & o.scale)
-      let columns = if o.columns == "": 0 else: (try: parseInt(o.columns) except ValueError: 0)
-      if o.columns != "" and columns < 1: usage("--columns must be a positive number, not " & o.columns)
-      let palette = if o.palette == "": vice else: readPalette(o.palette)
-      let input = load(o.input, o.inputFormat, o.set)
-      if input.kind == kCtm and input.ctm.ted:
-        fail("previews of CharPad C16 projects are not there yet; convert it to ctm first")
-      let picture = case input.kind
-                    of kCtm: input.ctm.previewCtm(o.part, columns)
-                    of kSpd: input.spd.previewSpd(o.part, columns)
-                    of kTiled: fail("previews are for CharPad and SpritePad projects, not Tiled maps")
+      let (picture, palette, scale) = still(o.input, o.inputFormat, o.set, o.part, o.palette, o.scale, o.columns)
       outputs.add Output(path: o.output, data: picture.toPng(palette, scale))
+    of "bmp":
+      let o = opts.argparse_bmp_opts.get
+      alwaysWrite = o.alwaysWrite
+      let (picture, palette, scale) = still(o.input, o.inputFormat, o.set, o.part, o.palette, o.scale, o.columns)
+      outputs.add Output(path: o.output, data: picture.toBmp(palette, scale))
     of "gif":
       let o = opts.argparse_gif_opts.get
       alwaysWrite = o.alwaysWrite
@@ -665,7 +807,6 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       alwaysWrite = o.alwaysWrite
       let input = load(o.input, o.inputFormat, o.set)
       if input.kind != kCtm: fail("statistics are for CharPad projects")
-      if input.ctm.ted: fail("statistics of CharPad C16 projects are not there yet; convert it to ctm first")
       outputs.add Output(path: o.output, data: input.ctm.statsText(
         o.of, if o.input == "-": "stdin" else: o.input.extractFilename, o.eol == "crlf"))
     of "import":
@@ -674,6 +815,38 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
       var notes: seq[string]
       outputs.add importOutput(o, notes)
       for n in notes: errors.writeLine "batchpad: " & n
+    of "fromimage":
+      let o = opts.argparse_fromimage_opts.get
+      alwaysWrite = o.alwaysWrite
+      var leftOut: seq[string]
+      inputPath = o.picture
+      outputs.add imageOutput(o, leftOut)
+      if o.strict and leftOut.len > 0:
+        fail("--strict: " & o.output & " can't hold " & leftOut.join("; "))
+      if not o.quiet:
+        for l in leftOut: errors.writeLine "batchpad: " & o.output & ": warning: left out " & l
+    of "inject":
+      let o = opts.argparse_inject_opts.get
+      alwaysWrite = o.alwaysWrite
+      if o.sprites == "" and o.background == "": usage("give --sprites, --background or both")
+      var leftOut: seq[string]
+      var a, b = ""
+      if o.sprites != "":
+        let input = load(o.sprites, "")
+        if input.kind != kSpd: fail("--sprites needs a sprite project")
+        a = input.spd.toSeuckA(leftOut)
+      if o.background != "":
+        let input = load(o.background, "")
+        if input.kind != kCtm: fail("--background needs a CharPad project")
+        b = input.ctm.toC64.toSeuckB(leftOut)
+      inputPath = o.game
+      let game = try: readFile(o.game)
+                 except IOError as e: fail(e.msg)
+      outputs.add Output(path: o.output, data: injectSeuck(game, a, b))
+      if o.strict and leftOut.len > 0:
+        fail("--strict: " & o.output & " can't hold " & leftOut.join("; "))
+      if not o.quiet:
+        for l in leftOut: errors.writeLine "batchpad: " & o.output & ": warning: left out " & l
     else:
       errors.write(parser.help)
       errors.flush
@@ -688,7 +861,7 @@ proc run*(args: seq[string], output: Stream = newFileStream(stdout),
     errors.writeLine "batchpad: " & e.msg
     errors.flush
     return 2
-  except CliError, CtmError, SpdError, SeuckError, TiledError, BinError, AsmError, ImageError, PreviewError, StatsError:
+  except CliError, CtmError, SpdError, SeuckError, TiledError, BinError, AsmError, ImageError, PreviewError, PictureError, StatsError:
     let e = getCurrentException()
     errors.writeLine "batchpad: " & (if inputPath != "": inputPath & ": " else: "") & e.msg
     errors.flush

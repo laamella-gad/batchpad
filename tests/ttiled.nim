@@ -1,5 +1,5 @@
 import std/[options, os, strutils, unittest]
-import batchpad/[asmout, cout, rawbin, tiled, tiledbin]
+import batchpad/[asmout, ctm, cout, image, preview, rawbin, tiled, tiledbin]
 
 const files = currentSourcePath().parentDir / "files" / "tiled"
 
@@ -111,6 +111,53 @@ suite "Tiled parts":
     m.tilesetName = "nope"
     expect BinError: discard m.binPart("map")
 
+  test "a layer as the map of a CharPad project":
+    let base = readCtm(currentSourcePath().parentDir / "files" / "ctm9" / "mctext_perchar_big.ctm")
+    var m = readTiled(files / "csv.tmx")
+    var leftOut: seq[string]
+    let p = m.withMap(base, leftOut)
+    check p.mapWidth == 4 and p.mapHeight == 3 and leftOut.len == 0
+    check p.map == @[0'u16, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    check p.chars == base.chars and p.tiles == base.tiles
+    # the flipped cell of sky is left out
+    m.layerName = "sky"
+    discard m.withMap(base, leftOut)
+    check leftOut == @["the flip flags of 1 cell"]
+    # char numbers without tiles; too few is an error
+    var small = base
+    small.tileSystem = false
+    small.tiles = @[]
+    small.chars.setLen 11
+    m.layerName = ""
+    expect BinError: discard m.withMap(small, leftOut)
+    small.chars.setLen 12
+    check m.withMap(small, leftOut).map == p.map
+
+  test "a CharPad map as a Tiled map":
+    let p = readCtm(currentSourcePath().parentDir / "files" / "ctm9" / "mctext_perchar_big.ctm")
+    let sheet = p.tileSheet
+    check sheet.count == 261 and sheet.columns == 8
+    check sheet.image.width == 8 * 24 and sheet.image.height == 33 * 8
+    check sheet.image == p.previewCtm("tiles")
+    var leftOut: seq[string]
+    let m = p.fromProject("big.png", sheet.count, sheet.columns, sheet.image.width,
+                          sheet.image.height, leftOut)
+    check leftOut.len == 0
+    check m.tileWidth == 24 and m.tileHeight == 8 and m.width == 21 and m.height == 13
+    check m.tilesets[0].image == "big.png" and m.tilesets[0].tileCount == 261
+    check m.binPart("map", BinOptions(cells: cfWord)) == p.binPart("map", BinOptions(cells: cfWord))
+    # and back, through TMX
+    check parseTmx(m.toTmx).withMap(p, leftOut).map == p.map
+    # without tiles: a tile per char; ECM numbers past the set count too
+    var e = ctm.Project(displayMode: dmEcmText, colouring: cmPerProject,
+                        chars: newSeq[Char](3), mapWidth: 2, mapHeight: 1, map: @[1'u16, 66],
+                        cellColours: @[1'u8, 2])
+    let es = e.tileSheet(4)
+    check es.count == 67 and es.columns == 4 and es.image.height == 17 * 8
+    let em = e.fromProject("e.png", es.count, es.columns, es.image.width, es.image.height, leftOut)
+    check em.tileWidth == 8 and em.layers[0].gids == @[2'u32, 67]
+    check leftOut.len == 1
+
   test "objects":
     var m = readTiled(files / "objects.tmx")
     check m.objectClasses == @["alien", "bat", "key"]
@@ -132,6 +179,29 @@ suite "Tiled parts":
     let a = m.toAsm(AsmOptions(parts: @["objects", "objects:items"]))
     check "objects_data" in a and "objects_items_data" in a
     check "object_size = 8" in a and "object_class_key = 2" in a
+
+  test "object templates and maps without tile layers":
+    for f in ["templates.tmx", "templates.json"]:
+      var m = readTiled(files / f)
+      let o = m.layers[0].objects
+      check o[0].name == "enemy" and o[0].class == "bat" and o[0].gid == 2
+      check o[0].width == 16 and o[0].height == 8
+      check o[0].properties.property("hp") == "4" and o[0].properties.property("speed") == "2"
+      check o[1].class == "alien" and o[1].width == 8 and o[1].height == 8
+      check o[1].properties.property("hp") == "9" and o[1].properties.property("speed") == "2"
+      check o[2].class == "key" and o[2].templ == ""
+      m.objectFields = @["hp"]
+      check m.binPart("objects") == @[byte 1, 1, 0, 2, 0, 2, 1, 4,
+                                           0, 2, 0, 1, 0, 1, 1, 9,
+                                           2, 0, 0, 0, 0, 1, 1, 0]
+      let a = m.toAsm(AsmOptions())
+      check "objects_data" in a and "map_wid = 4" in a
+      # convert keeps the template reference and the tile
+      let back = parseTmx(m.toTmx)
+      check back.layers[0].objects[0].templ == o[0].templ and back.layers[0].objects[0].gid == 2
+      check parseTiledJson(m.toTiledJson).layers[0].objects[1].templ == o[1].templ
+    var m = parseTmx(readFile(files / "templates.tmx").replace("enemy.tx", "nope.tx"))
+    expect TiledError: m.resolveTemplates(files)
 
   test "assembler and C":
     let m = readTiled(files / "csv.tmx")

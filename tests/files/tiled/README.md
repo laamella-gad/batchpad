@@ -16,3 +16,6 @@ and the other images are named but not present: batchpad never reads them.
 | `external.tmx` | `csv.tmx` with its tileset in `tiles.tsx` (external, firstgid 1) |
 | `tiles.tsx` | the external tileset: the same as `csv.tmx` holds inline |
 | `objects.tmx` | `csv.tmx` plus object layers `enemies` (bat "first" at 16,8 8x8 with `hp` 3 and `boss` true; alien at 24.5,0 16x16 with `hp` 10; a point without class at 0,16) and `items` (key at 8,16 8x8) |
+| `templates.tmx` | a map of object layer `enemies` only (no tile layer): two objects from the template `enemy.tx` (the second overrides class `alien`, width 8 and `hp` 9) and a `key` without template |
+| `enemy.tx` | the object template: name `enemy`, class (`type`) `bat`, tile gid 2, 16 x 8, `hp` 4, `speed` 2 |
+| `templates.json`, `enemy.tj` | the same map and template as Tiled JSON |

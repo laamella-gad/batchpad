@@ -15,7 +15,7 @@ func columnsFor(count, columns, default: int): int =
 
 # CharPad
 
-func cellColours(p: ctm.Project, ch: int, tile: int): Colours =
+func colourOf(p: ctm.Project, ch: int, tile: int): Colours =
   ## The colour matrix colours the colouring method gives a char cell; `tile`
   ## is -1 when the cell isn't in a tile (the project's colours then stand in
   ## for a per tile colouring).
@@ -31,10 +31,14 @@ proc drawChar(img: var Image, x0, y0: int, p: ctm.Project, ch: int, colours: Col
   let shape = if ecm: ch and 63 else: ch
   if shape >= p.chars.len: return
   let data = p.chars[shape].data
+  # C64 colours are 4 bits; TED colours (CharPad C16) 7: luma * 16 + chroma.
+  # In multicolour text bit 3 says multicolour on both, and pen 11 is the
+  # colour without it.
+  let mask = if p.ted: 0x7f'u8 else: 0x0f'u8
   let bg = p.chipColours
-  let l0 = colours[0] and 0x0f
+  let l0 = colours[0] and mask
   let multi = case p.displayMode
-              of dmMulticolourText: l0 >= 8
+              of dmMulticolourText: (l0 and 8) != 0
               of dmMulticolourBitmap: true
               else: false
   for y in 0 .. 7:
@@ -44,11 +48,12 @@ proc drawChar(img: var Image, x0, y0: int, p: ctm.Project, ch: int, colours: Col
               of dmHiresText: (if b == 1: l0 else: bg[0])
               of dmMulticolourText:
                 if not multi: (if b == 1: l0 else: bg[0])
-                else: [bg[0], bg[1], bg[2], l0 and 7][b]
+                else: [bg[0], bg[1], bg[2], l0 and (mask xor 8)][b]
               of dmEcmText: (if b == 1: l0 else: bg[(ch shr 6) and 3])
-              of dmHiresBitmap: (if b == 1: colours[2] else: colours[1]) and 0x0f
+              of dmHiresBitmap: (if b == 1: colours[2] else: colours[1]) and mask
               of dmMulticolourBitmap:
-                [bg[0], colours[2] and 0x0f, colours[1] and 0x0f, l0][b]
+                # the C16 has no colour RAM colour: pen 11 is chip colour 1
+                [bg[0], colours[2] and mask, colours[1] and mask, (if p.ted: bg[1] else: l0)][b]
       if multi:
         img.pixels[(y0 + y) * img.width + x0 + 2 * x] = c
         img.pixels[(y0 + y) * img.width + x0 + 2 * x + 1] = c
@@ -66,7 +71,7 @@ proc previewCtm*(p: ctm.Project, part: string, columns = 0): Image =
     let rows = (p.chars.len + cols - 1) div cols
     result = newImage(cols * 8, rows * 8, back)
     for i in 0 ..< p.chars.len:
-      result.drawChar((i mod cols) * 8, (i div cols) * 8, p, i, p.cellColours(i, -1))
+      result.drawChar((i mod cols) * 8, (i div cols) * 8, p, i, p.colourOf(i, -1))
   of "tiles":
     if not p.tileSystem: fail("the project has no tiles")
     if p.tiles.len == 0: fail("the project has no tiles")
@@ -78,7 +83,7 @@ proc previewCtm*(p: ctm.Project, part: string, columns = 0): Image =
       for i, ch in t.cells:
         result.drawChar((n mod cols) * tw + (i mod p.tileWidth) * 8,
                         (n div cols) * th + (i div p.tileWidth) * 8, p, int(ch),
-                        p.cellColours(int(ch), n))
+                        p.colourOf(int(ch), n))
   of "map":
     if p.mapWidth == 0 or p.mapHeight == 0: fail("the project has no map")
     let (tw, th) = if p.tileSystem: (p.tileWidth, p.tileHeight) else: (1, 1)
@@ -91,11 +96,33 @@ proc previewCtm*(p: ctm.Project, part: string, columns = 0): Image =
           if p.tileSystem:
             if v < p.tiles.len:
               let ch = int(p.tiles[v].cells[i])
-              result.drawChar(x, y, p, ch, p.cellColours(ch, v))
+              result.drawChar(x, y, p, ch, p.colourOf(ch, v))
+          elif p.cellColours.len == p.map.len:
+            var c = p.colourOf(v, -1)
+            c[0] = p.cellColours[my * p.mapWidth + mx]
+            result.drawChar(x, y, p, v, c)
           else:
-            result.drawChar(x, y, p, v, p.cellColours(v, -1))
+            result.drawChar(x, y, p, v, p.colourOf(v, -1))
   else:
     fail("a CharPad project has no picture of " & part & " (chars, tiles, map)")
+
+proc tileSheet*(p: ctm.Project, columns = 0): tuple[image: Image, count, columns: int] =
+  ## The tileset image of a Tiled map made from `p`: every tile, or without
+  ## tiles every char number up to the highest the map uses (in ECM a number
+  ## past the set is a char shape on another background), `columns` per row
+  ## (8 tiles, 16 chars by default).
+  if p.tileSystem:
+    if p.tiles.len == 0: fail("the project has no tiles")
+    let cols = columnsFor(p.tiles.len, columns, 8)
+    return (p.previewCtm("tiles", cols), p.tiles.len, cols)
+  var count = p.chars.len
+  for v in p.map: count = max(count, int(v) + 1)
+  if count == 0: fail("the project has no chars")
+  let cols = columnsFor(count, columns, 16)
+  var img = newImage(cols * 8, ((count + cols - 1) div cols) * 8, p.chipColours[0])
+  for i in 0 ..< count:
+    img.drawChar((i mod cols) * 8, (i div cols) * 8, p, i, p.colourOf(i, -1))
+  (img, count, cols)
 
 # SpritePad
 

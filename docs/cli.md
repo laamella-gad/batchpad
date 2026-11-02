@@ -46,12 +46,15 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 | `asm` | Writes assembler source | #43-#46 |
 | `c` | Writes C source for oscar64 | #53 |
 | `png` | Writes a preview image | #48, #50 |
+| `bmp` | Writes a preview image as a BMP | #72 |
 | `gif` | Writes an animated GIF of a SpritePad animation | #49, #50 |
 | `stats` | Writes usage statistics | #47 |
 | `import` | Builds a project from raw binary parts | #42, #54 |
+| `inject` | Puts sprites and a background into a SEUCK game file | #86 |
+| `fromimage` | Builds chars and a map, or sprites, from a picture (BMP) | #72 |
 
 The input type comes from its contents, not its extension: CTM, SPD,
-headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tilemedo `.tmd` (by its extension and its length field, or `--input-format tmd`; a CharPad project, see [charpad.md](charpad.md)), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)), SEUCK
+headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tilemedo `.tmd` (by its extension and its length field, or `--input-format tmd`; a CharPad project, see [charpad.md](charpad.md)), Petmate `.petmate` (by its extension or contents, or `--input-format petmate`; one screen as a CharPad project, the first unless `--set screen=N`; see [import-export.md](import-export.md#petmate-65)), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)),
 CharPad C16 `.ctt` (by its signature, or `--input-format ctt`; colours stay TED colours, 0-127, so `--set` takes those), SEUCK
 `.A` or `.B` (by extension and exact size, or `--input-format seuck-a`, `seuck-b`), a `.P00` of one of those (by the name inside it), and the "save all data" `.I` (by extension and size, or a `.P00`; `--input-format seuck-i` for the background, `seuck-i-sprites` for the sprites). `--input-format seuck-b-sideways`
 reads the sideways SEUCK `.B`, which looks the same as the normal one.
@@ -131,7 +134,8 @@ holding the low nibble of the project's, the tile's or the char's colour
 matrix colour as the colouring method says, ready to copy to $d800. A char or
 tile number the set doesn't have gives 0. It is always 8 bits a cell whatever
 `--cells` says. `--area` (an addition: Pro has none) is in map cells as for
-`map`, so with tiles it gives the chars of those tiles.
+`map`, so with tiles it gives the chars of those tiles. A Petmate screen has a
+colour per cell: `colour-map` gives those.
 
 ## Options shared by the export commands
 
@@ -165,6 +169,7 @@ CharPad:
 | `tiles` | `off` expands the tiles into a char map (see below) |
 | `key-map` | 0-15 |
 | `flexi-grid` | `W,H` (1-256 each) in the units the project uses, or `off` |
+| `screen` | which screen of a Petmate workspace to read, from 0 (read with the file, so only for `.petmate` inputs) |
 
 `tiles=off`: the map becomes a char map of map size times tile size, and the
 tile tags and names are dropped. With per tile colouring the colours move to
@@ -210,12 +215,19 @@ to get the sub-map count or the char count into a build.
 batchpad convert old.ctm new.ctm [--to ctm1|ctm2|ctm3|ctm4|ctm5|ctm6|ctm7|ctm8|ctm9]
 batchpad convert ships.spd ships.A [--to seuck-a]
 batchpad convert level.ctm level.B --to seuck-b-sideways
+batchpad convert level.tmx level.ctm --base art.ctm
+batchpad convert level.ctm level.tmx              # and level.png, the tileset
 ```
 
 `--to` defaults to the newest version of the output's kind: `.ctm` CTM V9,
-`.spd` SPD V5, `.tmd` Tilemedo, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `ctt8` and `ctt9` (CharPad C16; TED colours from the nearest VICE colour, and a `.ctt` converted to `ctm` goes the other way), `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spm` (Spritemate; leaves out tiles and animations), `tmd` (Tilemedo: needs tiles, no bitmap modes; at most 256 chars and tiles), `tmx` and `tiled-json` (Tiled maps, from each other only), `seuck-a` (127 sprites; a sprite project), `seuck-b` and `seuck-b-sideways` (a CharPad project with exactly 128 tiles of 5 x 5, 254 chars, per-tile colouring and an 8 x 512 map; sideways: 819 x 5, see import-export.md), `spd1`, `spd2`, `spd3`, `spd4`,
+`.spd` SPD V5, `.tmd` Tilemedo, `.petmate` Petmate, `.A` and `.B` SEUCK. Versions: `ctm1` to `ctm9`, `ctt8` and `ctt9` (CharPad C16; TED colours from the nearest VICE colour, and a `.ctt` converted to `ctm` goes the other way), `spd0` (SpritePad 1.8, no header), `spr` (SpritePad 1.x, writes `.spr` and `.spr.inf`), `spr12` (Sprite Painter 1.2: the `.inf` holds a colour byte per sprite, then the 3 colours; see spritepad.md), `spm` (Spritemate; leaves out tiles and animations), `tmd` (Tilemedo: needs tiles, no bitmap modes; at most 256 chars and tiles), `petmate` (Petmate: one hires screen of at most 1024 x 1024, tiles expanded, at most 256 chars; no bitmap modes), `tmx` and `tiled-json` (Tiled maps, from each other and from CharPad projects), `seuck-a` (127 sprites; a sprite project), `seuck-b` and `seuck-b-sideways` (a CharPad project with exactly 128 tiles of 5 x 5, 254 chars, per-tile colouring and an 8 x 512 map; sideways: 819 x 5, see import-export.md), `spd1`, `spd2`, `spd3`, `spd4`,
 `spd5`, and the others as their readers and writers come (#6-#39). `--set`
 works here too.
+
+`--base art.ctm` (#75) turns a Tiled map into any CharPad output: the chars and
+tiles of the base project, its map replaced by a tile layer of the map. The
+other way, `tmx` or `tiled-json` from a CharPad project writes a Tiled map and its
+tileset image (`.png` next to the map). See tiled.md.
 
 ### bin
 
@@ -339,16 +351,20 @@ batchpad c level.ctm -o build/level.c --header build/level.h --prefix level_
 Checked 2026-10-30 with oscar64 1.32: every part compiles, `--org` data is
 at its addresses in the PRG.
 
-### png, gif
+### png, bmp, gif
 
 ```
 batchpad png level.ctm map -o map.png [--palette my.pal] [--scale 2]
+batchpad bmp level.ctm map -o map.bmp
 batchpad png ships.spd sprites -o sheet.png --columns 8
 batchpad gif ships.spd -o walk.gif --anim 0 [--scale 2]
 batchpad gif ships.spd -o door.gif --tile-anim 1
 ```
 
 png parts: `chars`, `tiles`, `map` (CharPad); `sprites`, `tiles` (SpritePad).
+`bmp` takes the same parts and options and writes the same picture as an
+uncompressed 8 bit BMP (40 byte Windows header, the palette's 16 colours, or
+TED's 128, as its colour table; rows bottom first, padded to 4 bytes).
 The picture is an 8 bit indexed PNG (16 colours) in the C64's own pixels:
 8 wide per char, 24 x 21 per sprite, a multicolour pixel two wide. `--scale N`
 (1-64) repeats every pixel N times each way. `--columns N` sets the items per
@@ -356,6 +372,10 @@ row of a sheet (default 16 chars, 8 tiles or sprites; the rest of the last row
 is background). The map is the whole map with tiles expanded. `--palette FILE`
 reads a `.pal` file (16 lines of `#RRGGBB`, each with an optional name after
 it; blank lines and `;` or `//` lines are skipped); the default is VICE's (the internal VIC-II palette of VICE 3.9, pictured in `docs/palettes/`).
+A CharPad C16 `.ctt` gives a 128 colour PNG in the TED palette (from the CTT
+spec; `--palette` is refused): in multicolour text bit 3 of the chroma says
+multicolour, and in multicolour bitmap pen 11 is chip colour 1 (the C16 has
+no colour RAM).
 There is no compression yet: files are as big as their pixels.
 
 Colours, as the C64 shows them:
@@ -442,6 +462,74 @@ or sprite. A file whose size isn't a whole number of chars, sprites, tiles
 or cells, a missing `--tile-size` or `--map-size`, and a tile or map cell the
 output version can't hold are errors; nothing is written then. What the output
 version can't hold is left out and reported on stderr, as for `convert`.
+
+### inject
+
+```
+batchpad inject game.I --sprites ships.spd --background level.ctm -o new.I
+batchpad inject game.P00 --background level.ctm -o new.P00
+```
+
+Puts sprites and a background into a SEUCK "save all data" game file (#86): a
+`.I`, or a `.P00` holding one (named `.I`, or of that size). `--sprites` takes
+any sprite project, `--background` any CharPad project; give one or both. They
+must fit as for `convert --to seuck-a` and `seuck-b` (at most 127 sprites,
+padded with empty ones; exactly 128 tiles of 5 x 5, 254 chars, an 8 x 512 map,
+per-tile colouring), and what they can't hold is left out with a warning
+(`--quiet`, `--strict` as for `convert`). Only the bytes of the sprites (at
+`$c000`) and of the map, tile colours, tiles and chars (`$0900`, `$1a00`,
+`$f800`) are written; every other byte keeps the game's value, including the
+128 unused bytes after the tile colours, the 10 bytes after the chars, bits 5
+to 7 of each sprite's 64th byte and the high nibble of each tile colour. A
+`.P00` keeps its header. Animations and the rest of the game are not touched
+(#85, #84).
+
+### fromimage
+
+```
+batchpad fromimage title.bmp -o title.ctm [--set mode=multicolour] [--set bg0=6]
+batchpad fromimage ships.bmp -o ships.spd [--sprites any|hires|multicolour] [--set bg=0]
+batchpad fromimage tileset.png -o level.ctm --tiles 2x2
+```
+
+Cuts a picture into a project (#72). The output's extension (or `--to`, as for
+`import`) says what: a CharPad project gets chars and a map (8 x 8 cells),
+a SpritePad project sprites (24 x 21 cells), both read row by row from the top
+left. Cells on the right and bottom edge that the picture doesn't fill are
+padded with the background colour.
+
+The picture is a BMP or a PNG (told apart by their first bytes). BMP: 1, 4, 8,
+16, 24 or 32 bits per pixel, uncompressed (16 and 32 bits may have bit field
+masks), with a Windows or OS/2 header; RLE is refused. PNG (#76): every colour
+type and bit depth, interlaced or not; transparency is ignored (a pixel counts
+with its colour), and so are gamma and colour profiles. Each pixel becomes the nearest colour of the palette (VICE's, or
+`--palette FILE`; distance in RGB). `--scale N` reads a picture that was
+enlarged N times (the top left pixel of each N x N block counts); its size
+must be a multiple of N. Multicolour pixels are two picture pixels wide, so a
+multicolour picture as `png` or `bmp` draws it reads back as it was.
+
+CharPad: hires text unless `--set mode=multicolour`; ECM and the bitmap modes
+are not done yet. The colouring is per char. `bg0` (and in multicolour `bg1`,
+`bg2`) are the colours given with `--set`, else the most used colours of the
+picture, in that order. Each cell takes the char colour (and, in multicolour,
+hires or multicolour: colour 0-7, or 8-15 for multicolour) that is closest to
+the picture, summed over its pixels; equal chars with equal colours are made
+once. There is no limit on the number of chars: the output version leaves out
+what it can't hold, with a warning (`--quiet`, `--strict` as for `convert`).
+
+`--tiles WxH` (#76) reads the picture as a tileset image, e.g. the PNG a Tiled
+tileset names: the chars are grouped into tiles of W x H chars, numbered row by
+row as Tiled numbers a tileset's tiles (equal tiles stay separate, so the
+numbers match), and the map shows each tile once, where the picture has it. The
+picture must be a whole number of tiles; Tiled's margin and spacing are not
+handled. Then `convert level.tmx level.ctm --base tileset.ctm` puts a Tiled map
+on those tiles (see tiled.md). As shared colours are picked from the picture,
+give them with `--set` when they matter.
+
+SpritePad: each sprite is hires or multicolour, whichever is closer (or only
+the one `--sprites` names). `bg`, `mc1` and `mc2` come from `--set`, else the
+most used colours. A sprite's own colour is any of the 16. No tiles or
+animations are made.
 
 ## In a build
 

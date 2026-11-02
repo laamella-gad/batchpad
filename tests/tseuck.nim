@@ -157,3 +157,52 @@ suite "SEUCK .P00 and .I":
   test "a .I of another size is refused":
     expect SeuckError:
       discard seuckIBackground(newSeq[byte](100))
+
+  test "inject: what a game holds goes back in unchanged":
+    var game = allData()
+    for i in 2 ..< game.len: game[i] = char((i * 7 + 3) and 0xff)   # any game
+    let a = seuckISprites(game.toOpenArrayByte(0, game.high))
+    let b = seuckIBackground(game.toOpenArrayByte(0, game.high))
+    check injectSeuck(game, a, b) == game
+    check injectSeuck(game) == game
+
+  test "inject: only the sprite and background bytes change":
+    var game = newString(seuckISize)
+    game[0] = 'B'
+    for i in 2 ..< game.len: game[i] = '\xee'
+    let a = readFile(files / "sprites.A")
+    let b = readFile(files / "background.B")
+    let both = injectSeuck(game, a, b)
+    let sprites = seuckISprites(both.toOpenArrayByte(0, both.high))
+    for i in 2 ..< a.len:
+      # bits 5 to 7 of the 64th byte stay the game's
+      if (i - 2) mod 64 == 63: check sprites[i].int == ((a[i].int and 0x1f) or 0xe0)
+      else: check sprites[i] == a[i]
+    let back = seuckIBackground(both.toOpenArrayByte(0, both.high))
+    proc at(address: int): char = both[2 + address - 0x900]
+    for address in [0x1980, 0x19ff, 0x8000, 0xbfff, 0xdfc0, 0xf7ff, 0xfff0, 0xfff9]:
+      check at(address) == '\xee'
+    # the background part equals the .B, apart from the unused and last bytes
+    for i in 2 ..< b.len:
+      if i in 2 + 0x1980 - 0x900 ..< 2 + 0x1a00 - 0x900 or i >= b.len - 10:
+        check back[i] == '\xee'                    # unused, and the last bytes
+      elif i in 2 + 0x1900 - 0x900 ..< 2 + 0x1980 - 0x900:
+        check back[i].int == ((b[i].int and 0x0f) or 0xe0)   # tile colours: high nibble kept
+      else: check back[i] == b[i]
+    let onlyA = injectSeuck(game, a)
+    check seuckIBackground(onlyA.toOpenArrayByte(0, onlyA.high)) ==
+          seuckIBackground(game.toOpenArrayByte(0, game.high))
+
+  test "inject into a .P00 keeps its header":
+    var game = allData()
+    var header = readFile(files / "sprites.P00")[0 ..< p00HeaderSize]
+    header[22] = '.'; header[23] = 'I'
+    let a = readFile(files / "sprites.A")
+    var spr = parseSeuckA(a.toOpenArrayByte(0, a.high))
+    spr.sprites[0].data[0] = 0x55
+    let res = injectSeuck(header & game, spr.toSeuckA)
+    check res[0 ..< p00HeaderSize] == header
+    check res[p00HeaderSize + 2 + 0xc000 - 0x900] == '\x55'
+    expect SeuckError: discard injectSeuck(readFile(files / "sprites.P00"), a)   # holds a .A
+    expect SeuckError: discard injectSeuck(game, a[0 .. 10])
+    expect SeuckError: discard injectSeuck(game[0 .. 100], a)

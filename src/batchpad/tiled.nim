@@ -4,7 +4,7 @@
 ## a tileset names. So this model is not a CharPad project; `tiledbin.nim` turns
 ## its layers into the parts the binary exports write.
 
-import std/[algorithm, base64, json, os, strtabs, strutils, xmlparser, xmltree]
+import std/[algorithm, base64, json, os, sequtils, strtabs, strutils, xmlparser, xmltree]
 import inflate
 
 type
@@ -13,11 +13,17 @@ type
   Property* = object
     name*, kind*, value*: string   ## `kind` is Tiled's type name: string, int, float, bool, ...
 
+  ObjectField* = enum
+    ofName, ofClass, ofWidth, ofHeight
+
   TiledObject* = object
     id*: int
     name*, class*: string
     x*, y*, width*, height*: float
     properties*: seq[Property]
+    gid*: uint32                   ## tile objects: the tile, flip bits included; 0 otherwise
+    templ*: string                 ## the object template (.tx or .tj) it is made from, if any
+    given*: set[ObjectField]       ## what the object sets itself, over its template
 
   LayerKind* = enum
     lkTiles, lkObjects
@@ -187,10 +193,20 @@ proc tmxTileset(n: XmlNode): Tileset =
     else: discard
 
 proc tmxObject(n: XmlNode): TiledObject =
-  TiledObject(id: n.intAttr("id"), name: n.attr("name"),
+  result = TiledObject(id: n.intAttr("id"), name: n.attr("name"),
               class: if n.attr("class") != "": n.attr("class") else: n.attr("type"),
               x: n.floatAttr("x"), y: n.floatAttr("y"), width: n.floatAttr("width"),
-              height: n.floatAttr("height"), properties: n.tmxProperties)
+              height: n.floatAttr("height"), properties: n.tmxProperties,
+              templ: n.attr("template"))
+  let gid = n.attr("gid")
+  if gid != "":
+    try: result.gid = uint32(parseBiggestUInt(gid))
+    except ValueError, OverflowDefect: fail("<object> gid is not a tile number: " & gid)
+  if n.attrs != nil:
+    if n.attrs.hasKey("name"): result.given.incl ofName
+    if n.attrs.hasKey("class") or n.attrs.hasKey("type"): result.given.incl ofClass
+    if n.attrs.hasKey("width"): result.given.incl ofWidth
+    if n.attrs.hasKey("height"): result.given.incl ofHeight
 
 proc tmxLayers(n: XmlNode, prefix: string, m: var TiledMap) =
   for c in n.elements:
@@ -296,6 +312,23 @@ proc jsonData(d: JsonNode, encoding, compression: string, count: int, what: stri
   else:
     fail(what & ": the data is not a list")
 
+proc jsonObject(o: JsonNode): TiledObject =
+  if o.kind != JObject: fail("an object is not a JSON object: " & $o)
+  let class = o.getOrDefault("class").getStr(o.getOrDefault("type").getStr)
+  result = TiledObject(id: o.jsonInt("id"), name: o.getOrDefault("name").getStr,
+      class: class, x: o.getOrDefault("x").getFloat, y: o.getOrDefault("y").getFloat,
+      width: o.getOrDefault("width").getFloat, height: o.getOrDefault("height").getFloat,
+      properties: o.jsonProperties, templ: o.getOrDefault("template").getStr)
+  let gid = o.getOrDefault("gid")
+  if gid != nil:
+    if gid.kind != JInt or gid.getBiggestInt notin 0 .. 0xffffffff'i64:
+      fail("object gid is not a tile number: " & $gid)
+    result.gid = uint32(gid.getBiggestInt)
+  if o.hasKey("name"): result.given.incl ofName
+  if o.hasKey("class") or o.hasKey("type"): result.given.incl ofClass
+  if o.hasKey("width"): result.given.incl ofWidth
+  if o.hasKey("height"): result.given.incl ofHeight
+
 proc jsonLayers(layers: JsonNode, prefix: string, m: var TiledMap) =
   if layers == nil or layers.kind != JArray: return
   for c in layers:
@@ -325,12 +358,7 @@ proc jsonLayers(layers: JsonNode, prefix: string, m: var TiledMap) =
       var l = Layer(kind: lkObjects, name: name, properties: c.jsonProperties)
       let objs = c.getOrDefault("objects")
       if objs != nil and objs.kind == JArray:
-        for o in objs:
-          let class = o.getOrDefault("class").getStr(o.getOrDefault("type").getStr)
-          l.objects.add TiledObject(id: o.jsonInt("id"), name: o.getOrDefault("name").getStr,
-              class: class, x: o.getOrDefault("x").getFloat, y: o.getOrDefault("y").getFloat,
-              width: o.getOrDefault("width").getFloat, height: o.getOrDefault("height").getFloat,
-              properties: o.jsonProperties)
+        for o in objs: l.objects.add o.jsonObject
       m.layers.add l
     of "group":
       c.getOrDefault("layers").jsonLayers(name & "/", m)
@@ -375,6 +403,12 @@ proc parseTiledJson*(text: string): TiledMap =
 
 # --- reading and finding things ---
 
+func property*(props: openArray[Property], name: string): string =
+  ## The value of the property `name`, "" when there is none.
+  for p in props:
+    if p.name == name: return p.value
+
+
 proc resolveTilesets*(m: var TiledMap, dir: string) =
   ## Reads the external tilesets (`.tsx`, or JSON `.tsj`) the map names, looking in
   ## `dir`. Their `firstgid` and `source` stay as the map has them.
@@ -398,11 +432,59 @@ proc resolveTilesets*(m: var TiledMap, dir: string) =
     t.firstGid = firstGid
     t.source = source
 
+proc readTemplate(path, name: string): TiledObject =
+  if not fileExists(path): fail("can't find the object template " & name & " (looked for " & path & ")")
+  let text = readFile(path)
+  if text.strip.startsWith("<"):
+    var root: XmlNode
+    try: root = parseXml(text)
+    except CatchableError as e: fail("object template " & name & " is not valid XML: " & e.msg)
+    if root.tag != "template": fail("object template " & name & " is not a template")
+    for c in root.elements:
+      if c.tag == "object": return c.tmxObject
+  else:
+    var j: JsonNode
+    try: j = parseJson(text)
+    except CatchableError as e: fail("object template " & name & " is not valid JSON: " & e.msg)
+    if j.kind == JObject and j.getOrDefault("object") != nil: return j["object"].jsonObject
+  fail("object template " & name & " has no object")
+
+proc resolveTemplates*(m: var TiledMap, dir: string) =
+  ## Fills in the objects made from a template (`.tx`, or JSON `.tj`) with what
+  ## the template has and the object doesn't set itself: name, class, size,
+  ## properties and the tile. The object keeps its `templ`.
+  ## A template's own tileset is not read: a tile object from a template keeps
+  ## the template's gid, which is right when the map lists that tileset first.
+  var cache: seq[(string, TiledObject)]
+  for l in m.layers.mitems:
+    if l.kind != lkObjects: continue
+    for o in l.objects.mitems:
+      if o.templ == "": continue
+      var t: TiledObject
+      var found = false
+      for (k, v) in cache:
+        if k == o.templ:
+          t = v
+          found = true
+      if not found:
+        t = readTemplate(dir / o.templ, o.templ)
+        cache.add (o.templ, t)
+      if ofName notin o.given: o.name = t.name
+      if ofClass notin o.given: o.class = t.class
+      if ofWidth notin o.given: o.width = t.width
+      if ofHeight notin o.given: o.height = t.height
+      if o.gid == 0: o.gid = t.gid
+      for p in t.properties:
+        if not o.properties.anyIt(it.name == p.name):
+          o.properties.add p
+
 proc readTiled*(path: string): TiledMap =
-  ## Reads a .tmx, or else a JSON map, and the external tilesets it names.
+  ## Reads a .tmx, or else a JSON map, and the external tilesets and object
+  ## templates it names.
   let text = readFile(path)
   result = if text.strip.startsWith("<"): parseTmx(text) else: parseTiledJson(text)
   result.resolveTilesets(path.parentDir)
+  result.resolveTemplates(path.parentDir)
 
 func tileLayer*(m: TiledMap, name = ""): Layer =
   ## The tile layer called `name`, `m.layerName` when that is empty, and then the first one.
@@ -435,11 +517,6 @@ func tilesetIndex*(m: TiledMap): int =
   for i, t in m.tilesets:
     if t.name == m.tilesetName: return i
   fail("the map has no tileset " & m.tilesetName)
-
-func property*(props: openArray[Property], name: string): string =
-  ## The value of the property `name`, "" when there is none.
-  for p in props:
-    if p.name == name: return p.value
 
 # --- writing ---
 
@@ -496,6 +573,8 @@ proc toTiledJson*(m: TiledMap): string =
       for e in l.objects:
         var oo = %*{"id": e.id, "name": e.name, "class": e.class, "x": e.x, "y": e.y,
                     "width": e.width, "height": e.height, "visible": true, "rotation": 0}
+        if e.gid != 0: oo["gid"] = %e.gid
+        if e.templ != "": oo["template"] = %e.templ
         if e.properties.len > 0:
           oo["properties"] = newJArray()
           for p in e.properties: oo["properties"].add p.propertyJson
@@ -579,6 +658,8 @@ proc toTmx*(m: TiledMap): string =
         let oe = newElement("object")
         oe.attrs = {"id": $o.id, "name": o.name, "class": o.class, "x": $o.x, "y": $o.y,
                     "width": $o.width, "height": $o.height}.toXmlAttributes
+        if o.gid != 0: oe.attrs["gid"] = $o.gid
+        if o.templ != "": oe.attrs["template"] = o.templ
         if o.properties.len > 0: oe.add o.properties.propertiesXml
         e.add oe
       root.add e

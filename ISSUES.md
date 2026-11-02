@@ -2,36 +2,22 @@
 
 Format: `- #N [type, priority] Title` with optional indented details.
 Types: bug, feature, task. Priorities: high, normal, low.
-Move an issue between sections to change its status. Never reuse a number; next free number: **#88**.
+Move an issue between sections to change its status. Never reuse a number; next free number: **#91**.
 
 ## Open
 
 - #87 [task, normal] Check Tiled support against real Tiled files
   - All files in `tests/files/tiled/` are hand-made from the format docs; none was saved by Tiled. Risky spots: tile objects (`gid`), object templates (`.tx`), `class` vs `type` across versions, external `.tsj` tilesets in JSON maps, zlib/gzip data from Tiled (only Python-made data tested), infinite maps with negative chunk positions.
-  - Without Tiled: run the example maps of the mapeditor/tiled GitHub repo through `info`, `bin`, `asm` and `convert` in a scratch dir (don't copy them into the repo).
+  - Without Tiled: done 2026-11-02. The 87 example and test maps of the mapeditor/tiled repo went through `info`, `asm` and `convert` (results in docs/tiled.md). Fixed: object templates (`.tx`, `.tj`) are read, maps with object layers only give `asm`/`c` output. Left: the risky spots that need Tiled itself, below.
   - With Tiled (by hand): draw a small map (two tile layers, a flipped tile, an external tileset, an object layer with classes and an `hp` property), save as TMX CSV, TMX zlib and JSON; run `info`, `bin`, `asm` on each; open the `convert` output back in Tiled. `apt` has Tiled 1.8.2 only (we write 1.10).
+  - Also open what `convert level.ctm level.tmx` writes (#74): map, tileset and its PNG, for a project with tiles, one without, and an ECM one.
   - Fix what turns up; write the result in `docs/tiled.md` and the README row.
-- #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
-  - No samples; layout from 1.5 ReadMe only. SpritePad 1.5's code ignores such an `.inf` (it reads only 3-byte ones), despite its ReadMe. 1.0/1.1 saved a bare `.spr`: readable by #26 when no `.inf` is present.
-
-- #65 [feature, normal] Read and write Petmate `.petmate` screen projects
-  - Petmate (PETSCII screen editor, github.com/nurpax/petmate) saves JSON `.petmate`. A screen is a char map with a colour per cell plus its own charset and background/border colours: fits the char-map model (tile system off, per-cell colour). Check the format against its source first; the screen sizes it allows and how it names the charset.
-  - Found by a web search on 2026-10-31; format not looked at yet.
-- #72 [feature, low] BMP export and import
-  - In scope (decided 2026-11-01).
-  - BMP as the lowest common denominator picture format of the PC platform. Asked for 2026-10-31; not started.
-  - Export: a `bmp` command next to `png` (same parts, `--palette`, `--scale`, `--columns`): uncompressed 8 bit BMP with a 16 colour palette, rows padded to 4 bytes, bottom row first. Share the code with `png` in `cli.nim`.
-  - Import: read BMPs of 1, 4, 8, 16, 24 and 32 bits (uncompressed, Windows and OS/2 headers; no RLE) and quantise any picture to the C64 palette (nearest RGB; `--palette`, `--scale N` for pictures enlarged N times). A new command (name to decide, e.g. `fromimage`) builds chars plus a map (8 x 8 cells, equal chars merged, partial cells padded with the background) or sprites (24 x 21 cells, row by row).
-  - Colours: the shared colours (`bg0`-`bg2`, or `bg`, `mc1`, `mc2`) come from `--set` or else the most used colours of the picture. Each cell takes the cheapest fit (least colour distance) of its own colour and, in multicolour, hires or multicolour (sprites: per sprite). Text modes and sprites first; ECM and bitmap modes later.
-  - Needs: tests with BMPs we build ourselves (round trip through `bmp`), `docs/cli.md`, `docs/import-export.md`, CLAUDE.md.
-- #74 [feature, low] Convert a CharPad map to a Tiled map with a tileset image
-  - CTM -> TMX/JSON: the map is a layer, the tileset image can be drawn with `preview.nim` and `image.nim`. Several CharPad features (colour per tile, ECM) need thought.
-- #75 [feature, low] Convert a Tiled map to a CharPad project
-  - Needs chars and tiles from somewhere: `--base project.ctm`, so only its map is replaced.
-- #76 [feature, low] Import tileset images from Tiled
-  - Cut a tileset PNG into chars or sprites. Overlaps #72 (image import).
-- #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
-  - `png` and `stats` refuse a project with TED colours; `gif` never took CTM. Needs the 128-colour TED palette (chroma-major, from the CTT spec) in `image.nim` and TED-aware colour handling in `preview.nim` and `stats.nim`. Follow-up of #79.
+- #88 [task, low] Check Sprite Painter 1.2 support against the real program
+  - The layout `parseSpr` and `toSprPainter` use (#24) is a guess: 64 bytes per sprite in the `.spr`, an `.inf` of one byte per sprite (bit 7 multicolour, low nibble colour) plus the 3 shared colours. Find Sprite Painter 1.2 (or files it saved), save a few sprites of both kinds, compare, and load what `convert --to spr12` writes. Fix `spd.nim`, `docs/spritepad.md`, `tests/files/spr/painter.*` and the README row.
+- #89 [task, normal] Check Petmate support against files Petmate saved
+  - `petmate.nim` (#65) was written from Petmate's source; every file in `tests/files/petmate/` is ours. Save workspaces in Petmate (several screens, upper and lower case ROM charset, a custom charset, odd sizes, border colour), run `info`, `convert`, `bin` and `png` on them, and open what `convert --to petmate` writes in Petmate. Fix what turns up; note the result in the README row.
+- #90 [task, low] Compare `.ctt` previews with CharPad C16
+  - `png`/`bmp` of a `.ctt` (#81) use our TED palette (`tedPalette` in `ctt.nim`) and our reading of the multicolour rules (bit 3 of the colour, pen 11 in multicolour bitmap is chip colour 1). Draw the sample projects in CharPad C16 Pro, take screenshots, and compare colours and pixels per display mode. Fix `preview.nim`/`ctt.nim` and docs/charpad.md.
 - #84 [feature, low] SEUCK `.C` to `.G` files, writing `.I` and `.P00`
   - `.C` (animations, enemy properties; see #85) and `.E` (attack waves) layouts are in docs/import-export.md but not read by batchpad; `.F` (`$b776`, 154 bytes) is unknown; `.D` is sound effects (240 bytes at `$b810`), `.G` a 64-char font (`$f400`). See "Memory map" in docs/import-export.md. Decide what batchpad would do with them (`bin` parts? a font as a CharPad project?). Also writing `.P00` (and `.I`, from a sprite project and a CharPad project).
 - #85 [feature, normal] SpritePad animations in SEUCK games
@@ -39,15 +25,27 @@ Move an issue between sections to change its status. Never reuse a number; next 
   - Read: `.C` (and the `.C` part of a `.I`) as the animations of a sprite project; a SEUCK frame list that isn't a run of consecutive sprites needs a rule (limit to runs, or expand to several animations). Write: SpritePad animations into a `.C`, or into a game's `.I`/`.P00` with the sprites (`inject`, see the SEUCK plan). Frame lists are 18 at most; longer SpritePad animations need an error or a cut.
   - To decide: how SpritePad's timer and attribute bits map to the speed byte and the directional bits; what a frame `$ff` (end marker plus sprite 127) means; how `--sprite-attribs seuck` and the animations meet in `bin` (`sprite-anims` part exists already).
   - No SEUCK or SpritePad program was used to check any mapping.
-- #86 [feature, normal] `inject`: put edited sprites and background into a SEUCK game file
-  - SEUCK users draw in CharPad and SpritePad but the game file only holds what SEUCK saved. A command such as `batchpad inject game.I --sprites ships.spd --background level.ctm -o new.I` (and the same for `.P00`) would overwrite the sprites at `$c000` and the map, tile colours, tiles and chars at `$900` and `$f800`, and leave every other byte alone. Memory map in docs/import-export.md.
-  - Same checks as `seuck-a` and `seuck-b` (127 sprites, 128 tiles of 5 x 5, 254 chars, 8 x 512 map, per-tile colouring), reported as a clear error; `leftOut` lines as `convert` has. Keep the `.P00` header and name. Also writes `.I` and `.P00` for #84 in the narrow sense of a patched existing file; making one from nothing stays out.
-  - Round trip test: inject what `seuck-i` and `seuck-i-sprites` read out of a game and expect the same bytes (apart from the bytes `.A` and `.B` loading ignores). Foundation for #85 (animations go into `.C` at `$2c80`).
 
 ## In progress
 
 ## Closed
 
+- #76 [feature, low] Import tileset images from Tiled
+  - Done 2026-11-02. `fromimage` reads PNGs (`parsePng` in `picture.nim`: all colour types and depths, Adam7 interlace, transparency ignored; `parsePicture` picks BMP or PNG), so a tileset PNG goes into chars or sprites. `--tiles WxH` groups the chars into tiles numbered as Tiled numbers them (`intoTiles`), so `convert map.tmx --base` (#75) puts the map on them. Margin and spacing of a Tiled tileset are not handled. Test PNGs in `tests/files/png/` saved by ImageMagick 6.9; tests `tests/tpicture.nim`, `tests/tcli.nim`; docs/cli.md, docs/tiled.md, docs/import-export.md, README.
+- #74 [feature, low] Convert a CharPad map to a Tiled map with a tileset image
+  - Done 2026-11-02. `convert level.ctm level.tmx` (or JSON): one tile layer `map`, one tileset of the tiles (or chars without tiles), its image `level.png` next to the map, drawn by `tileSheet` in `preview.nim` (colouring method as `png`; ECM numbers past the set drawn on their background; TED colours for `.ctt`). `fromProject` in `tiledbin.nim`. Tile numbers stay CharPad's, so `bin map=` agrees and `convert --base` (#75) gives the map back. Left out with warnings: Petmate cell colours, Tilemedo triggers. Not opened in Tiled. Tests in `tests/ttiled.nim`, `tests/tcli.nim`; docs/tiled.md, docs/cli.md, README.
+- #75 [feature, low] Convert a Tiled map to a CharPad project
+  - Done 2026-11-02. `convert map.tmx out.ctm --base art.ctm`: the base's chars and tiles, its map replaced by a tile layer (`withMap` in `tiledbin.nim`). Tile or char numbers by the base's tile system, checked against its count; flip flags, a trigger map and cell colours are left out with warnings. Any CharPad output. Without `--base` a CharPad output asks for it. Tests in `tests/ttiled.nim`, `tests/tcli.nim`; docs/tiled.md, docs/cli.md, README.
+- #72 [feature, low] BMP export and import
+  - Done 2026-11-02. Export: command `bmp` (as `png`; `toBmp` in `image.nim`, 8 bit, 16 or 128 colour table). Import: command `fromimage` (name picked by us) in `src/batchpad/picture.nim`: BMPs of 1/4/8/16/24/32 bits, Windows and OS/2 headers, bit fields, top-down; RLE refused. Nearest RGB colour (`--palette`), `--scale N`. CharPad output: hires or multicolour text (`--set mode=`), colour per char, shared colours from `--set bg0..bg2` or the most used, each cell the cheapest char colour and hires/multicolour, equal chars merged, edges padded. SpritePad output: 24 x 21 cells, hires or multicolour per sprite (`--sprites`), `bg`/`mc1`/`mc2` from `--set` or the most used. Not done: ECM and bitmap modes, PNG input (see #76), dithering. Test BMPs in `tests/files/bmp/` saved by ImageMagick 6.9; tests `tests/tpicture.nim`, `tests/timage.nim`, `tests/tcli.nim`; docs/cli.md, docs/import-export.md, README.
+- #24 [feature, low] Sprite Painter 1.2 `.spr` + `.spr.inf` (colours in .inf) reader and writer
+  - Done 2026-11-02. `parseSpr` takes an `.inf` of a byte per sprite plus 3 colours as 1.2's (the byte as a 64th byte: bit 7 multicolour, bits 0-3 colour; a guess), with 63 or 64 bytes per sprite in the `.spr`; also a 63-byte-sprite `.spr` without `.inf`. `toSprPainter` / `convert --to spr12` writes 64 bytes per sprite and the 1.2 `.inf`. No 1.2 files exist to check against. Tests: `tests/tspd.nim`, own files `tests/files/spr/painter.spr*`; docs/spritepad.md, docs/cli.md, README.
+- #81 [feature, low] Previews and statistics of CharPad C16 `.ctt` projects
+  - Done 2026-11-02. `tedPalette` in `ctt.nim` (128 colours from `tedColour`); `toPng` takes any palette up to 256 colours; `preview.nim` masks TED colours to 7 bits, multicolour text tests bit 3 of the chroma, multicolour bitmap pen 11 is chip colour 1 (no colour RAM on the C16). `png` of a `.ctt` uses the TED palette and refuses `--palette`; `stats` needed no colour code, its refusal is gone. `gif` stays SpritePad only. Not compared with CharPad C16's own screen. Tests: `tests/timage.nim`, `tests/tcli.nim`; docs/cli.md, docs/charpad.md, README.
+- #65 [feature, normal] Read and write Petmate `.petmate` screen projects
+  - Done 2026-11-02. `src/batchpad/petmate.nim` (`parsePetmate`, `toPetmate`, `petmateScreens`, `isPetmate`), format read from Petmate's source (workspace versions 1 and 2; screens 1 x 1 to 1024 x 1024; charset `upper`/`lower` = C64 ROM, else a key of `customFonts`). One screen (`--set screen=N`) becomes a hires char-map project; new `Project.cellColours` (colour per cell; part `colour-map` and `png` use it) and `Project.screen` (border, ROM charset, names, screen count). Chars also get the colour of their first cell, so CTM/CTT/TMD writers keep the nearest thing and warn about differing cells and about the blank ROM chars. `convert --to petmate` writes one screen (tiles expanded; multicolour/ECM as hires). Not checked against files Petmate saved: its repository has none, and Petmate isn't installed. Tests: `tests/tpetmate.nim`, `tests/tcli.nim`, own files `tests/files/petmate/`; docs/import-export.md, docs/cli.md.
+- #86 [feature, normal] `inject`: put edited sprites and background into a SEUCK game file
+  - Done 2026-11-02. `batchpad inject game.I --sprites x.spd --background y.ctm -o new.I` (also a `.P00` holding a `.I`; keeps the header). `injectSeuck` in `seuck.nim` writes only the sprite, map, tile colour, tile and char bytes; the unused bytes, the 10 bytes after the chars, sprite attribute bits 5-7 and tile colour high nibbles keep the game's values (real games set some). Checked: all 48 "save all data" files of Martin Piper's repository come back byte for byte through `.spd` + `.ctm`. Tests in `tests/tseuck.nim` and `tests/tcli.nim`; docs/cli.md, docs/import-export.md. Animations stay #85.
 - #80 [feature, normal] Read and write Tilemedo `.tmd` projects and its binary exports
   - Done 2026-11-01. `src/batchpad/tmd.nim` (`parseTmd`, `toTmd`, `isTmd`) as CharPad projects; the trigger map is `Project.triggers` (new; CTM/CTT writers leave it out with a warning) and part `triggers` in `bin`/`asm`/`c`. CLI: detected by `.tmd` + length field, `--input-format tmd`, `convert --to tmd`. Tilemedo's 2 examples round trip byte for byte (also through CTM V9), and our map PNGs match its BMP exports pixel for pixel. The headerless exports are existing raw parts (docs/charpad.md); BMP map import/export stays with #72. Tests: `tests/ttmd.nim`, `tests/tcli.nim`, own files `tests/files/tmd/`.
 - #73 [feature, low] Export Tiled object layers as data tables

@@ -260,6 +260,7 @@ func defaultParts(p: ctm.Project): seq[string] =
     result.add "tile-tags"
   result.add "map"
   if p.triggers.len > 0: result.add "triggers"
+  if p.cellColours.len > 0 and not p.tileSystem: result.add "colour-map"
 
 # SpritePad
 
@@ -401,7 +402,13 @@ proc blocks(t: TiledMap, part: string, ao: AsmOptions): seq[Block] =
         chunks: @[Chunk(data: data)])
   else: fail("a Tiled map has no part " & part)
 
-func defaultParts(t: TiledMap): seq[string] = @["map"]
+func defaultParts(t: TiledMap): seq[string] =
+  ## The map, or the objects of a map without tile layers.
+  for l in t.layers:
+    if l.isTiles: return @["map"]
+  for l in t.layers:
+    if not l.isTiles: return @["objects"]
+  @["map"]
 
 # Writing
 
@@ -639,9 +646,14 @@ proc head*(t: TiledMap, o: AsmOptions): seq[HeadLine] =
   h.blank
   h.comment "Quantities and dimensions..."
   h.blank
-  let layer = t.tiledLayer("")
+  var hasTiles = false
+  for l in t.layers:
+    if l.isTiles: hasTiles = true
+  # A map of object layers only has no tile layer: its size is the map's.
+  let (lw, lh) = if hasTiles: (let l = t.tiledLayer(""); (l.width, l.height))
+                 else: (t.width, t.height)
   let (w, h2) = if o.bin.area.isSome: (o.bin.area.get.width, o.bin.area.get.height)
-                else: (layer.width, layer.height)
+                else: (lw, lh)
   h.constant("map_wid", $w)
   h.constant("map_hei", $h2)
   h.constant("tile_wid_pxls", $t.tileWidth)

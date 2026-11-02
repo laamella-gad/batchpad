@@ -465,6 +465,22 @@ suite "SpritePad 1.x .spr":
     check spr == cast[seq[byte]](readFile(dir / "sprites.spr"))
     check inf == cast[seq[byte]](readFile(dir / "sprites.spr.inf"))
 
+  test "Sprite Painter 1.2: a colour byte per sprite in the .inf":
+    let p = readSpr(dir / "painter.spr")
+    let q = readSpr(dir / "sprites.spr")
+    check p.sprites == q.sprites[0 .. 1] and p.colours == q.colours
+    # 64 bytes per sprite, the .inf colour bytes win over the 64th bytes
+    let data = cast[seq[byte]](readFile(dir / "sprites.spr"))[0 ..< 128]
+    let r = parseSpr(data, [byte 0x87, 0x02, 1, 2, 3])
+    check r.sprites[0].attributes == 0x87 and r.sprites[1].attributes == 0x02
+    check r.colours == [1'u8, 2, 3]
+    # 63 bytes per sprite without an .inf
+    check parseSpr(data[0 ..< 126]).sprites.len == 2
+    var leftOut: seq[string]
+    let (spr, inf) = p.toSprPainter(leftOut)
+    check spr == data and inf == cast[seq[byte]](readFile(dir / "painter.spr.inf"))
+    check readSpr(dir / "sprites.spr").toSprPainter(leftOut).inf.len == 6 + 3
+
   test "V5 to .spr":
     var leftOut: seq[string]
     let p = readSpd(currentSourcePath().parentDir / "files" / "spd5" / "tiles_anims.spd")

@@ -147,7 +147,14 @@ proc colourMap(p: ctm.Project, o: BinOptions): seq[byte] =
   ## The colour matrix colour of every char cell of the map, row by row, as
   ## CharPad Pro's ColourMap: 0 for a char (or tile) number that isn't in
   ## the set. With `o.area` (in map cells, as for `map`) only the chars of
-  ## those cells; Pro has no such export.
+  ## those cells; Pro has no such export. A char map with a colour per cell
+  ## (Petmate) gives those colours.
+  if not p.tileSystem and p.cellColours.len > 0 and p.cellColours.len == p.map.len:
+    let a = p.checkedArea(o)
+    for y in a.y ..< a.y + a.height:
+      for x in a.x ..< a.x + a.width:
+        result.add p.cellColours[y * p.mapWidth + x] and 0x0f
+    return
   if p.colouring == cmPerTile and not p.tileSystem:
     fail("the colouring is per tile, but the project has no tiles")
   let a = p.checkedArea(o)

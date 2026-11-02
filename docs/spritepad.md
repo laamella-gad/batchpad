@@ -62,6 +62,12 @@ Older versions, also from the 1.5 ReadMe (no releases or samples of them):
   per sprite, then background, multicolour 1, multicolour 2. How that byte holds
   the mode is not said.
 - 1.1 added "Save up to current", so a `.spr` can hold any number of sprites.
+- batchpad (#24) reads an `.inf` of a byte per sprite plus 3 as 1.2's,
+  taking the byte as a 64th byte (bit 7 multicolour, bits 0-3 colour; a
+  guess), with 63 or 64 bytes per sprite in the `.spr` (the `.inf` length
+  tells which). A `.spr` of 63 byte sprites without an `.inf` is read too.
+  `convert --to spr12` writes 64 bytes per sprite (so 1.3 to 1.7 read the
+  sprites) and the 1.2 `.inf`. Unchecked: there are no 1.2 files.
 - The ReadMe says "the program still supports the original .inf files but they
   will be updated when saved", but 1.5's code doesn't (see below).
 

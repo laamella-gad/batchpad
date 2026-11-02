@@ -386,7 +386,8 @@ those of CTM V8 and V9; the header and colours differ:
   `char-materials`) and in the bitmap modes the lumas (pen 10/0 high, 01/1
   low); `char-attribs-l2` and `tile-attribs-l2` the chromas (01/1 high, 10/0
   low). These two are there in both bitmap modes.
-- Not done: `png`, `gif` and `stats` of a `.ctt` (they say so).
+- `png` draws a `.ctt` in the 128 TED colours (#81); `stats` takes it as any
+  CharPad project. `gif` is for SpritePad animations only.
 
 ## Tilemedo (`.tmd`)
 

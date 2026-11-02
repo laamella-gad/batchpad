@@ -1,0 +1,8 @@
+{ "type": "map", "version": "1.10", "orientation": "orthogonal", "renderorder": "right-down",
+  "width": 4, "height": 3, "tilewidth": 8, "tileheight": 8, "infinite": false,
+  "tilesets": [ { "firstgid": 1, "source": "tiles.tsx" } ],
+  "layers": [ { "id": 1, "name": "enemies", "type": "objectgroup", "objects": [
+    { "id": 1, "template": "enemy.tj", "x": 8, "y": 16 },
+    { "id": 2, "template": "enemy.tj", "type": "alien", "x": 16, "y": 8, "width": 8,
+      "properties": [ { "name": "hp", "type": "int", "value": 9 } ] },
+    { "id": 3, "class": "key", "x": 0, "y": 0, "width": 8, "height": 8 } ] } ] }

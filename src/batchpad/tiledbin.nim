@@ -3,7 +3,7 @@
 ## numbering in docs/tiled.md.
 
 import std/[options, strutils]
-import rawbin, tiled
+import ctm, rawbin, tiled
 
 const
   tiledParts* = ["map", "map-lo", "map-hi", "map-flags", "tile-tags", "objects"]
@@ -130,3 +130,52 @@ proc binPart*(t: TiledMap, part: string, o = BinOptions()): seq[byte] =
     result = t.objectRecords(name)
   else:
     fail("a Tiled map has no part " & part)
+
+proc withMap*(t: TiledMap, base: ctm.Project, leftOut: var seq[string]): ctm.Project =
+  ## `base` with its map replaced by the tile layer of `t` (`--set layer=NAME`):
+  ## tile numbers when `base` uses tiles, char numbers when not. Flip flags
+  ## don't fit a CharPad map and are left out.
+  let layer = try: t.tileLayer
+              except TiledError as e: fail(e.msg)
+  let set = try: t.tilesetIndex
+            except TiledError as e: fail(e.msg)
+  result = base
+  let (what, count) = if base.tileSystem: ("tile", base.tiles.len) else: ("char", base.chars.len)
+  result.map.setLen 0
+  var flipped = 0
+  for g in layer.gids:
+    let n = t.tileNumber(set, g, layer.name)
+    if int(n) >= count:
+      fail("layer " & layer.name & " uses " & what & " " & $n & ", the base project has " &
+           $count & " " & what & "s")
+    if (g and (flipH or flipV or flipD)) != 0: inc flipped
+    result.map.add n
+  result.mapWidth = layer.width
+  result.mapHeight = layer.height
+  if flipped > 0: leftOut.add "the flip flags of " & $flipped & (if flipped == 1: " cell" else: " cells")
+  if base.triggers.len > 0:
+    result.triggers.setLen 0
+    leftOut.add "the base project's trigger map"
+  if base.cellColours.len > 0:
+    result.cellColours.setLen 0
+    leftOut.add "the base project's cell colours"
+
+proc fromProject*(p: ctm.Project, image: string, count, columns, imageWidth, imageHeight: int,
+                  leftOut: var seq[string]): TiledMap =
+  ## A Tiled map of the map of `p`: one tile layer `map` and one tileset whose
+  ## image (`image`, `count` tiles in `columns` columns) shows the tiles, or the
+  ## chars without tiles; `preview.tileSheet` draws it. Tile numbers stay as
+  ## they are in CharPad, so `bin` gives the same map bytes from either.
+  if p.mapWidth == 0 or p.mapHeight == 0: fail("the project has no map")
+  let (tw, th) = if p.tileSystem: (p.tileWidth * 8, p.tileHeight * 8) else: (8, 8)
+  result = TiledMap(width: p.mapWidth, height: p.mapHeight, tileWidth: tw, tileHeight: th)
+  result.tilesets.add Tileset(firstGid: 1, name: (if p.tileSystem: "tiles" else: "chars"),
+                              image: image, tileWidth: tw, tileHeight: th, tileCount: count,
+                              columns: columns, imageWidth: imageWidth,
+                              imageHeight: imageHeight)
+  var layer = Layer(name: "map", kind: lkTiles, width: p.mapWidth, height: p.mapHeight)
+  for v in p.map: layer.gids.add uint32(v) + 1
+  result.layers.add layer
+  if p.cellColours.len > 0:
+    leftOut.add "the colour of each map cell (the tileset shows every char in one colour)"
+  if p.triggers.len > 0: leftOut.add "the trigger map"

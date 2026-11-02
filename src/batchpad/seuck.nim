@@ -238,3 +238,53 @@ proc parseSeuckIBackground*(data: openArray[byte]): ctm.Project =
 proc parseSeuckISprites*(data: openArray[byte]): SpriteProject =
   let a = seuckISprites(data)
   parseSeuckA(a.toOpenArrayByte(0, a.high))
+
+# Putting sprites and a background into a game
+
+const
+  tileColoursEnd = 0x1980 ## after the 128 tile colours: 128 unused bytes up to $19ff
+  tilesAt = 0x1a00        ## the tiles, up to $267f
+  charsEnd = charsAt + charCount * 8  ## $fff0: the 10 bytes after the chars are left alone
+
+proc injectSeuck*(game: string, a = "", b = ""): string =
+  ## A SEUCK "save all data" file (`.I`, bare or in a `.P00` named `.I` or of
+  ## that size) with the sprites
+  ## of the `.A` file `a` and the background of the `.B` file `b` in it; ""
+  ## leaves that part as it is. Only the bytes the sprites, map, tile colours,
+  ## tiles and chars take are written: the 128 unused bytes after the tile
+  ## colours and the 10 bytes after the chars keep the game's values, and so does
+  ## every other byte (a `.P00` keeps its header and name). The bits a project
+  ## can't hold keep the game's values too: bits 5 to 7 of each sprite's 64th
+  ## byte and the high nibble of each tile colour (set in some real games, use
+  ## unknown). `a` and `b` are what
+  ## `toSeuckA` and `toSeuckB` (not sideways) make. Raises SeuckError when the
+  ## game is not a `.I` file or `a` or `b` has the wrong size.
+  var header = ""
+  var body = game
+  if game.isP00:
+    let (name, inner) = game.unwrapP00
+    if name.seuckKind != 'I' and inner.len != seuckISize:
+      fail("the .P00 file holds '" & name & "', not a SEUCK \"save all data\" (.I) file")
+    header = game[0 ..< p00HeaderSize]
+    body = inner
+  body.toOpenArrayByte(0, body.high).checkI
+  if a != "" and a.len != seuckASize:
+    fail("not a SEUCK sprite file: " & $a.len & " bytes, expected " & $seuckASize)
+  if b != "" and b.len != seuckBSize:
+    fail("not a SEUCK background: " & $b.len & " bytes, expected " & $seuckBSize)
+  proc copy(body: var string, address: int, src: string, srcAt, len: int) =
+    for i in 0 ..< len: body[2 + address - mapAt + i] = src[srcAt + i]
+  proc keep(body: var string, address: int, mask: int) =
+    ## Takes the bits of `mask` from the game: `game` still has them.
+    let i = 2 + address - mapAt
+    let g = if header == "": game[i] else: game[p00HeaderSize + i]
+    body[i] = char((body[i].int and not mask) or (g.int and mask))
+  if a != "":
+    body.copy(spritesAt, a, 2, 127 * 64)
+    for k in 0 ..< 127: body.keep(spritesAt + 64 * k + 63, 0xe0)
+  if b != "":
+    body.copy(mapAt, b, 2, tileColoursEnd - mapAt)
+    for k in 0 ..< tileCount: body.keep(mapAt + 4096 + k, 0xf0)
+    body.copy(tilesAt, b, 2 + tilesAt - mapAt, mapEnd - tilesAt)
+    body.copy(charsAt, b, 2 + mapEnd - mapAt, charsEnd - charsAt)
+  header & body

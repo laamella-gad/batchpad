@@ -22,7 +22,7 @@ has been tried in the programs yet unless it says so.
 | Koala Painter, Art Studio, Advanced Art Studio | import, export | - | - | - |
 | Palette (`.pal` text, or image) | import, export | - | import, export | - |
 
-batchpad reads and writes `.ctt` V8 and V9 (#40, #79; see `charpad.md`): `convert` to and from `ctm`, `bin`, `asm` and `c` straight from a `.ctt`. Previews and statistics of one are not done.
+batchpad reads and writes `.ctt` V8 and V9 (#40, #79; see `charpad.md`): `convert` to and from `ctm`, `bin`, `asm` and `c` straight from a `.ctt`, and `png`, `bmp` and `stats` of one (#81).
 
 Internal files, not for exchange: the clipboard files
 (`CharPadC64_CopiedChars.bin`, `SpritePad_CopiedSprites.bin`, ...), the
@@ -441,6 +441,12 @@ or 2 when the timer reload is 0 or 1. So the timer counts 50 Hz frames.
 - Export: CharPad exports the char set, tile set or map as BMP or PNG.
   SpritePad also writes sprite and tile sheets, and animations as animated GIFs
   ("GIF Composer", optionally scaled to tile size).
+- batchpad (#72): `png` and `bmp` write the chars, tiles and map (CharPad)
+  or the sprite and tile sheets (SpritePad); `gif` the animations.
+  `fromimage` reads a BMP or PNG into hires or multicolour text chars plus a
+  map (or tiles, `--tiles WxH`, #76), or into sprites (nearest colour, equal
+  chars merged; see cli.md). Not done: ECM and bitmap modes, GIF input, a
+  colour scheme per area as CharPad's Image Importer picks.
 
 ## VICE snapshots
 
@@ -484,6 +490,14 @@ else at defaults (multicolour text, per-tile colouring, 254 chars, 128 tiles,
 and 9 x `$ff`. `.A` follows SpritePad Pro's rules (above). The sideways
 variant follows 1.7 as noted here and has not been checked against a real
 file; it pads fewer tiles and chars and keeps tile colours unmasked.
+
+`inject` (#86) writes a sprite project and a CharPad project into a game's
+`.I` (bare or in a `.P00`), at the addresses of the memory map below, and
+leaves every other byte alone (docs/cli.md). The game's bits that projects
+don't hold stay: bits 5 to 7 of the sprites' 64th bytes (`$20` is set in some
+games) and the high nibble of tile colours (`$10` in some). Checked on the 48
+"save all data" files of the repository below: reading each into a `.spd` and
+a `.ctm` and injecting those gives the same file back, byte for byte.
 
 ### Real files (checked 2026-11-01)
 
@@ -619,6 +633,47 @@ headerless binary exports are batchpad's `bin` parts: charset `chars`, colours
 `triggers`. `import` does not take a trigger map. Its BMP map import and export
 are #72.
 
+## Petmate (#65)
+
+[Petmate](https://github.com/nurpax/petmate) (a PETSCII screen editor, MIT
+licensed) saves a workspace as JSON, `.petmate`. Read from its source
+(`src/utils/index.ts` `saveWorkspace`, `src/redux/workspace.ts`), version 2:
+
+```
+{"version":2,"screens":[0,1],"framebufs":[{"width":40,"height":25,
+ "backgroundColor":6,"borderColor":14,"charset":"upper","name":"title",
+ "framebuf":[[{"code":32,"color":14},...],...]}, ...],
+ "customFonts":{"custom_1":{"name":"font","font":{"bits":[2048 bytes],"charOrder":[256 numbers]}}}}
+```
+
+- `framebufs` holds the screens in order (`screens` is always 0 to N-1). Each
+  is 1 x 1 to 1024 x 1024 cells (the size editor clamps to that), rows top to
+  bottom, a screen code and a colour (0-15) per cell. `name` is left out when
+  the screen has none.
+- `charset` is `upper` or `lower` (the C64 ROM charsets, which the file
+  doesn't hold) or the key of one of `customFonts`. Version 1 has no
+  `customFonts`, and a missing `charset` means `upper`. Custom fonts come
+  from a `.64c` (2 bytes load address, then 2048 bytes); `charOrder` only
+  orders the chars in Petmate's picker.
+- Petmate writes it with `JSON.stringify`: no spaces, keys in the order above.
+
+batchpad reads one screen (`--set screen=N`, default 0) as a hires CharPad
+project without tiles: the screen codes are the map, the colours a colour per
+cell (part `colour-map`), the background `bg0`. Each char also takes the colour
+of the first cell using it (per char colouring, 14 when unused), so a
+conversion to CTM or another format without cell colours keeps the closest
+thing and warns about the cells whose colour differs. A ROM charset gives 256
+blank chars, with a warning when they are written to another format; `info`
+shows `romCharset`. The border colour, screen name and font name are kept for
+writing Petmate again only.
+
+Writing makes a workspace with one screen. A ROM charset stays a ROM charset;
+otherwise the chars become `custom_1` (padded to 256). Tiles are expanded,
+multicolour and ECM are written as hires (ECM cells keep their char, not the
+background bits), chars past 256 are left out; bitmap modes are refused. Petmate's
+other exports (PNG, GIF, `.seq`, `.prg`, BASIC, assembler, C, JSON, `.pet`) are
+not read.
+
 ## Palettes
 
 A `.pal` text file, or an image of the palette. It sets how the 16 C64
@@ -651,11 +706,17 @@ Decided 2026-10-18; issues #41-#51, #53 and #54.
 - SEUCK `.A` sprites and `.B` backgrounds, and the SEUCK attribute style for
   raw sprites (#56, #57; added 2026-10-18).
 - Tiled maps (`.tmx` and JSON): read into the binary, assembler and C exports,
-  and converted to each other (#66; see tiled.md).
+  converted to each other (#66; see tiled.md), from a CharPad project with a
+  tileset PNG (#74) and into a CharPad project's map with `--base` (#75).
 - SEUCK `.A` and `.B` files: read and write through `convert` (#56, #57; done).
 - Tilemedo `.tmd`: read and write as a CharPad project; trigger map as part
   `triggers` (#80; done 2026-11-01).
-- Skipped: Koala / Art Studio / Advanced Art Studio, image import,
+- Petmate `.petmate`: read and write one screen as a CharPad project; cell
+  colours as part `colour-map` (#65; done 2026-11-02).
+- BMP export (`bmp`) and import (`fromimage`; text modes and sprites) (#72;
+  done 2026-11-02). PNG import too, and tileset images into tiles (#76; done
+  2026-11-02).
+- Skipped: Koala / Art Studio / Advanced Art Studio,
   VICE snapshots, Glaze's parallax build.
 
 ## Glaze

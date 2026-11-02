@@ -230,6 +230,58 @@ suite "CharPad previews":
     p.map[1] = 5   # no such tile: left as the background
     check p.previewCtm("map").row(0, 16, 16) == newSeqWith(16, 6)
 
+  test "a colour per map cell (Petmate)":
+    var p = charProject(dmHiresText, cmPerChar)
+    p.mapWidth = 2
+    p.mapHeight = 1
+    p.map = @[1'u16, 1]
+    p.cellColours = @[3'u8, 4]
+    check p.previewCtm("map").row(0, 0, 16) == newSeqWith(8, 3) & newSeqWith(8, 4)
+
+  test "TED colours (CharPad C16): 7 bits, bit 3 of the chroma says multicolour":
+    var p = charProject(dmHiresText, cmPerChar)
+    p.ted = true
+    p.chipColours = [0x71'u8, 0x32, 0x45, 0]
+    p.chars[0].colours = [0x5a'u8, 0, 0]
+    check p.previewCtm("chars").row(0, 0, 8) == @[0x71, 0x71, 0x71, 0x5a, 0x5a, 0x71, 0x5a, 0x5a]
+    p.displayMode = dmMulticolourText
+    # multicolour: the 11 pen is the colour without bit 3, luma kept
+    check p.previewCtm("chars").row(0, 0, 8) == @[0x71, 0x71, 0x32, 0x32, 0x45, 0x45, 0x52, 0x52]
+    p.chars[0].colours = [0x52'u8, 0, 0]   # chroma 2: hires
+    check p.previewCtm("chars").row(0, 0, 8)[3] == 0x52
+    p.displayMode = dmMulticolourBitmap
+    p.chars[0].colours = [0'u8, 0x15, 0x27]
+    # no colour RAM on the C16: pen 11 is chip colour 1
+    check p.previewCtm("chars").row(0, 0, 8) == @[0x71, 0x71, 0x27, 0x27, 0x15, 0x15, 0x32, 0x32]
+    p.displayMode = dmHiresBitmap
+    check p.previewCtm("chars").row(0, 0, 8) == @[0x15, 0x15, 0x15, 0x27, 0x27, 0x15, 0x27, 0x27]
+
+  test "BMP":
+    var img = newImage(3, 2)
+    img.pixels = @[1'u8, 2, 3, 4, 5, 0x16]
+    let b = img.toBmp(vice, 2)
+    proc le(at: int): int =
+      for i in countdown(3, 0): result = result * 256 + ord(b[at + i])
+    check b.startsWith("BM") and le(2) == b.len
+    check le(10) == 14 + 40 + 64 and le(14) == 40 and le(18) == 6 and le(22) == 4
+    check b[28] == '\x08' and le(46) == 16
+    check b[54 .. 57] == "\x00\x00\x00\x00" and b[58 .. 61] == "\xff\xff\xff\x00"
+    check b[62 .. 64] == "\x58\x3c\xaf"                    # red as BGR
+    # rows bottom first, 6 pixels padded to 8
+    let pixels = b[le(10) .. ^1]
+    check pixels.len == 4 * 8
+    check pixels[0 ..< 8] == "\x04\x04\x05\x05\x06\x06\0\0"
+    check pixels[16 ..< 24] == "\x01\x01\x02\x02\x03\x03\0\0"
+    expect ImageError: discard img.toBmp(vice, 0)
+
+  test "a PNG with the 128 TED colours":
+    var img = newImage(2, 1)
+    img.pixels = @[0x00'u8, 0x71]
+    var pal: seq[Rgb]
+    for i in 0 ..< 128: pal.add [uint8(i), 0, 0]
+    let d = decode(img.toPng(pal))
+    check d.palette.len == 384 and d.rows[0] == "\x00\x71"
+
   test "mistakes":
     let p = charProject(dmHiresText)
     expect PreviewError: discard p.previewCtm("tiles")

@@ -38,6 +38,10 @@ proc tedColour*(c: uint8): Rgb =
   let v = tedRgb[int(c and 15) * 8 + int((c shr 4) and 7)]
   [uint8(v shr 16), uint8(v shr 8), uint8(v)]
 
+proc tedPalette*(): seq[Rgb] =
+  ## The 128 TED colours by colour number, for previews.
+  for c in 0'u8 .. 127'u8: result.add tedColour(c)
+
 func distance(a, b: Rgb): int =
   for i in 0 .. 2:
     let d = int(a[i]) - int(b[i])
@@ -185,6 +189,7 @@ proc toCtt*(p: Project, version: int, leftOut: var seq[string]): seq[byte] =
   if p.mapWidth notin 0 .. 65535 or p.mapHeight notin 0 .. 65535 or p.map.len != p.mapWidth * p.mapHeight:
     fail("map has " & $p.map.len & " cells, not " & $p.mapWidth & " x " & $p.mapHeight)
   if p.triggers.len > 0: leftOut.add "the trigger map (no CTT has one)"
+  p.leaveOutScreen(leftOut)
   var keyMap = p.keyMap
   if keyMap > 10:
     leftOut.add "key map " & $keyMap & " (CharPad C16 has 0-10)"

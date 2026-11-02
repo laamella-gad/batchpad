@@ -180,15 +180,32 @@ proc parseSpr*(spr: openArray[byte], inf: openArray[byte] = []): SpriteProject =
   ## Parses the `.spr` of SpritePad 1.3 to 1.7 (sprites only: 64 bytes each,
   ## 1 to 256 of them) and its `.spr.inf`. As SpritePad 1.5, it takes the colours from
   ## an `inf` of exactly 3 bytes (cut to their low nibble) and otherwise has them all 0.
+  ##
+  ## Also Sprite Painter 1.2 (no samples; layout from the SpritePad 1.5
+  ## ReadMe): an `inf` of a colour byte per sprite and then the 3 colours. The
+  ## colour byte is taken as a 64th byte (bit 7 multicolour, bits 0-3 colour),
+  ## and the `.spr` may hold 63 or 64 bytes per sprite. A `.spr` of 63 byte
+  ## sprites without an `inf` (perhaps Sprite Painter 1.0 and 1.1) is read too.
   var r = Reader(data: @spr)
-  if spr.len == 0 or spr.len mod 64 != 0 or spr.len > 64 * 256:
+  let painter = inf.len > 3 and (spr.len == 63 * (inf.len - 3) or spr.len == 64 * (inf.len - 3))
+  let size = if painter: spr.len div (inf.len - 3)
+             elif inf.len == 0 and spr.len mod 64 != 0 and spr.len mod 63 == 0: 63
+             else: 64
+  if spr.len == 0 or spr.len mod size != 0 or spr.len > size * 256:
     r.fail("a .spr holds 1 to 256 sprites of 64 bytes, not " & $spr.len & " bytes")
   result.version = sprVersion
-  if inf.len == 3:
-    for i, c in result.colours.mpairs: c = inf[i] and 0x0f
+  if inf.len == 3 or painter:
+    for i, c in result.colours.mpairs: c = inf[inf.len - 3 + i] and 0x0f
   result.spriteOverlay = 1
   result.tileOverlay = 1
-  r.readSprites(result, spr.len div 64)
+  if size == 64:
+    r.readSprites(result, spr.len div 64)
+  else:
+    result.sprites.setLen spr.len div 63
+    for s in result.sprites.mitems:
+      for b in s.data.mitems: b = r.u8
+  if painter:
+    for i, s in result.sprites.mpairs: s.attributes = inf[i]
 
 proc readSpr*(path: string): SpriteProject =
   ## Reads `path` and, when it exists, `path & ".inf"`.
@@ -455,6 +472,17 @@ proc toSpr*(p: SpriteProject, leftOut: var seq[string]): tuple[spr, inf: seq[byt
   w.writeSprites(q)
   result.spr = w.data
   result.inf = @(q.colours)
+
+proc toSprPainter*(p: SpriteProject, leftOut: var seq[string]): tuple[spr, inf: seq[byte]] =
+  ## Formats `p` as the `.spr` and `.spr.inf` of Sprite Painter 1.2, as far as
+  ## its layout is known (see `parseSpr`): the `.inf` holds each sprite's 64th
+  ## byte and then the 3 colours. The `.spr` keeps the 64th bytes too, so
+  ## SpritePad 1.3 to 1.7 read it (without the colours: their `.inf` is 3 bytes).
+  result = p.toSpr(leftOut)
+  let colours = result.inf
+  result.inf = newSeq[byte]()
+  for i in 0 ..< result.spr.len div 64: result.inf.add result.spr[i * 64 + 63]
+  result.inf.add colours
 
 proc toSpd*(p: SpriteProject, version: int, leftOut: var seq[string]): seq[byte] =
   ## Formats `p` as a .spd file of version 0 (headerless), 1, 2, 3, 4 or 5. What the version can't

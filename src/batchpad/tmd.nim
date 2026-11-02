@@ -91,6 +91,7 @@ proc toTmd*(p: Project, leftOut: var seq[string]): seq[byte] =
   if tags > 0: leftOut.add "tags of " & count(tags, "tiles")
   if names > 0: leftOut.add "names of " & count(names, "tiles")
   if p.keyMap != 0: leftOut.add "key map " & $p.keyMap
+  p.leaveOutScreen(leftOut)
   if (p.flexiGrid.settings and 0x80) != 0: leftOut.add "the flexi-grid"
   if p.triggers.len != 0 and p.triggers.len != p.map.len:
     leftOut.add "the trigger map (" & $p.triggers.len & " cells, the map has " & $p.map.len & ")"

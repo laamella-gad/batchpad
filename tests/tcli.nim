@@ -1,5 +1,5 @@
 import std/[os, sequtils, streams, strutils, times, unittest]
-import batchpad/[cli, ctm, spd]
+import batchpad/[cli, ctm, preview, spd]
 
 const files = currentSourcePath().parentDir / "files"
 
@@ -114,6 +114,24 @@ suite "command line":
     check batchpad("bin", files / "tmd" / "hires.tmd", "triggers=" & tmp / "trig2.bin")[0] == 1
     check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "x.tmd")[0] == 1
 
+  test "Petmate workspaces":
+    let src = files / "petmate" / "screens.petmate"
+    let (code, text) = batchpad("info", src)
+    check code == 0 and "screens: 2" in text and "romCharset: upper" in text and "mapWidth: 4" in text
+    check batchpad("bin", src, "--set", "screen=1", "map=" & tmp / "pm.bin", "colour-map=" & tmp / "pc.bin")[0] == 0
+    check readFile(tmp / "pm.bin") == "\x01\x02\x03\x04" and readFile(tmp / "pc.bin") == "\x07\x07\x07\x07"
+    check batchpad("bin", src, "--set", "screen=2", "map=" & tmp / "pm.bin")[0] == 1
+    check batchpad("bin", files / "tmd" / "hires.tmd", "--set", "screen=0", "map=" & tmp / "pm.bin")[0] == 1
+    let custom = files / "petmate" / "custom.petmate"
+    check batchpad("convert", custom, tmp / "p.petmate")[0] == 0
+    check readFile(tmp / "p.petmate") == readFile(custom)
+    let (wcode, warned) = warnings("convert", custom, tmp / "p.ctm")
+    check wcode == 0 and "colour per cell" in warned
+    check batchpad("convert", tmp / "p.ctm", tmp / "p2.petmate")[0] == 0
+    check batchpad("convert", files / "spd5" / "sprites.spd", tmp / "x.petmate")[0] == 1
+    let (acode, asmText) = batchpad("asm", custom)
+    check acode == 0 and "colourmap_data" in asmText
+
   test "Tiled maps":
     let src = files / "tiled" / "csv.tmx"
     let (code, text) = batchpad("info", src)
@@ -140,11 +158,29 @@ suite "command line":
     let (ccode, cText) = batchpad("c", src)
     check ccode == 0 and "map_data" in cText
     check batchpad("convert", src, tmp / "t.json")[0] == 0
+    # a CharPad map to Tiled, its tileset image next to it
+    check batchpad("convert", files / "ctm9" / "mctext_perchar_big.ctm", tmp / "big.tmx")[0] == 0
+    check readFile(tmp / "big.png").startsWith("\x89PNG")
+    check batchpad("convert", files / "ctm9" / "mctext_perchar_big.ctm", tmp / "big.json")[0] == 0
+    check batchpad("info", tmp / "big.json")[0] == 0
+    check batchpad("convert", files / "ctm9" / "mctext_perchar_big.ctm", "-", "--to", "tmx")[0] == 1
+    check batchpad("convert", files / "spd5" / "sprites.spd", tmp / "s.tmx")[0] == 1
+    # a layer into a CharPad project's map
+    let big = files / "ctm9" / "mctext_perchar_big.ctm"
+    let (nobase, nobaseText) = warnings("convert", src, tmp / "tb.ctm")
+    check nobase == 1 and "--base" in nobaseText
+    check batchpad("convert", src, tmp / "tb.ctm", "--base", big)[0] == 0
+    check batchpad("bin", tmp / "tb.ctm", "map=" & tmp / "tb.bin")[0] == 0
+    check readFile(tmp / "tb.bin") == readFile(tmp / "t.bin")
+    let (flips, flipsText) = warnings("convert", src, tmp / "tb.ctm", "--base", big, "--set", "layer=sky")
+    check flips == 0 and "flip flags" in flipsText
+    check batchpad("convert", src, tmp / "tb.ctm", "--base", files / "ctm9" / "mctext_pertile.ctm")[0] == 1
+    check batchpad("convert", big, tmp / "tb.ctm", "--base", big)[0] == 1
     check batchpad("convert", tmp / "t.json", tmp / "t2.tmx")[0] == 0
     check batchpad("bin", tmp / "t2.tmx", "map:sky=" & tmp / "t5.bin")[0] == 0
     check readFile(tmp / "t5.bin") == readFile(tmp / "t2.bin")
     check batchpad("convert", src, tmp / "t.ctm")[0] == 1
-    check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "t6.tmx")[0] == 1
+    check batchpad("convert", files / "ctm9" / "hirestext_perchar_notiles.ctm", tmp / "t6.tmx")[0] == 0
     check batchpad("png", src, "map")[0] == 1
     check batchpad("stats", src)[0] == 1
 
@@ -159,9 +195,11 @@ suite "command line":
     check batchpad("convert", tmp / "c16.ctm", tmp / "c16d.ctt")[0] == 0
     check batchpad("bin", t, "chars=" & tmp / "c16.bin")[0] == 0
     check fileExists(tmp / "c16.bin")
-    let (code, err) = warnings("png", t, "map")
-    check code == 1 and "not there yet" in err
-    check batchpad("stats", t)[0] == 1
+    let (code, png) = batchpad("png", t, "map")
+    check code == 0 and png.startsWith("\x89PNG")
+    check batchpad("png", t, "map", "--palette", tmp / "any.pal")[0] == 1
+    let (scode, stats) = batchpad("stats", t)
+    check scode == 0 and "3 chars" in stats
 
   test "SEUCK files":
     let a = files / "seuck" / "sprites.A"
@@ -213,6 +251,16 @@ suite "command line":
     c[23] = 'x'
     writeFile(tmp / "y.P00", c)
     check batchpad("info", tmp / "y.P00")[0] == 1
+    # inject: the game's own sprites and background give the same game back
+    check batchpad("inject", tmp / "game.I", "--sprites", tmp / "g.A",
+                   "--background", tmp / "g.B", "-o", tmp / "new.I")[0] == 0
+    check readFile(tmp / "new.I") == all
+    check batchpad("convert", tmp / "g.A", tmp / "g.spd")[0] == 0
+    check batchpad("inject", tmp / "game.I", "--sprites", tmp / "g.spd", "-o", tmp / "new2.I")[0] == 0
+    check readFile(tmp / "new2.I") == all
+    check batchpad("inject", tmp / "game.I", "-o", tmp / "new3.I")[0] == 2
+    check batchpad("inject", tmp / "game.I", "--sprites", bp, "-o", tmp / "new3.I")[0] == 1
+    check batchpad("inject", sp, "--sprites", tmp / "g.A", "-o", tmp / "new3.I")[0] == 1
 
   test "convert to spd3 and spd4":
     for v in [3, 4]:
@@ -400,6 +448,50 @@ suite "command line":
     check batchpad("png", src, "sprites")[0] == 1
     check batchpad("png", src, "chars", "--scale", "0")[0] == 2
     check batchpad("png", src, "chars", "--columns", "x")[0] == 2
+
+  test "bmp":
+    let src = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("bmp", src, "map", "-o", tmp / "map.bmp", "--scale", "2")[0] == 0
+    let bmp = readFile(tmp / "map.bmp")
+    check bmp.startsWith("BM") and bmp.len == 14 + 40 + 64 + 192 * 96
+    check bmp[18 .. 25] == "\xc0\0\0\0\x60\0\0\0"
+    check batchpad("bmp", src, "chars", "--palette", tmp / "nope.pal")[0] == 1
+    check batchpad("bmp", src, "chars", "--scale", "0")[0] == 2
+
+  test "fromimage":
+    let mc = files / "bmp" / "mc24.bmp"
+    check batchpad("fromimage", mc, "-o", tmp / "pic.ctm", "--set", "mode=multicolour",
+                   "--set", "bg0=6", "--set", "bg1=11", "--set", "bg2=12")[0] == 0
+    let p = readCtm(tmp / "pic.ctm")
+    check p.displayMode == dmMulticolourText and p.mapWidth == 12 and p.mapHeight == 6
+    check p.chipColours[0 .. 2] == [6'u8, 11, 12]
+    # back to a BMP: the same pixels
+    check batchpad("bmp", tmp / "pic.ctm", "map", "-o", tmp / "pic.bmp")[0] == 0
+    check batchpad("fromimage", tmp / "pic.bmp", "-o", tmp / "pic2.ctm", "--set", "mode=multicolour",
+                   "--set", "bg0=6", "--set", "bg1=11", "--set", "bg2=12")[0] == 0
+    check readCtm(tmp / "pic2.ctm") == p
+    check batchpad("fromimage", files / "bmp" / "sprites.bmp", "-o", tmp / "pic.spd")[0] == 0
+    check readSpd(tmp / "pic.spd").sprites.len == 6
+    check batchpad("fromimage", mc, "-o", tmp / "pic.xyz")[0] == 2
+    check batchpad("fromimage", mc, "-o", tmp / "pic.ctm", "--set", "tiles=off")[0] == 1
+    check batchpad("fromimage", mc, "-o", tmp / "pic.ctm", "--set", "mode=ecm")[0] == 1
+    check batchpad("fromimage", files / "ctm9" / "mctext_pertile.ctm", "-o", tmp / "pic.ctm")[0] == 1
+    # a PNG gives the same project
+    check batchpad("fromimage", files / "png" / "mc8.png", "-o", tmp / "pic3.ctm", "--set", "mode=multicolour",
+                   "--set", "bg0=6", "--set", "bg1=11", "--set", "bg2=12")[0] == 0
+    check readCtm(tmp / "pic3.ctm") == p
+    # a Tiled tileset image: CharPad project -> Tiled map and PNG -> tiles -> the map again
+    let orig = files / "ctm9" / "mctext_pertile.ctm"
+    check batchpad("convert", orig, tmp / "ts.tmx")[0] == 0
+    check batchpad("fromimage", tmp / "ts.png", "-o", tmp / "ts.ctm", "--tiles", "2x2", "--set", "mode=multicolour",
+                   "--set", "bg0=6", "--set", "bg1=11", "--set", "bg2=12")[0] == 0
+    let ts = readCtm(tmp / "ts.ctm")
+    check ts.tileSystem and ts.tiles.len == 4 and ts.tileWidth == 2 and ts.mapWidth == 4
+    check batchpad("convert", tmp / "ts.tmx", tmp / "ts2.ctm", "--base", tmp / "ts.ctm")[0] == 0
+    check readCtm(tmp / "ts2.ctm").previewCtm("map") == readCtm(orig).previewCtm("map")
+    check batchpad("fromimage", tmp / "ts.png", "-o", tmp / "ts.ctm", "--tiles", "3x1")[0] == 1
+    check batchpad("fromimage", tmp / "ts.png", "-o", tmp / "ts.ctm", "--tiles", "2")[0] == 2
+    check batchpad("fromimage", files / "bmp" / "sprites.bmp", "-o", tmp / "pic.spd", "--tiles", "2x2")[0] == 2
 
   test "gif":
     let src = files / "spd5" / "tiles_anims.spd"
