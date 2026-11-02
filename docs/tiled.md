@@ -16,8 +16,9 @@ had no `asm` or `c` output.
 ## What a Tiled map holds
 
 Tile numbers only. A map says which tile sits in which cell; the pictures are in
-the image a tileset names (`<image source="tiles.png">`), which batchpad never
-reads. So a Tiled map is not a CharPad project: there are no chars and no tile
+the image a tileset names (`<image source="tiles.png">`), which batchpad doesn't
+read with the map (`fromimage --tiles` can cut it into CharPad tiles, see
+Conversion). So a Tiled map is not a CharPad project: there are no chars and no tile
 cells to put in one. batchpad keeps it as a third kind of input and writes it
 straight to the binary exports: `bin`, `asm` and `c`. The game's map bytes come
 from Tiled; its chars and tiles come from CharPad as before, or `convert --base`

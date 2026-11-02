@@ -41,7 +41,7 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 | Command | Does | Issues |
 | --- | --- | --- |
 | `info` | Prints what a project holds | |
-| `convert` | Writes the project in another project format | #6-#39, #56, #57 |
+| `convert` | Writes the project in another project format | #6-#40, #56, #57, #64-#66, #74, #75, #79, #80 |
 | `bin` | Writes raw binary parts | #41, #44, #45, #54 |
 | `asm` | Writes assembler source | #43-#46 |
 | `c` | Writes C source for oscar64 | #53 |
@@ -51,7 +51,7 @@ batchpad <command> <input> [<part>=<file> ...] [options]
 | `stats` | Writes usage statistics | #47 |
 | `import` | Builds a project from raw binary parts | #42, #54 |
 | `inject` | Puts sprites and a background into a SEUCK game file | #86 |
-| `fromimage` | Builds chars and a map, or sprites, from a picture (BMP) | #72 |
+| `fromimage` | Builds chars and a map, tiles, or sprites, from a picture (BMP or PNG) | #72, #76 |
 
 The input type comes from its contents, not its extension: CTM, SPD,
 headerless SPD, `.spr` (recognised by its extension, or `--input-format spr`; with `.spr.inf` next to it when there is one), Spritemate `.spm` (by its extension, or `--input-format spm`), Tilemedo `.tmd` (by its extension and its length field, or `--input-format tmd`; a CharPad project, see [charpad.md](charpad.md)), Petmate `.petmate` (by its extension or contents, or `--input-format petmate`; one screen as a CharPad project, the first unless `--set screen=N`; see [import-export.md](import-export.md#petmate-65)), Tiled `.tmx` or JSON (by its contents or extension, or `--input-format tmx` / `tiled-json`; see [tiled.md](tiled.md)),
