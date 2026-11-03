@@ -2,7 +2,7 @@
 ## and the tags of the tiles. Part names are described in docs/cli.md, the
 ## numbering in docs/tiled.md.
 
-import std/[options, strutils]
+import std/[options, os, strutils]
 import ctm, rawbin, tiled
 
 const
@@ -35,13 +35,17 @@ proc tileNumber(t: TiledMap, set: int, gid: uint32, layer: string): uint16 =
   if gid == 0: return uint16(t.emptyTile)
   let id = int(gid and idMask)
   let ts = t.tilesets[set]
-  var next = high(int)
-  for o in t.tilesets:
-    if o.firstGid > ts.firstGid: next = min(next, o.firstGid)
-  if id < ts.firstGid or id >= next:
+  var owner = -1
+  for i, o in t.tilesets:
+    if o.firstGid <= id and (owner < 0 or o.firstGid > t.tilesets[owner].firstGid):
+      owner = i
+  if owner < 0 or (owner != set and
+      (ts.source == "" or t.tilesets[owner].source == "" or
+       (ts.source != t.tilesets[owner].source and
+        normalizedPath(ts.source) != normalizedPath(t.tilesets[owner].source)))):
     fail("layer " & layer & " has a cell of another tileset (tile " & $id &
          "); pick it with --set tileset=NAME or draw with one tileset")
-  let n = id - ts.firstGid
+  let n = id - t.tilesets[owner].firstGid
   if n > 0xffff: fail("tile number " & $n & " doesn't fit in 16 bits")
   uint16(n)
 

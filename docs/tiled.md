@@ -3,7 +3,7 @@
 [Tiled](https://www.mapeditor.org) (mapeditor.org) saves maps as `.tmx` (XML)
 or JSON (`.tmj`, or `.json`). Layouts: doc.mapeditor.org, "TMX Map Format" and
 "JSON Map Format". We wrote the readers from those pages and made our own test
-files (`tests/files/tiled/`); none of them was opened in Tiled itself. On
+files (`tests/files/tiled/`). On
 2026-11-02 the example and test maps of the Tiled repository (github.com/mapeditor/tiled,
 `examples/` and `tests/`, 87 `.tmx` files and one JSON map, saved by Tiled 1.0 to 1.11) went
 through `info`, `asm` and `convert` to JSON and back: every orthogonal map reads,
@@ -12,6 +12,22 @@ be (isometric and hexagonal maps, tile numbers over 255 without a wider
 `--cells`, tilesets in Qt resources or missing files). That run found two bugs,
 fixed since: object templates were not read, and a map with object layers only
 had no `asm` or `c` output.
+
+On 2026-11-04 a map drawn and saved in Tiled 1.12.2, its external TSX and SVG,
+and Tiled-generated JSON, zlib and gzip variants were checked with `info`,
+`bin`, `asm` and conversion. Tiled reopened the conversions and rendered the
+tile layers pixel-for-pixel like the original. The map has two tile layers,
+empty cells, horizontal and combined horizontal/vertical flips, and a rectangle
+of type `enemy` with an `hp` string of `3`. Tiled collapsed two references to
+the same external tileset when it reopened the original; batchpad now exports
+the same local tile numbers. Fixtures and regression tests are in
+`tests/files/tiled/tiled-1.12.2/` and `tests/ttiled.nim`.
+
+Tiled 1.12.2's rasterizer also rendered three CharPad-to-Tiled exports (with
+tiles, without tiles, and ECM) pixel-for-pixel like batchpad's previews; their
+map bytes match too. This is not a GUI inspection. Tile objects, templates,
+external JSON tilesets and negative-position infinite chunks still need checks
+against files saved by Tiled (#87).
 
 ## What a Tiled map holds
 
@@ -53,8 +69,9 @@ Tiled map with a tileset image from one (see Conversion).
 
 A cell is a global tile id (gid): bit 31 horizontal flip, bit 30 vertical flip,
 bit 29 diagonal flip, bit 28 hexagonal rotation (ignored); the rest is the id.
-The tile number written is `id - firstgid` of the chosen tileset, so the first
-tile of the tileset is 0, as in a CharPad map.
+The tile number written is `id - firstgid` of the reference owning the cell,
+so the first tile of the tileset is 0, as in a CharPad map. Multiple references
+to the same external tileset are treated as the same tileset.
 
 - The tileset is the first one, or the one `--set tileset=NAME` names. A cell
   from another tileset is an error.
@@ -134,7 +151,8 @@ the project's colouring method, VICE colours, or TED colours for a `.ctt`. Tile
 numbers stay CharPad's, so `bin map=` gives the same bytes from either file,
 and `convert level.tmx back.ctm --base level.ctm` gives the map back. Left out
 with a warning: Petmate's colour per cell (a char has one colour in the tileset)
-and Tilemedo's trigger map. Not opened in Tiled itself.
+and Tilemedo's trigger map. Three example outputs were rendered with Tiled's
+rasterizer as described above; they were not inspected in the editor GUI.
 
 A tileset image drawn elsewhere becomes CharPad tiles with `fromimage
 tileset.png -o tileset.ctm --tiles 2x2` (#76; see cli.md): tile numbers follow

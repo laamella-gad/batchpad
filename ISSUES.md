@@ -7,11 +7,10 @@ Move an issue between sections to change its status. Never reuse a number; next 
 ## Open
 
 - #87 [task, normal] Check Tiled support against real Tiled files
-  - All files in `tests/files/tiled/` are hand-made from the format docs; none was saved by Tiled. Risky spots: tile objects (`gid`), object templates (`.tx`), `class` vs `type` across versions, external `.tsj` tilesets in JSON maps, zlib/gzip data from Tiled (only Python-made data tested), infinite maps with negative chunk positions.
+  - Risky spots still needing Tiled-saved examples: tile objects (`gid`), object templates (`.tx`), `class` vs `type` across versions, external `.tsj` tilesets in JSON maps and infinite maps with negative chunk positions.
   - Without Tiled: done 2026-11-02. The 87 example and test maps of the mapeditor/tiled repo went through `info`, `asm` and `convert` (results in docs/tiled.md). Fixed: object templates (`.tx`, `.tj`) are read, maps with object layers only give `asm`/`c` output. Left: the risky spots that need Tiled itself, below.
-  - With Tiled (by hand): draw a small map (two tile layers, a flipped tile, an external tileset, an object layer with classes and an `hp` property), save as TMX CSV, TMX zlib and JSON; run `info`, `bin`, `asm` on each; open the `convert` output back in Tiled. `apt` has Tiled 1.8.2 only (we write 1.10).
-  - Also open what `convert level.ctm level.tmx` writes (#74): map, tileset and its PNG, for a project with tiles, one without, and an ECM one.
-  - Fix what turns up; write the result in `docs/tiled.md` and the README row.
+  - 2026-11-04: Tiled 1.12.2 CSV map with two layers, flips, an external TSX and an object (`type=enemy`, string `hp=3`), plus Tiled-generated JSON, zlib and gzip variants, passed `info`, `bin`, `asm` and conversion. Tiled reopened and rendered the conversions like the original. Fixed binary map exports from repeated references to the same external tileset. Fixtures and checks: `tests/files/tiled/tiled-1.12.2/`, `tests/ttiled.nim`.
+  - Tiled's rasterizer rendered three CharPad exports (tiles, no tiles and ECM) pixel-for-pixel like batchpad's previews, with matching map bytes. GUI inspection remains; see `docs/tiled.md`.
 - #88 [task, low] Check Sprite Painter 1.2 support against the real program
   - The layout `parseSpr` and `toSprPainter` use (#24) is a guess: 64 bytes per sprite in the `.spr`, an `.inf` of one byte per sprite (bit 7 multicolour, low nibble colour) plus the 3 shared colours. Find Sprite Painter 1.2 (or files it saved), save a few sprites of both kinds, compare, and load what `convert --to spr12` writes. Fix `spd.nim`, `docs/spritepad.md`, `tests/files/spr/painter.*` and the README row.
 - #89 [task, normal] Check Petmate support against files Petmate saved

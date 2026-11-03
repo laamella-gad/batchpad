@@ -1,8 +1,13 @@
 # Tiled test files
 
-Made by hand for batchpad, not by Tiled itself (Tiled was not opened on them).
+The files in this directory were made by hand for batchpad, not by Tiled.
 All hold a 4 x 3 map of 8 x 8 pixel tiles unless said otherwise. `tiles.png`
 and the other images are named but not present: batchpad never reads them.
+The `tiled-1.12.2/` subdirectory instead holds an actual Tiled-saved map and
+tileset, its SVG image, and JSON, zlib and gzip variants written by Tiled 1.12.2.
+`generate-compressed.js` regenerates the compressed variants using Tiled's
+`--evaluate` option from the repository root. The original map references the
+same external tileset twice; Tiled merges the references when it loads the map.
 
 | File | Holds |
 | --- | --- |

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.12.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="3">
+ <tileset firstgid="1" source="aaaaaaaaaaad.tsx"/>
+ <layer id="2" name="ground" width="30" height="20">
+  <data encoding="base64" compression="zlib">
+   eJxjZGBgYKQiZoZiapo5au+ovcw48Ki91MUsUDxS7MUV7qP2jto7au+ovZTaCwBySwLV
+  </data>
+ </layer>
+ <layer id="1" name="details" width="30" height="20">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFwwHwDLQDiAAcEHwAiBtA9EC7ZxSMglFAP8A+0A4YBaOAzgAAKc0CNA==
+  </data>
+ </layer>
+ <objectgroup id="4" name="objects">
+  <object id="1" name="guard" type="enemy" x="72" y="100.667" width="142" height="101.333">
+   <properties>
+    <property name="hp" value="3"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

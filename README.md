@@ -96,8 +96,8 @@ versions.
 | Tilemedo `.tmd` | Tilemedo 1.10 | yes | yes | Checked (Tilemedo's 2 examples, byte for byte, and its BMP map exports). Read and written as a CharPad project; the trigger map is part `triggers` |
 | SEUCK `.A` sprites | SEUCK (1987) | yes | yes | Checked (the 4 sample games of the original SEUCK disks; [details](docs/import-export.md#the-original-disks)). Read and written as a sprite project; also from a `.P00` or the "save all data" `.I` (read only) |
 | SEUCK `.B` background | SEUCK (1987) | yes | yes | Checked (4 files), as `.A`. Read and written as a CharPad project; also from a `.P00` or `.I` (read only); also the sideways kind of CharPad 1.7 |
-| Tiled `.tmx` | Tiled | yes | yes | Checked (the 87 example and test maps of the Tiled repository; not opened in Tiled itself). A map, not a CharPad project: goes to `bin`, `asm` and `c`, converts to and from JSON, into a CharPad project's map with `convert --base`, and from a CharPad project with a tileset PNG; CSV and base64 data (zlib and gzip too); external `.tsx` tilesets; object layers as data tables; object templates |
-| Tiled JSON (`.tmj`, `.json`) | Tiled | yes | yes | Checked (the one JSON map of the Tiled repository, and all its maps through `convert`). As `.tmx` |
+| Tiled `.tmx` | Tiled | yes | yes | Checked against the Tiled repository examples and one map saved in Tiled 1.12.2, including Tiled-generated zlib and gzip; some cases remain unverified (#87). A map, not a CharPad project: goes to `bin`, `asm` and `c`, converts to and from JSON, into a CharPad project's map with `convert --base`, and from a CharPad project with a tileset PNG; CSV and base64 data; external `.tsx` tilesets; object layers as data tables; object templates |
+| Tiled JSON (`.tmj`, `.json`) | Tiled | yes | yes | Checked against the Tiled repository example and a Tiled 1.12.2 export; conversions reopened in Tiled. As `.tmx` |
 | **Exports and imports** | | | | |
 | Raw binary (`bin`) | | | yes | Parts such as chars, tiles, map, colours, sprites |
 | Raw binary (`import`) | | yes | | Binary parts into a CharPad or SpritePad project |

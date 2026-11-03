@@ -52,6 +52,40 @@ suite "Tiled maps":
     check readTiled(files / "zlib.tmx").gids == m.gids
     check readTiled(files / "gzip.tmx").gids == m.gids
 
+  test "Tiled 1.12.2 map with a repeated external tileset":
+    let dir = files / "tiled-1.12.2"
+    var m = readTiled(dir / "aaaaaa.tmx")
+    var exported = readTiled(dir / "tiled-export.tmj")
+    check m.tilesets.len == 2 and exported.tilesets.len == 1
+    check m.binPart("map:ground") == exported.binPart("map:ground")
+    check m.binPart("map:details") == exported.binPart("map:details")
+    check m.binPart("map-flags:details") == exported.binPart("map-flags:details")
+    check m.binPart("map:ground")[0] == 0
+    check m.binPart("map:details")[155 .. 158] == @[byte 7, 7, 7, 7]
+    check m.binPart("map-flags:details")[155 .. 158] == @[byte 0, 0xc0, 0x80, 0xc0]
+    m.objectFields = @["hp"]
+    exported.objectFields = @["hp"]
+    check m.objectClasses == @["enemy"]
+    check m.binPart("objects") == @[byte 0, 4, 0, 6, 0, 8, 6, 3]
+    check m.binPart("objects") == exported.binPart("objects")
+    let base = readCtm(currentSourcePath().parentDir / "files" / "ctm9" / "mctext_pertile.ctm")
+    var leftOut: seq[string]
+    check m.withMap(base, leftOut).map == exported.withMap(base, leftOut).map
+    for f in ["tiled-zlib.tmx", "tiled-gzip.tmx"]:
+      var compressed = readTiled(dir / f)
+      compressed.objectFields = @["hp"]
+      for part in ["map:ground", "map:details", "map-flags:details", "objects"]:
+        check compressed.binPart(part) == exported.binPart(part)
+
+  test "repeated tilesets do not hide a different tileset":
+    var m = readTiled(files / "tiled-1.12.2" / "aaaaaa.tmx")
+    m.tilesets[1].source = "./" & m.tilesets[1].source
+    m.tilesets.add Tileset(firstGid: 3, name: "other")
+    m.layers[0].gids = @[1'u32, 2, 5, 6]
+    check m.binPart("map") == @[byte 0, 1, 0, 1]
+    m.layers[0].gids[1] = 3
+    expect BinError: discard m.binPart("map")
+
   test "zstd data is refused with a hint":
     try:
       discard readTiled(files / "compressed.tmx")
