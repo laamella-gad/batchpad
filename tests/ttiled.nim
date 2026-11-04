@@ -230,12 +230,85 @@ suite "Tiled parts":
                                            2, 0, 0, 0, 0, 1, 1, 0]
       let a = m.toAsm(AsmOptions())
       check "objects_data" in a and "map_wid = 4" in a
-      # convert keeps the template reference and the tile
-      let back = parseTmx(m.toTmx)
-      check back.layers[0].objects[0].templ == o[0].templ and back.layers[0].objects[0].gid == 2
-      check parseTiledJson(m.toTiledJson).layers[0].objects[1].templ == o[1].templ
+      # convert keeps the template reference and explicit overrides
+      for xml in [true, false]:
+        var back = if xml: parseTmx(m.toTmx) else: parseTiledJson(m.toTiledJson)
+        check back.layers[0].objects[0].templ == o[0].templ and back.layers[0].objects[0].gid == 0
+        back.resolveTemplates(files)
+        check back.layers[0].objects[0].gid == 2
+        check back.layers[0].objects[1].class == "alien" and back.layers[0].objects[1].width == 8
+        check back.layers[0].objects[1].properties.property("hp") == "9"
     var m = parseTmx(readFile(files / "templates.tmx").replace("enemy.tx", "nope.tx"))
     expect TiledError: m.resolveTemplates(files)
+
+  test "Tiled-saved tile templates retain inheritance through conversion":
+    let dir = files / "tiled-1.12.2" / "template-map"
+    var m = readTiled(dir / "aaaaaa.tmx")
+    let original = m.objectLayer.objects
+    let reference = readTiled(dir / "tiled-reference.tmj").objectLayer.objects
+    check original.len == 3 and reference.len == 3
+    for i in 1 .. 2:
+      check original[i].name == reference[i].name
+      check original[i].class == reference[i].class
+      check original[i].gid == reference[i].gid and original[i].gid == 12
+      check original[i].width == reference[i].width and original[i].height == reference[i].height
+      check original[i].properties == reference[i].properties
+    m.objectFields = @["hp"]
+    check m.binPart("objects") == @[byte 0, 4, 0, 6, 0, 8, 6, 3,
+                                         0, 2, 0, 3, 0, 1, 1, 3,
+                                         0, 10, 0, 2, 0, 1, 1, 5]
+    for xml in [true, false]:
+      let serialized = (if xml: m.toTmx else: m.toTiledJson).replace("enemy.tx", "enemy-updated.tx")
+      var converted = if xml: parseTmx(serialized) else: parseTiledJson(serialized)
+      converted.resolveTemplates(dir)
+      let objects = converted.objectLayer.objects
+      check objects[1].properties.property("hp") == "9"
+      check objects[2].properties.property("hp") == "5"
+      check objects[1].gid == 11 and objects[1].class == "boss" and objects[1].name == "changed"
+      check objects[1].width == 32 and objects[1].height == 24
+
+    let text = readFile(dir / "aaaaaa.tmx").replace("id=\"3\" template=",
+        "id=\"3\" name=\"custom\" class=\"guard\" gid=\"6\" width=\"8\" height=\"4\" template=")
+        .replace("value=\"5\"", "value=\"3\"")
+    var overridden = parseTmx(text)
+    overridden.resolveTemplates(dir)
+    for xml in [true, false]:
+      let serialized = (if xml: overridden.toTmx else: overridden.toTiledJson).replace("enemy.tx", "enemy-updated.tx")
+      var converted = if xml: parseTmx(serialized) else: parseTiledJson(serialized)
+      converted.resolveTemplates(dir)
+      let obj = converted.objectLayer.objects[1]
+      check obj.name == "custom" and obj.class == "guard" and obj.gid == 6
+      check obj.width == 8 and obj.height == 4 and obj.properties.property("hp") == "9"
+      check converted.objectLayer.objects[2].properties.property("hp") == "3"
+
+  test "template tile GIDs use the matching map tileset":
+    let dir = files / "tiled-1.12.2" / "template-second-tileset"
+    for path in ["second-tileset.tmx", "second-tileset.json"]:
+      var m = readTiled(dir / path)
+      let objects = m.objectLayer.objects
+      check objects[0].gid == 0x8000001c'u32
+      check objects[1].gid == 0x80000006'u32
+      check objects[0].properties.property("hp") == "3"
+      check objects[1].properties.property("hp") == "9"
+      for xml in [true, false]:
+        var converted = if xml: parseTmx(m.toTmx) else: parseTiledJson(m.toTiledJson)
+        converted.resolveTilesets(dir)
+        converted.resolveTemplates(dir)
+        check converted.objectLayer.objects[0].gid == 0x8000001c'u32
+        check converted.objectLayer.objects[1].gid == 0x80000006'u32
+        check converted.objectLayer.objects[1].class == "override"
+        check converted.objectLayer.objects[1].width == 8
+        check converted.objectLayer.objects[1].properties.property("hp") == "9"
+
+    var noMatch = parseTmx(readFile(dir / "second-tileset.tmx"))
+    noMatch.tilesets[1].source = "tilesets/other.tsx"
+    expect TiledError: noMatch.resolveTemplates(dir)
+
+  test "Tiled-saved template uses second map tileset":
+    let root = currentSourcePath().parentDir.parentDir
+    let m = readTiled(root / "software" / "Tiled" / "two-tilesets.tmx")
+    check m.objectLayer.objects.len == 1
+    check m.objectLayer.objects[0].gid == 28
 
   test "assembler and C":
     let m = readTiled(files / "csv.tmx")

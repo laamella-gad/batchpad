@@ -14,7 +14,7 @@ type
     name*, kind*, value*: string   ## `kind` is Tiled's type name: string, int, float, bool, ...
 
   ObjectField* = enum
-    ofName, ofClass, ofWidth, ofHeight
+    ofName, ofClass, ofWidth, ofHeight, ofGid
 
   TiledObject* = object
     id*: int
@@ -24,6 +24,7 @@ type
     gid*: uint32                   ## tile objects: the tile, flip bits included; 0 otherwise
     templ*: string                 ## the object template (.tx or .tj) it is made from, if any
     given*: set[ObjectField]       ## what the object sets itself, over its template
+    inheritedProperties: seq[Property]
 
   LayerKind* = enum
     lkTiles, lkObjects
@@ -202,6 +203,7 @@ proc tmxObject(n: XmlNode): TiledObject =
   if gid != "":
     try: result.gid = uint32(parseBiggestUInt(gid))
     except ValueError, OverflowDefect: fail("<object> gid is not a tile number: " & gid)
+    result.given.incl ofGid
   if n.attrs != nil:
     if n.attrs.hasKey("name"): result.given.incl ofName
     if n.attrs.hasKey("class") or n.attrs.hasKey("type"): result.given.incl ofClass
@@ -324,6 +326,7 @@ proc jsonObject(o: JsonNode): TiledObject =
     if gid.kind != JInt or gid.getBiggestInt notin 0 .. 0xffffffff'i64:
       fail("object gid is not a tile number: " & $gid)
     result.gid = uint32(gid.getBiggestInt)
+    result.given.incl ofGid
   if o.hasKey("name"): result.given.incl ofName
   if o.hasKey("class") or o.hasKey("type"): result.given.incl ofClass
   if o.hasKey("width"): result.given.incl ofWidth
@@ -432,7 +435,7 @@ proc resolveTilesets*(m: var TiledMap, dir: string) =
     t.firstGid = firstGid
     t.source = source
 
-proc readTemplate(path, name: string): TiledObject =
+proc readTemplate(path, name: string): tuple[obj: TiledObject, tileset: Tileset] =
   if not fileExists(path): fail("can't find the object template " & name & " (looked for " & path & ")")
   let text = readFile(path)
   if text.strip.startsWith("<"):
@@ -440,43 +443,73 @@ proc readTemplate(path, name: string): TiledObject =
     try: root = parseXml(text)
     except CatchableError as e: fail("object template " & name & " is not valid XML: " & e.msg)
     if root.tag != "template": fail("object template " & name & " is not a template")
+    var hasObject = false
     for c in root.elements:
-      if c.tag == "object": return c.tmxObject
+      case c.tag
+      of "tileset": result.tileset = c.tmxTileset
+      of "object":
+        result.obj = c.tmxObject
+        hasObject = true
+      else: discard
+    if not hasObject: fail("object template " & name & " has no object")
   else:
     var j: JsonNode
     try: j = parseJson(text)
     except CatchableError as e: fail("object template " & name & " is not valid JSON: " & e.msg)
-    if j.kind == JObject and j.getOrDefault("object") != nil: return j["object"].jsonObject
-  fail("object template " & name & " has no object")
+    if j.kind == JObject and j.getOrDefault("object") != nil:
+      result.obj = j["object"].jsonObject
+      if j.getOrDefault("tileset") != nil: result.tileset = j["tileset"].jsonTileset
+    else:
+      fail("object template " & name & " has no object")
+
+proc mapTemplateGid(m: TiledMap, dir, templateName: string,
+                    templateTileset: Tileset, gid: uint32): uint32 =
+  if gid == 0 or templateTileset.source == "": return gid
+  let templateTilesetPath = normalizedPath(absolutePath(
+    (dir / templateName).parentDir / templateTileset.source))
+  let tileId = int64(gid and idMask)
+  let localId = tileId - int64(templateTileset.firstGid)
+  if localId < 0: fail("object template " & templateName & " has a tile outside its tileset")
+  for t in m.tilesets:
+    if t.source != "" and normalizedPath(absolutePath(dir / t.source)) == templateTilesetPath:
+      let mapId = int64(t.firstGid) + localId
+      if mapId < 0 or mapId > int64(idMask):
+        fail("object template " & templateName & " has a tile outside the map's gid range")
+      return (gid and not idMask) or uint32(mapId)
+  fail("object template " & templateName & " uses tileset " & templateTileset.source &
+       " that isn't listed in the map")
 
 proc resolveTemplates*(m: var TiledMap, dir: string) =
   ## Fills in the objects made from a template (`.tx`, or JSON `.tj`) with what
   ## the template has and the object doesn't set itself: name, class, size,
   ## properties and the tile. The object keeps its `templ`.
-  ## A template's own tileset is not read: a tile object from a template keeps
-  ## the template's gid, which is right when the map lists that tileset first.
-  var cache: seq[(string, TiledObject)]
+  ## An external template tileset rebases the tile id to the matching map
+  ## tileset; flip flags are kept.
+  var cache: seq[(string, TiledObject, Tileset)]
   for l in m.layers.mitems:
     if l.kind != lkObjects: continue
     for o in l.objects.mitems:
       if o.templ == "": continue
       var t: TiledObject
+      var templateTileset: Tileset
       var found = false
-      for (k, v) in cache:
+      for (k, v, ts) in cache:
         if k == o.templ:
           t = v
+          templateTileset = ts
           found = true
       if not found:
-        t = readTemplate(dir / o.templ, o.templ)
-        cache.add (o.templ, t)
+        (t, templateTileset) = readTemplate(dir / o.templ, o.templ)
+        cache.add (o.templ, t, templateTileset)
       if ofName notin o.given: o.name = t.name
       if ofClass notin o.given: o.class = t.class
       if ofWidth notin o.given: o.width = t.width
       if ofHeight notin o.given: o.height = t.height
-      if o.gid == 0: o.gid = t.gid
+      if ofGid notin o.given: o.gid = m.mapTemplateGid(dir, o.templ, templateTileset, t.gid)
       for p in t.properties:
         if not o.properties.anyIt(it.name == p.name):
           o.properties.add p
+          o.inheritedProperties.add p
 
 proc readTiled*(path: string): TiledMap =
   ## Reads a .tmx, or else a JSON map, and the external tilesets and object
@@ -519,6 +552,10 @@ func tilesetIndex*(m: TiledMap): int =
   fail("the map has no tileset " & m.tilesetName)
 
 # --- writing ---
+
+func writtenProperties(o: TiledObject): seq[Property] =
+  for p in o.properties:
+    if o.templ == "" or p notin o.inheritedProperties: result.add p
 
 proc propertyJson(p: Property): JsonNode =
   let v = case p.kind
@@ -571,13 +608,17 @@ proc toTiledJson*(m: TiledMap): string =
       o["draworder"] = %"topdown"
       var objs = newJArray()
       for e in l.objects:
-        var oo = %*{"id": e.id, "name": e.name, "class": e.class, "x": e.x, "y": e.y,
-                    "width": e.width, "height": e.height, "visible": true, "rotation": 0}
-        if e.gid != 0: oo["gid"] = %e.gid
+        var oo = %*{"id": e.id, "x": e.x, "y": e.y, "visible": true, "rotation": 0}
+        if e.templ == "" or ofName in e.given: oo["name"] = %e.name
+        if e.templ == "" or ofClass in e.given: oo["class"] = %e.class
+        if e.templ == "" or ofWidth in e.given: oo["width"] = %e.width
+        if e.templ == "" or ofHeight in e.given: oo["height"] = %e.height
+        if e.gid != 0 and (e.templ == "" or ofGid in e.given): oo["gid"] = %e.gid
         if e.templ != "": oo["template"] = %e.templ
-        if e.properties.len > 0:
+        let props = e.writtenProperties
+        if props.len > 0:
           oo["properties"] = newJArray()
-          for p in e.properties: oo["properties"].add p.propertyJson
+          for p in props: oo["properties"].add p.propertyJson
         objs.add oo
       o["objects"] = objs
     if l.properties.len > 0:
@@ -656,11 +697,15 @@ proc toTmx*(m: TiledMap): string =
       if l.properties.len > 0: e.add l.properties.propertiesXml
       for o in l.objects:
         let oe = newElement("object")
-        oe.attrs = {"id": $o.id, "name": o.name, "class": o.class, "x": $o.x, "y": $o.y,
-                    "width": $o.width, "height": $o.height}.toXmlAttributes
-        if o.gid != 0: oe.attrs["gid"] = $o.gid
+        oe.attrs = {"id": $o.id, "x": $o.x, "y": $o.y}.toXmlAttributes
+        if o.templ == "" or ofName in o.given: oe.attrs["name"] = o.name
+        if o.templ == "" or ofClass in o.given: oe.attrs["class"] = o.class
+        if o.templ == "" or ofWidth in o.given: oe.attrs["width"] = $o.width
+        if o.templ == "" or ofHeight in o.given: oe.attrs["height"] = $o.height
+        if o.gid != 0 and (o.templ == "" or ofGid in o.given): oe.attrs["gid"] = $o.gid
         if o.templ != "": oe.attrs["template"] = o.templ
-        if o.properties.len > 0: oe.add o.properties.propertiesXml
+        let props = o.writtenProperties
+        if props.len > 0: oe.add props.propertiesXml
         e.add oe
       root.add e
   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" & $root & "\n"

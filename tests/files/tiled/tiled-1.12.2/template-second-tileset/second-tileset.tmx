@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.12.2" orientation="orthogonal" renderorder="right-down" width="1" height="1" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="3">
+ <tileset firstgid="1" source="tilesets/first.tsx"/>
+ <tileset firstgid="17" source="tilesets/second.tsx"/>
+ <objectgroup id="1" name="objects">
+  <object id="1" template="templates/enemy.tx" x="0" y="16"/>
+  <object id="2" class="override" gid="2147483654" width="8" height="4" template="templates/enemy.tx" x="16" y="16">
+   <properties><property name="hp" type="int" value="9"/></properties>
+  </object>
+ </objectgroup>
+</map>

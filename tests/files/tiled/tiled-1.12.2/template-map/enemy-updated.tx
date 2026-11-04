@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+ <tileset firstgid="1" source="aaaaaaaaaaad.tsx"/>
+ <object name="changed" type="boss" gid="11" width="32" height="24">
+  <properties>
+   <property name="hp" type="int" value="9"/>
+  </properties>
+ </object>
+</template>

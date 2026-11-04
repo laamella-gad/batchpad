@@ -8,6 +8,16 @@ tileset, its SVG image, and JSON, zlib and gzip variants written by Tiled 1.12.2
 `generate-compressed.js` regenerates the compressed variants using Tiled's
 `--evaluate` option from the repository root. The original map references the
 same external tileset twice; Tiled merges the references when it loads the map.
+`tiled-1.12.2/template-map/` contains the same map later saved in Tiled with
+two instances of the authored tile-object template `enemy.tx`. One inherits
+`hp=3`, the other overrides it to `5`. `tiled-reference.tmj` is Tiled's detached,
+resolved export; `enemy-updated.tx` is a modified template for inheritance tests,
+not a file saved by Tiled.
+`template-second-tileset/` has TMX and JSON maps and templates for checking
+template-local GID translation when the template's external tileset is second
+in the map, including relative paths, flip flags, explicit GID overrides and an
+unmatched-tileset error. The actual Tiled-saved map in `software/Tiled/` is also
+checked directly by `tests/ttiled.nim`.
 
 | File | Holds |
 | --- | --- |

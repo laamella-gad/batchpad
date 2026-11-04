@@ -23,11 +23,30 @@ the same external tileset when it reopened the original; batchpad now exports
 the same local tile numbers. Fixtures and regression tests are in
 `tests/files/tiled/tiled-1.12.2/` and `tests/ttiled.nim`.
 
+The same map was later saved in Tiled with two instances of a tile-object
+template: one inherits integer `hp=3`, the other overrides it to `5`. The
+template was authored for the test; Tiled saved the map. Batchpad's `bin` and
+`asm` exported both values, and Tiled reopened its TMX and JSON conversions.
+Changing a copy of the template's name, class, tile, size and `hp` exposed a
+conversion bug: inherited values had become overrides. This is fixed; Tiled
+now resolves both converted maps like the original, including the `hp=5`
+override. The fixture and a Tiled-detached reference export are in
+`tests/files/tiled/tiled-1.12.2/template-map/`.
+
+A Tiled-saved map in `software/Tiled/two-tilesets.tmx` puts the template's
+external TSX second, at `firstgid=17`. Tiled 1.12.2's detached JSON export
+resolves the inherited object to `gid=28`; batchpad now does the same by
+matching the template's TSX path (relative to the template) with the map's
+TSX path (relative to the map). Inherited flip bits and explicit object GIDs
+are preserved. TMX and JSON template cases, conversions, and a missing-match
+error are covered by `tests/files/tiled/tiled-1.12.2/template-second-tileset/`
+and `tests/ttiled.nim`.
+
 Tiled 1.12.2's rasterizer also rendered three CharPad-to-Tiled exports (with
 tiles, without tiles, and ECM) pixel-for-pixel like batchpad's previews; their
-map bytes match too. This is not a GUI inspection. Tile objects, templates,
-external JSON tilesets and negative-position infinite chunks still need checks
-against files saved by Tiled (#87).
+map bytes match too. This is not a GUI inspection. External JSON tilesets,
+`class` versus `type` across versions, and negative-position infinite chunks
+still need checks against files saved by Tiled (#87).
 
 ## What a Tiled map holds
 
@@ -56,8 +75,13 @@ Tiled map with a tileset image from one (see Conversion).
   `objects` part (#73).
 - Object templates (`template="x.tx"`, or a JSON `.tj`) are read from the map's
   folder: what the object doesn't set itself (name, class, width, height, tile,
-  properties) comes from the template. `convert` keeps the template reference.
-  A template's tileset is not read: its tile number is taken as the map's.
+  properties) comes from the template. `convert` keeps the template reference
+  and explicit overrides without turning inherited values into overrides.
+  For a template with an external tileset, its local tile ID is rebased to the
+  matching map tileset's `firstgid`; flip flags are kept. Paths are matched
+  after resolving them relative to the template and map. If the template's
+  tileset is not listed in the map, resolution fails. Templates without a
+  tileset reference keep their tile ID as written.
 - Group layers are flattened; a layer in a group is called `group/layer`.
 - Image layers are skipped. External tilesets (`source="x.tsx"`, or a JSON
   `.tsj`) are read from the map's folder (#78); a missing file is an error. The

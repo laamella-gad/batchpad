@@ -1,0 +1,17 @@
+{
+  "type": "map", "version": "1.10", "tiledversion": "1.12.2",
+  "orientation": "orthogonal", "renderorder": "right-down",
+  "width": 1, "height": 1, "tilewidth": 16, "tileheight": 16, "infinite": false,
+  "tilesets": [
+    { "firstgid": 1, "source": "tilesets/first.tsx" },
+    { "firstgid": 17, "source": "tilesets/second.tsx" }
+  ],
+  "layers": [
+    { "id": 1, "name": "objects", "type": "objectgroup", "objects": [
+      { "id": 1, "template": "templates/enemy.tj", "x": 0, "y": 16 },
+      { "id": 2, "class": "override", "gid": 2147483654, "width": 8, "height": 4,
+        "template": "templates/enemy.tj", "x": 16, "y": 16,
+        "properties": [ { "name": "hp", "type": "int", "value": 9 } ] }
+    ] }
+  ]
+}

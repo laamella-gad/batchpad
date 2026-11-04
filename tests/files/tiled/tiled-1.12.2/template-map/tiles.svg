@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Sixteen 16 x 16 pixel tiles, in four rows. -->
+  <g>
+    <rect width="16" height="16" fill="#588d43"/>
+    <path d="M2 3h2v2H2zm8 1h2v2h-2zM5 10h2v2H5zm8 3h2v2h-2z" fill="#315d32"/>
+    <path d="M7 2h2v2H7zM1 12h2v2H1zm9-3h2v2h-2z" fill="#8ac05f"/>
+  </g>
+  <g transform="translate(16)">
+    <rect width="16" height="16" fill="#956037"/>
+    <path d="M2 2h3v2H2zm8 3h2v2h-2zM5 10h3v2H5zm8 3h2v2h-2z" fill="#653b29"/>
+    <path d="M8 1h2v1H8zM1 8h2v1H1zm10 3h2v1h-2z" fill="#c18b51"/>
+  </g>
+  <g transform="translate(32)">
+    <rect width="16" height="16" fill="#9a8878"/>
+    <path d="M0 5h16v1H0zm0 5h16v1H0zM5 0h1v5H5zm5 6h1v4h-1zm-6 5h1v5H4zm9 0h1v5h-1z" fill="#554e50"/>
+    <path d="M1 1h3v1H1zm7 6h2v1H8zm-6 5h2v1H2z" fill="#c8b7a3"/>
+  </g>
+  <g transform="translate(48)">
+    <rect width="16" height="16" fill="#316ba5"/>
+    <path d="M1 3h5v1H1zm8 2h5v1H9zM3 9h6v1H3zm8 4h4v1h-4z" fill="#88c8d8"/>
+    <path d="M0 6h4v1H0zm6 7h3v1H6z" fill="#244977"/>
+  </g>
+  <g transform="translate(0 16)">
+    <rect width="16" height="16" fill="#735542"/>
+    <path d="M0 1h16v5H0zM0 7h16v5H0zM0 13h16v3H0z" fill="#b57750"/>
+    <path d="M5 1h1v5H5zm6 6h1v5h-1zM4 13h1v3H4z" fill="#735542"/>
+    <path d="M1 2h3v1H1zm7 6h2v1H8z" fill="#d99a68"/>
+  </g>
+  <g transform="translate(16 16)">
+    <rect width="16" height="16" fill="#c9b994"/>
+    <path d="M0 7h16v1H0zM7 0h1v16H7z" fill="#897b68"/>
+    <path d="M1 1h5v1H1zm8 0h5v1H9zm-8 8h5v1H1zm8 0h5v1H9z" fill="#e6d7b1"/>
+  </g>
+  <g transform="translate(32 16)">
+    <rect width="16" height="16" fill="#588d43"/>
+    <path d="M6 10h4v5H6z" fill="#653b29"/>
+    <path d="M4 2h8v2h2v6h-2v2H4v-2H2V4h2z" fill="#285d38"/>
+    <path d="M5 3h4v2H5zM3 6h3v2H3z" fill="#75a954"/>
+  </g>
+  <g transform="translate(48 16)">
+    <rect width="16" height="16" fill="#588d43"/>
+    <path d="M7 8h2v6H7zM5 11h2v2H5zm4-1h2v2H9z" fill="#315d32"/>
+    <path d="M6 2h4v2h2v4h-2v2H6V8H4V4h2z" fill="#e4798a"/>
+    <path d="M7 5h2v2H7z" fill="#f5d875"/>
+  </g>
+  <g transform="translate(0 32)">
+    <rect width="16" height="16" fill="#434452"/>
+    <path d="M0 13h16v3H0zM1 12 4 3l3 9zm5 0 3-9 3 9zm5 0 3-9 2 9z" fill="#d9d3c4"/>
+    <path d="M4 5 2 12h2zm5 0-2 7h2zm5 0-2 7h2z" fill="#ffffff"/>
+  </g>
+  <g transform="translate(16 32)">
+    <rect width="16" height="16" fill="#588d43"/>
+    <path d="M7 8h2v7H7z" fill="#653b29"/>
+    <path d="M2 2h12v8H2z" fill="#bd8953"/>
+    <path d="M4 4h8v1H4zm0 3h6v1H4z" fill="#653b29"/>
+  </g>
+  <g transform="translate(32 32)">
+    <rect width="16" height="16" fill="#434452"/>
+    <path d="M5 2h6v2h2v8h-2v2H5v-2H3V4h2z" fill="#edb93f"/>
+    <path d="M6 4h2v8H6zM9 5h1v6H9z" fill="#fff19b"/>
+    <path d="M11 5h1v6h-1z" fill="#a86b24"/>
+  </g>
+  <g transform="translate(48 32)">
+    <rect width="16" height="16" fill="#c9b994"/>
+    <path d="M2 5h12v9H2z" fill="#7e4930"/>
+    <path d="M3 3h10v3H3zM4 8h8v4H4z" fill="#bc7d40"/>
+    <path d="M7 5h2v5H7z" fill="#f5d875"/>
+  </g>
+  <g transform="translate(0 48)">
+    <rect width="16" height="16" fill="#345170"/>
+    <path d="M2 6h7V3l5 5-5 5v-3H2z" fill="#f5d875"/>
+    <path d="M2 6h7v1H2z" fill="#fff4bc"/>
+  </g>
+  <g transform="translate(16 48)">
+    <rect width="16" height="16" fill="#9a8878"/>
+    <path d="M3 2h10v14H3z" fill="#653b29"/>
+    <path d="M4 3h8v13H4z" fill="#9f6339"/>
+    <path d="M7 3h1v13H7zM10 9h1v2h-1z" fill="#f5d875"/>
+  </g>
+  <g transform="translate(32 48)">
+    <rect width="16" height="16" fill="#588d43"/>
+    <path d="M4 4h8v2h2v7h-2v1H3v-2H2V7h2z" fill="#777883"/>
+    <path d="M5 5h5v2H5zM4 7h2v2H4z" fill="#b7b7b0"/>
+    <path d="M10 10h2v2h-2z" fill="#555761"/>
+  </g>
+  <g transform="translate(48 48)">
+    <rect width="16" height="16" fill="#345170"/>
+    <path d="M5 2h6v2h1v5h-1v1h2v4H3v-4h2V9H4V4h1z" fill="#f3c79a"/>
+    <path d="M4 3h8v2H4zm-1 8h10v4H3z" fill="#d86150"/>
+    <path d="M6 6h1v1H6zm3 0h1v1H9z" fill="#342e35"/>
+  </g>
+</svg>

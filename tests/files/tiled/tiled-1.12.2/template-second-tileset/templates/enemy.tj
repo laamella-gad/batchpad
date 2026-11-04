@@ -1,0 +1,8 @@
+{
+  "type": "template",
+  "tileset": { "firstgid": 1, "source": "../tilesets/second.tsx" },
+  "object": {
+    "name": "enemy", "class": "enemy", "gid": 2147483660, "width": 16, "height": 16,
+    "properties": [ { "name": "hp", "type": "int", "value": 3 } ]
+  }
+}
