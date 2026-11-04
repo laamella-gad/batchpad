@@ -101,6 +101,57 @@ suite "Tiled maps":
     check l.gids[2 * 6 + 4 .. 2 * 6 + 5] == @[11'u32, 12]
     check l.gids[3 * 6 + 4 .. 3 * 6 + 5] == @[15'u32, 16]
 
+  test "Tiled-saved negative chunks survive TMX and JSON conversion":
+    let dir = files / "tiled-1.12.2" / "infinite-negative"
+    let original = readTiled(dir / "infinite-negative.tmx")
+    let layer = original.layers[0]
+    check original.infinite
+    check original.width == 8 and original.height == 6
+    check layer.originX == -16 and layer.originY == -16
+    check layer.width == 32 and layer.height == 32
+    check layer.gids[14 * 32 + 14] == 2
+    check layer.gids[17 * 32 + 17] == 2
+
+    for xml in [true, false]:
+      let converted = if xml: parseTmx(original.toTmx) else: parseTiledJson(original.toTiledJson)
+      check converted.infinite
+      check converted.width == original.width and converted.height == original.height
+      check converted.layers[0].originX == layer.originX
+      check converted.layers[0].originY == layer.originY
+      check converted.layers[0].width == layer.width and converted.layers[0].height == layer.height
+      check converted.layers[0].gids == layer.gids
+
+  test "infinite conversions keep independent layer origins and objects":
+    let original = parseTmx("""
+      <map orientation="orthogonal" width="4" height="3" tilewidth="16" tileheight="16" infinite="1">
+       <layer name="negative" width="4" height="3"><data encoding="csv">
+        <chunk x="-2" y="-1" width="2" height="1">1,0</chunk>
+       </data></layer>
+       <layer name="positive" width="4" height="3"><data encoding="csv">
+        <chunk x="3" y="4" width="2" height="1">0,7</chunk>
+       </data></layer>
+       <layer name="empty" width="4" height="3"><data encoding="csv">
+        <chunk x="8" y="-6" width="2" height="1">0,0</chunk>
+       </data></layer>
+       <layer name="no chunks" width="4" height="3"><data encoding="csv"/></layer>
+       <objectgroup name="objects"><object id="1" x="-32" y="48" width="16" height="16"/></objectgroup>
+      </map>
+    """)
+    for xml in [true, false]:
+      let converted = if xml: parseTmx(original.toTmx) else: parseTiledJson(original.toTiledJson)
+      check converted.infinite
+      check converted.layers[0].originX == -2 and converted.layers[0].originY == -1
+      check converted.layers[0].gids == @[1'u32, 0]
+      check converted.layers[1].originX == 3 and converted.layers[1].originY == 4
+      check converted.layers[1].gids == @[0'u32, 7]
+      check converted.layers[2].originX == 8 and converted.layers[2].originY == -6
+      check converted.layers[2].gids == @[0'u32, 0]
+      check converted.layers[3].originX == 0 and converted.layers[3].originY == 0
+      check converted.layers[3].width == 0 and converted.layers[3].height == 0
+      check converted.layers[3].gids.len == 0
+      check converted.objectLayer.objects[0].x == -32
+      check converted.objectLayer.objects[0].y == 48
+
   test "bad input":
     expect TiledError: discard parseTmx("<nothing/>")
     expect TiledError: discard parseTmx("not xml <")
@@ -303,12 +354,6 @@ suite "Tiled parts":
     var noMatch = parseTmx(readFile(dir / "second-tileset.tmx"))
     noMatch.tilesets[1].source = "tilesets/other.tsx"
     expect TiledError: noMatch.resolveTemplates(dir)
-
-  test "Tiled-saved template uses second map tileset":
-    let root = currentSourcePath().parentDir.parentDir
-    let m = readTiled(root / "software" / "Tiled" / "two-tilesets.tmx")
-    check m.objectLayer.objects.len == 1
-    check m.objectLayer.objects[0].gid == 28
 
   test "assembler and C":
     let m = readTiled(files / "csv.tmx")

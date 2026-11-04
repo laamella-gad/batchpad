@@ -42,11 +42,20 @@ are preserved. TMX and JSON template cases, conversions, and a missing-match
 error are covered by `tests/files/tiled/tiled-1.12.2/template-second-tileset/`
 and `tests/ttiled.nim`.
 
+A Tiled 1.12.2 infinite map saved as `software/Tiled/infinite-negative.tmx`
+has tiles at `(-2,-2)` and `(1,1)`. BatchPad keeps the map infinite and writes
+each flattened tile layer as a chunk at its original origin in both TMX and
+JSON, rather than moving its cells to `(0,0)`. Tiled accepted both conversions;
+its rasterizer produced byte-identical images for the original and both
+converted maps. The portable map and TSX fixture is in
+`tests/files/tiled/tiled-1.12.2/infinite-negative/`; regression tests also cover
+separate layer origins, empty chunks and layers, and unchanged object coordinates.
+
 Tiled 1.12.2's rasterizer also rendered three CharPad-to-Tiled exports (with
 tiles, without tiles, and ECM) pixel-for-pixel like batchpad's previews; their
-map bytes match too. This is not a GUI inspection. External JSON tilesets,
-`class` versus `type` across versions, and negative-position infinite chunks
-still need checks against files saved by Tiled (#87).
+map bytes match too. This is not a GUI inspection. External JSON tilesets and
+`class` versus `type` across versions still need checks against files saved by
+Tiled (#87).
 
 ## What a Tiled map holds
 
@@ -68,8 +77,9 @@ Tiled map with a tileset image from one (see Conversion).
   checked against Python's zlib; the checksums are not verified). zstd layers are
   an error that says to switch the compression or the format to CSV in Tiled
   (Map Properties).
-- Infinite maps (`<chunk>`s) are flattened to the bounding box of their chunks;
-  cells in no chunk are empty.
+- Infinite maps (`<chunk>`s) are flattened to each layer's bounding box; cells
+  in no chunk are empty. Conversion back to TMX or JSON keeps the map infinite
+  and writes each layer's data as a chunk at its original origin.
 - Object layers (name, class, position, size, properties, the tile of a tile
   object): kept in the model and in TMX <-> JSON conversion, and written by the
   `objects` part (#73).
@@ -151,9 +161,10 @@ Assembler labels: `objects_data`, `objects_NAME_data`. Constants (when an
 ## Conversion
 
 `convert in.tmx out.json` and back (`--to tmx` or `tiled-json`; by extension
-`.tmx`, `.tmj`, `.json`). The writers produce CSV data, finite, orthogonal maps,
-version 1.10. Properties, object layers and tilesets that have an image are kept;
-group structure is flattened, image layers dropped.
+`.tmx`, `.tmj`, `.json`). The writers produce orthogonal maps; TMX layers use
+CSV data and JSON layers use arrays. Infinite maps retain their chunks and
+per-layer origins. Properties, object layers and tilesets that have an image
+are kept; group structure is flattened, image layers dropped.
 
 `convert level.tmx level.ctm --base art.ctm` (#75) makes a CharPad project: the
 chars, tiles and colours of `art.ctm` (any CharPad project batchpad reads, also

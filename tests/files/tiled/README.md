@@ -16,8 +16,13 @@ not a file saved by Tiled.
 `template-second-tileset/` has TMX and JSON maps and templates for checking
 template-local GID translation when the template's external tileset is second
 in the map, including relative paths, flip flags, explicit GID overrides and an
-unmatched-tileset error. The actual Tiled-saved map in `software/Tiled/` is also
-checked directly by `tests/ttiled.nim`.
+unmatched-tileset error. The user-saved map remains under `software/Tiled/`;
+these fixtures keep the test suite independent of ignored local files.
+`tiled-1.12.2/infinite-negative/` contains a map saved in Tiled 1.12.2 with
+tiles at negative and positive coordinates and its external TSX. Its SVG image
+is the sibling `tiled-1.12.2/tiles.svg`. Tests verify that TMX and JSON
+conversion preserve negative chunk origins, independent layer origins, empty
+chunks and chunkless layers, and object coordinates.
 
 | File | Holds |
 | --- | --- |

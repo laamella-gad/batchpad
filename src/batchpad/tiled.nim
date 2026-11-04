@@ -569,8 +569,16 @@ proc propertyJson(p: Property): JsonNode =
 
 const writerVersion = "1.10"
 
+func csvLayerData(l: Layer): string =
+  var rows: seq[string]
+  for y in 0 ..< l.height:
+    var row: seq[string]
+    for x in 0 ..< l.width: row.add $l.gids[y * l.width + x]
+    rows.add row.join(",")
+  rows.join(",\n")
+
 proc toTiledJson*(m: TiledMap): string =
-  ## Formats `m` as a Tiled JSON map: CSV data, finite, orthogonal.
+  ## Formats `m` as a Tiled JSON map with orthogonal layers.
   var tilesets = newJArray()
   for t in m.tilesets:
     if t.source != "":
@@ -599,10 +607,19 @@ proc toTiledJson*(m: TiledMap): string =
     case l.kind
     of lkTiles:
       o["type"] = %"tilelayer"
-      o["width"] = %l.width
-      o["height"] = %l.height
-      o["data"] = newJArray()
-      for g in l.gids: o["data"].add %g
+      let (width, height) = if m.infinite: (m.width, m.height) else: (l.width, l.height)
+      o["width"] = %width
+      o["height"] = %height
+      if m.infinite:
+        o["chunks"] = newJArray()
+        if l.width > 0 and l.height > 0:
+          var data = newJArray()
+          for g in l.gids: data.add %g
+          o["chunks"].add %*{"x": l.originX, "y": l.originY, "width": l.width,
+                             "height": l.height, "data": data}
+      else:
+        o["data"] = newJArray()
+        for g in l.gids: o["data"].add %g
     of lkObjects:
       o["type"] = %"objectgroup"
       o["draworder"] = %"topdown"
@@ -626,7 +643,7 @@ proc toTiledJson*(m: TiledMap): string =
       for p in l.properties: o["properties"].add p.propertyJson
     layers.add o
   var j = %*{"type": "map", "version": writerVersion, "orientation": "orthogonal",
-             "renderorder": "right-down", "infinite": false, "width": m.width,
+             "renderorder": "right-down", "infinite": m.infinite, "width": m.width,
              "height": m.height, "tilewidth": m.tileWidth, "tileheight": m.tileHeight,
              "nextlayerid": id + 1, "nextobjectid": 1, "tilesets": tilesets, "layers": layers}
   if m.properties.len > 0:
@@ -642,13 +659,14 @@ proc propertiesXml(props: seq[Property]): XmlNode =
     result.add e
 
 proc toTmx*(m: TiledMap): string =
-  ## Formats `m` as a TMX map: CSV data, finite, orthogonal.
+  ## Formats `m` as a TMX map with CSV data and orthogonal layers.
   let root = newElement("map")
   var id = 0
   for l in m.layers: inc id
   root.attrs = {"version": writerVersion, "orientation": "orthogonal", "renderorder": "right-down",
                 "width": $m.width, "height": $m.height, "tilewidth": $m.tileWidth,
-                "tileheight": $m.tileHeight, "infinite": "0", "nextlayerid": $(id + 1),
+                "tileheight": $m.tileHeight, "infinite": (if m.infinite: "1" else: "0"),
+                "nextlayerid": $(id + 1),
                 "nextobjectid": "1"}.toXmlAttributes
   if m.properties.len > 0: root.add m.properties.propertiesXml
   for t in m.tilesets:
@@ -677,18 +695,23 @@ proc toTmx*(m: TiledMap): string =
     inc id
     case l.kind
     of lkTiles:
+      let (width, height) = if m.infinite: (m.width, m.height) else: (l.width, l.height)
       let e = newElement("layer")
-      e.attrs = {"id": $id, "name": l.name, "width": $l.width,
-                 "height": $l.height}.toXmlAttributes
+      e.attrs = {"id": $id, "name": l.name, "width": $width,
+                 "height": $height}.toXmlAttributes
       if l.properties.len > 0: e.add l.properties.propertiesXml
       let d = newElement("data")
       d.attrs = {"encoding": "csv"}.toXmlAttributes
-      var rows: seq[string]
-      for y in 0 ..< l.height:
-        var row: seq[string]
-        for x in 0 ..< l.width: row.add $l.gids[y * l.width + x]
-        rows.add row.join(",")
-      d.add newText("\n" & rows.join(",\n") & "\n")
+      let data = csvLayerData(l)
+      if m.infinite:
+        if l.width > 0 and l.height > 0:
+          let chunk = newElement("chunk")
+          chunk.attrs = {"x": $l.originX, "y": $l.originY, "width": $l.width,
+                         "height": $l.height}.toXmlAttributes
+          chunk.add newText("\n" & data & "\n")
+          d.add chunk
+      else:
+        d.add newText("\n" & data & "\n")
       e.add d
       root.add e
     of lkObjects:
